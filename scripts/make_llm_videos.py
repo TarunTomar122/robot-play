@@ -89,7 +89,7 @@ def main():
     if a.file:
         for r in _rows(a.file):
             if r["phase"] == a.phase and r["idx"] == a.idx:
-                render(r, a.tag, f"{a.phase}{a.idx}", TITLES[r["task"]])
+                render(r, a.tag, f"{a.phase}{a.idx}", TITLES[r["task"]] + (f" ({r['disturbance']} disturbance)" if r.get("disturbance") else ""))
         return
     if a.pick_borrowed:
         n = 0
