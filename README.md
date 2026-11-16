@@ -6,17 +6,17 @@ Picture a new worker in a workshop. On day one they do not know that one drill s
 
 This project asks whether a language model can do the same thing with a simulated robot arm. The model never touches the arm's motors. It only calls simple tools such as `pick` and `place`. Behind those tools, ordinary robotics code (inverse kinematics and collision-free motion planning) does the careful movement. We hide a small physical "catch" in each job and watch whether the model finds it, writes it down, and uses it next time.
 
-> **Status, 16 Nov 2026 (night 1):** the simulated world, the tools, three jobs and the checks that prove the jobs are fair are done and tested. **No AI model has been run on them yet, so there are no learning results to show.** The plan for the experiments is written down before running them in [PROTOCOL.md](PROTOCOL.md).
+> **Status, 16 Nov 2026 (night 1).** The simulated world, the tools, three jobs, the checks that prove the jobs are fair, the spend cap, the agent loop and the analysis code are built and tested (85 automated tests). A few live runs have shown the setup works end to end. **The main experiments have not been run yet, so there are no learning results to show.** The plan is written down before running them in [PROTOCOL.md](PROTOCOL.md).
 
 ## The three jobs
 
-Each job has one hidden catch. The catch is physical (weight, wall height, shape), so the model cannot get around it by being clever with words. It has to notice what the simulator reports and change how it acts.
+Each job has one physical catch. The catch is not stated anywhere the model can read. The model has to notice what the simulator reports and change how it acts.
 
-| Job | The catch (the model is **not** told) | What a failure looks like | What fixes it |
-|---|---|---|---|
-| **Stack** three cubes into a tower | The green cube is heavy (250 g against 50 g for the others). A normal squeeze cannot hold it. | The fingers close to 1.9 cm and the cube is left on the table. | A firmer grip. |
-| **Sort** four cubes into a red bin and a blue bin | The bin walls are 12 cm tall, higher than the hand can reach over when it lowers the cube. | `arm/hand would touch bin_red_wall2` | Letting go from higher up. |
-| **Stand** two flasks upright on rings | Each flask has a wide base (10 cm) that the fully open hand (8 cm) cannot get around. | `hand stopped 1.4 cm short of the requested grasp point` | Grabbing the narrow neck near the top. |
+| Job | The catch | Can the model see it? | What a failure looks like | What fixes it |
+|---|---|---|---|---|
+| **Stack** three cubes into a tower | The green cube is heavy (250 g against 50 g) and slippery. A normal squeeze cannot hold it. | **No.** Weight and friction are never shown. | The fingers close to 1.9 cm and the cube stays on the table. | A firm grip. |
+| **Sort** four cubes into a red bin and a blue bin | The bin walls are 12 cm tall, higher than the hand can reach over when it lowers the cube. | **Partly.** The wall heights are in the observation. What they mean for the hand is not stated. | `arm/hand would touch bin_red_wall2` | Letting go from 14 cm up or higher. |
+| **Stand** two flasks upright on rings | Each flask has a wide base (10 cm) that the fully open hand (8 cm) cannot get around. | **Partly.** The flask sizes are in the observation. What they mean for the fingers is not stated. | `hand stopped 1.4 cm short of the requested grasp point` | Grabbing the narrow neck near the top (`grasp_height` 0.9). |
 
 Every job also has a **control** version with no catch, so that any improvement we later see can be traced to the catch and not to the model simply warming up.
 
@@ -29,19 +29,21 @@ These clips are me playing each job by hand, using only the tools and the number
 
 ## How an AI drives the arm
 
-The model gets eight tools. None of their descriptions mentions a catch, and every result is a measurement, never an explanation.
+The model gets eight tools, one call per turn, so each call sees the result of the one before it. No tool description mentions a catch, and every result is a measurement, never an explanation.
 
 - **`observe`** shows where every object and zone is.
-- **`pick`** moves above an object, goes down, squeezes, and lifts. You can choose where on the object to grab (`grasp_height`), how hard to squeeze (`grip_level`), how fast to move (`speed`), and some settings that do nothing useful in these jobs (`yaw_offset_deg`, `lift_height`, and `settle_time` on `place`). Those are decoys, so the model has to work out which settings matter.
-- **`place`** carries the held object to a target, lowers it, lets go, and backs off. You can choose how high above the surface to let go (`release_height`).
+- **`pick`** moves above an object, goes down, squeezes, and lifts. You can choose where on the object to grab (`grasp_height`), how hard to squeeze (`grip_level`), how fast to move (`speed`), how far to lift (`lift_height`) and how far to turn the hand (`yaw_offset_deg`).
+- **`place`** carries the held object to a target, lowers it, lets go, and backs off. You can choose how high above the surface to let go (`release_height`), the speed and a pause (`settle_time`).
 - **`move_to`**, **`open_gripper`**, **`close_gripper`**, **`home`** are the basic moves.
 - **`done`** ends the episode. The simulator then decides whether the job was really finished. The model's own claim is recorded separately so we can count how often it says "done" when it is not.
 
-The model has a small budget of tool calls per episode, so wasting calls on discovering a catch costs it.
+The model has 20 tool calls per episode, so wasting calls on discovering a catch costs it. There is also a **pose-level version** with no `pick` and `place`, where the model builds them from moves and the gripper. Comparing the two tells us whether good building blocks make learning from experience easier.
 
 ## How we know the jobs are fair
 
-A badly made job would give meaningless results, so before any AI is allowed near them they have to pass four checks, run on 100 random layouts each (`python scripts/gate.py`).
+A badly made job would give meaningless results. So before any AI is allowed near them, the jobs pass these checks. All of them are played through the same wrapper the AI uses, with the same 20-call budget.
+
+**1. A script that knows the answer always wins, and one that does not always loses** (100 random layouts per row, `python scripts/gate.py`).
 
 | Job | Scene | A script using default settings | A script that knows the catch |
 |---|---|---|---|
@@ -52,62 +54,81 @@ A badly made job would give meaningless results, so before any AI is allowed nea
 | Stand up | with the catch | 0 / 100 | 100 / 100 |
 | Stand up | control | 100 / 100 | 100 / 100 |
 
-In plain words: the catch really does stop a naive attempt, a script that knows the answer always succeeds, and with the catch removed the naive attempt works. No run crashed.
-
-The chart below shows the catch switching on as it gets stronger. For example, a green cube of 150 g is still fine with default settings, and at 250 g it never works.
+**2. The catch switches on gradually.** For example, a green cube of 150 g is still fine with default settings, and at 250 g it never works.
 
 ![dose response](docs/img/dose_response.png)
 
+**3. We know which settings matter** ([full table](results/settings_audit.md), 20 layouts per cell). Changing one setting at a time from its default, exactly one fixes each catch: a firm grip for the stack (20 of 20), letting go from 14 cm or higher for the sort (20 of 20), and a high grasp for the flasks (20 of 20). Speed, lift height and the pause after letting go change nothing in these jobs. A few settings do harm even without a catch (a light grip, turning the hand 45 degrees, a low grasp on the flasks). Turning the hand 45 degrees also happens to build the tower about half the time with the default grip, so there is more than one way to fix the stack. We do not call any setting a harmless decoy.
+
+**4. The disturbances work** ([table](results/disturbance.md), 50 fresh layouts per row, not the layouts the nudge was tuned on). Both the slip (the gripper lets go 3 cm into the lift) and the shove (a sideways push on the object) happened in every episode. A script that knows the catch but does not react never recovered (0 of 50 in every row). A script that tries again recovered in 47 to 50 of 50.
+
+**What this does not prove.** It proves the jobs can be solved, are failed by default settings, and respond to the catch. It does not prove that a language model can learn the catch. That is what the experiments are for.
+
+## A first live look (not a result)
+
+Before the main run, I ran two small models with no memory on 8 layouts per job that nothing else uses (these runs are excluded from every result). Each episode cost about a fifth of a cent.
+
+| Model | Stack | Sort | Stand up |
+|---|---|---|---|
+| Claude Haiku 5.5 | 0 of 8 | 8 of 8 | 7 of 8 |
+| GPT-6 Luna | 7 of 8 | 7 of 8 | 7 of 8 |
+
+Two things stand out. First, some model and job pairs already succeed without any memory, so in those pairs practice can only show up as fewer calls, less time and less money, not as a higher success rate. That matters, and the plan measures it (calls to success). Second, Haiku does not finish the stack within 20 calls. It tried a firm grip in 3 of the 8 episodes and got the green cube onto the red one in 3, but it ran out of calls before the blue cube. That is the situation where a notebook should help, because it can start with the grip that worked. A small run of the whole memory loop before the final fixes (112 episodes, one layout set, excluded from results) pointed the same way: Haiku with a notebook finished the stack on all 12 practice attempts, against 5 of 12 without one. One layout set is not evidence, and the real experiment has ten.
+
 ## What we plan to measure
 
-All of this is fixed in advance in [PROTOCOL.md](PROTOCOL.md), including what result would count as the idea being wrong.
+All of this is fixed in advance in [PROTOCOL.md](PROTOCOL.md), including what result would count against each claim.
 
-1. **Does practice raise the success rate?** Compare an AI that keeps notes between episodes with one that starts fresh every time, on layouts it has never seen.
-2. **Does practice make it faster and cheaper?** Count tool calls, simulated seconds and dollars per successful episode.
-3. **Can a cheap model with practice come close to an expensive model's first try?** The cheap models are Claude Haiku 5.5 and GPT-6 Luna. The expensive ones are Claude Fable 5.2 and GPT-6 Astra.
-4. **Does practice help when something goes wrong mid-task?** We make the object slip out of the gripper, or give it a sideways shove, and check how often the AI recovers.
+1. **Does practice raise the success rate?** Compare an AI that keeps notes between episodes (or sees its last success) with one that starts fresh every time, on layouts it has never seen. Then check that the gain is bigger where the catch exists than in the control scene.
+2. **Does practice make it faster and cheaper?** Count tool calls (a failed episode is charged the whole budget), simulated seconds and dollars.
+3. **Can a cheap model with practice come close to an expensive model's first try?** The cheap models are Claude Haiku 5.5 and GPT-6 Luna. The expensive ones are Claude Fable 5.2 and GPT-6 Astra. "Close" means the gap is under 10 percentage points with its whole interval, which we fixed beforehand.
+4. **Does practice help when something goes wrong mid-task?** We make the object slip out of the gripper, or give it a sideways shove, and compare how much success drops for an AI with a notebook against one without.
 
-The money is capped in code: Anthropic stops at $90 and OpenAI at $45, and a call that could push past the cap is refused before it is made.
+The plan is about 5,300 episodes. The money is capped in code: Anthropic stops at $90 and OpenAI at $45, a call that could push past the cap is refused before it is made, and failed retries and notebook-writing calls are counted.
 
 ## Where things stand
 
 **Done**
 - A simulated Franka Panda arm (MuJoCo) with inverse kinematics, collision-free planning and smooth motion.
-- Eight tools, three jobs with hidden catches and matching controls, and a success check that only the simulator decides.
-- Validation on 100 layouts per cell, with a chart of how strong each catch is.
-- All three jobs solved by hand through the same tool interface an AI uses.
-- A recorder that turns any episode into a captioned video.
+- Eight tools (and a pose-level variant), three jobs with catches and matching controls, and a success check that only the simulator decides.
+- Fairness checks on the final setup: oracle and naive gates, a dose-response chart, a settings audit and disturbance validation on fresh layouts.
+- Memory conditions (none, notebook, replay), the agent loop for Anthropic and OpenAI, the spend cap, a resumable runner that refuses to continue a run whose setup changed, and the analysis code.
+- Two rounds of fixes after review by two independent AI judges (a list is in [PROTOCOL.md](PROTOCOL.md) section 10).
 
 **In progress**
-- Physical disturbances (a slip and a shove) are written and still need their own validation.
-- Reviews of the plan and code by two independent AI judges, with a target of 9.5 out of 10 on every score.
+- Review of the fixed setup by the two judges, with a target of 9.5 out of 10 on every score.
 
 **Not done yet**
-- The AI loop for Anthropic and OpenAI models, the spend meter that enforces the budget, and the memory conditions.
-- Every experiment. There are no learning curves yet, and nothing here says an AI learns anything.
+- Every main experiment. There are no learning curves yet, and nothing here says an AI learns anything.
 - Other robots. The SO-101 arm is future work.
 
 ## Run it yourself
 
 ```bash
-uv sync                                  # installs MuJoCo 4.0.1 and the rest
-bash scripts/fetch_models.sh             # downloads the Franka Panda model
+uv sync                                  # installs MuJoCo 4.0.1 and the pinned packages from uv.lock
+bash scripts/fetch_models.sh             # downloads the Franka Panda model at the pinned revision
+.venv/bin/python -m pytest -q            # the automated tests (no network, no money)
 .venv/bin/python scripts/play.py start stack 11
 .venv/bin/python scripts/play.py call pick '{"object": "cube_green"}'
-.venv/bin/python scripts/gate.py --seeds 100     # the fairness checks (about 10 minutes)
-.venv/bin/python scripts/make_videos.py v1       # the captioned videos
+.venv/bin/python scripts/gate.py --seeds 100     # the fairness checks (about 6 minutes)
+.venv/bin/python scripts/audit_settings.py       # the settings audit
+# with ANTHROPIC_API_KEY / OPENAI_API_KEY set (this spends money, behind the spend cap):
+.venv/bin/python scripts/smoke.py --model claude-haiku-5-5 --task stack
+.venv/bin/python scripts/run_experiment.py --cell main --models claude-haiku-5-5 gpt-6-luna --seeds 0-9 --out runs/main
+.venv/bin/python scripts/analyze.py      # writes results/RESULTS.md and the learning-curve charts
 ```
 
 `play.py` lets you play a job yourself through the exact tools an AI gets. Try the default `pick` on the green cube first.
 
 ## What is already known in this area
 
-Several papers study parts of this, and the closest ones are listed in [PROTOCOL.md](PROTOCOL.md) section 9: RoboARCade (in-context improvement from one example demo, and false success claims), PhysMem (an AI building and testing guesses about physics while it works) and PhysCaP (an AI exploring to find hidden masses). We do not claim any one of those ideas as new. What we are testing is the combination: skill-level tools with decoy settings, catches proved by validation, learning curves on layouts the AI has never seen, recovery from mid-task problems, and a cost comparison against bigger models with a margin we fixed beforehand.
+Several papers study parts of this, and the closest ones are listed in [PROTOCOL.md](PROTOCOL.md) section 9: RoboARCade (in-context improvement from one example demo, and false success claims), PhysMem (an AI building and testing guesses about physics while it works) and PhysCaP (an AI exploring to find hidden masses). We do not claim any one of those ideas as new. What we are testing is the combination: the same jobs through skill-level and pose-level tools, catches proved by validation, learning curves on layouts the AI has never seen, recovery from mid-task problems, and a cost comparison against bigger models with a margin we fixed beforehand.
 
 ## Folder map
 
-- `robot_play/` the code: `world.py` (the physics scene), `motion.py` (inverse kinematics and planning), `skills.py` (the tools), `env.py` (the three jobs), `tools.py` (what the AI sees), `disturb.py`, `render.py` (videos).
-- `scripts/` things you run: `gate.py`, `play.py`, `make_videos.py`, `make_charts.py`.
+- `robot_play/` the code: `world.py` (the physics scene), `motion.py` (inverse kinematics and planning), `skills.py` (the tools), `env.py` (the three jobs), `tools.py` (what the AI sees), `disturb.py`, `scripted.py` (the validation scripts), `llm.py` (Anthropic and OpenAI), `agent.py` (the loop and the memory), `runner.py` (resumable runs), `spend.py` (the spend cap), `analysis.py` (the statistics), `render.py` (videos).
+- `scripts/` things you run: `gate.py`, `gate_disturbance.py`, `audit_settings.py`, `play.py`, `smoke.py`, `run_experiment.py`, `analyze.py`, `make_videos.py`, `make_charts.py`.
+- `tests/` the automated tests.
 - `docs/` plain-language explanations, hand-played transcripts and charts.
 - `results/` the raw numbers behind every table and chart.
 - `council/` the judges' rubric and their reviews.
