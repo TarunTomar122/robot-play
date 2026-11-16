@@ -16,13 +16,16 @@ MAX_CALLS = 30
 
 
 def _sample_xy(rng, n, x=(0.40, 0.58), y=(-0.26, 0.26), min_sep=0.11, avoid=()):
-    pts = []
-    for _ in range(20000):
-        p = np.array([rng.uniform(*x), rng.uniform(*y)])
-        if all(np.linalg.norm(p - q) >= min_sep for q in list(pts) + list(avoid)):
-            pts.append(p)
-        if len(pts) == n:
-            return pts
+    """n points at least min_sep apart. Greedy rejection sampling can paint itself into a corner (a first point that leaves no room for the last one); then it starts again with fresh draws
+    from the same generator, so the layout stays a pure function of the seed and every layout that used to succeed is unchanged (flasks layout seed 20801 used to crash here)."""
+    for _ in range(20):
+        pts = []
+        for _ in range(20000):
+            p = np.array([rng.uniform(*x), rng.uniform(*y)])
+            if all(np.linalg.norm(p - q) >= min_sep for q in list(pts) + list(avoid)):
+                pts.append(p)
+            if len(pts) == n:
+                return pts
     raise RuntimeError("could not sample poses")
 
 
