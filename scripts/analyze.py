@@ -169,10 +169,18 @@ def main():
             for cell, d in (("borrowed", "runs/borrowed"), ("borrowed_other", "runs/borrowed_other"), ("borrowed_1", "runs/borrowed_1"), ("borrowed_3", "runs/borrowed_3")):
                 planned.append((cell, cheap_m, range(10), d, {"source_dir": "runs/frontier_exp"}))      # planned only where the Fable notebook it reads finished
         missing = {}
+        planned += [("main", ["claude-haiku-5-5"], range(10), "runs/main_fixhold", {"tasks": ["stack"], "only": ("none", "notebook")}),
+                    ("main", ["claude-haiku-5-5"], range(10), "runs/main_fixcollide", {"tasks": ["stack"], "only": ("none", "notebook")})]
         for cell, ms, seeds, d, kw in planned:
+            kw = dict(kw)
+            only = kw.pop("only", None)
+            if only and not Path(d).exists():
+                continue                                 # an exploratory rerun that was never launched is not a gap
             if not Path(d).exists() and cell.startswith("borrowed"):
                 continue                                 # an exploratory cell that was never launched is not a gap
             specs = build_specs(cell, ms, list(seeds), d, **kw)
+            if only:
+                specs = [sp for sp in specs if sp.condition in only]
             n_missing = sum(1 for sp in specs if not sp.path.exists())
             if n_missing:
                 missing[f"{cell} ({d})"] = f"{n_missing} of {len(specs)} planned run files were never created"
@@ -293,7 +301,7 @@ def main():
                     verdict = "frontier too low to be a target"
                 else:
                     verdict = ("yes" if g["within_margin"] else "not shown") + ("" if cc == "notebook" else " (exploratory)")
-                q3.append((fr, f"{ch}, {NAMES[cc]}", f"{g['n_layouts']} in {g['n_clusters']} runs", f(g["frontier"], True), f(g["cheap"], True), ci(g, "gap", pct=True), verdict))
+                q3.append((fr, f"{ch}, {NAMES[cc]}", f"{g['n_layouts']} in {g['n_clusters']} runs" + (f" ({g['n_partial_clusters']} partly paired runs left out)" if g.get("n_partial_clusters") else ""), f(g["frontier"], True), f(g["cheap"], True), ci(g, "gap", pct=True), verdict))
                 if cc == "notebook":
                     c = A.q3_cost(skills, fr, ch, abandoned=abandoned)
                     if c:
@@ -364,7 +372,7 @@ def main():
               f"Each cheap model reads, frozen and with no practice of its own, the notebook that the Fable-with-notebook run of the same task and run seed ended with, and plays the same four held-out layouts (run seeds {seeds5[0]} to {seeds5[-1]}, three jobs). "
               "Exploratory throughout, plain 95% intervals. The control `reads Fable's notebook for another job` gives each job the notebook written for a different job. "
               "Four things limit what the numbers can say: **(1)** the arms introduce their notebook differently ('written by a more capable assistant after it practised this same task', 'written by you', and for the control 'a DIFFERENT task ... may or may not apply'), "
-              "so borrowed against the control shows that the content matters, and borrowed against the model's own notebook cannot show that Fable's notes are better than its own. "
+              "so borrowed against the control is suggestive that the content matters (it changes the instruction as well as the content, so it does not isolate content), and borrowed against the model's own notebook cannot show that Fable's notes are better than its own. "
               "**(2)** The replication on run seeds 5 to 9 was decided after the first five were seen. "
               "**(3)** Fable writes its notebook after solving every practice episode, so this is a working recipe from a strong model, not experience gathered from failures. "
               "**(4)** One frontier writer and two cheap models.", ""]
@@ -388,7 +396,7 @@ def main():
         L += [table(["model", "comparison", "pairs", "first", "second", "difference in calls to success"], cs) if cs else "No pairs yet.", ""]
         mt, pj = [], []
         for m in cheap:
-            conds = [c for c in ("none", "notebook", "replay", "borrowed", "borrowed_other") if A.select(skills, model=m, condition=c, phase="eval", quirk=True)]
+            conds = [c for c in ("none", "notebook", "borrowed", "borrowed_other") if A.select(skills, model=m, condition=c, phase="eval", quirk=True)]          # replay exists only for stack and sort, so it has its own rows in the comparison table above
             keys = None
             for c in ("none", "notebook", "borrowed", "borrowed_other"):
                 kc = {(r["task"], r["run_seed"]) for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True)}
@@ -423,6 +431,8 @@ def main():
                 fprac[k] = fprac.get(k, 0.0) + r["cost_usd"]
                 if r["idx"] == 0:
                     ffirst[k] = r["cost_usd"]
+        for k in list(fprac):
+            fprac[k] += abandoned.get(("claude-fable-5-2", "skills", k[0], "notebook", True, k[1]), 0.0)          # attempts abandoned and redone (provider failure, cut-off reply) are part of what the notebook cost
         ftry = A.select(skills, model="claude-fable-5-2", condition="none", phase="eval", quirk=True)
         if fprac:
             fp, f1 = float(np.mean(list(fprac.values()))), float(np.mean(list(ffirst.values()))) if ffirst else float("nan")
@@ -433,13 +443,15 @@ def main():
                 for r in skills:
                     if r["model"] == m and r["condition"] == "notebook" and r["phase"] == "practice" and (r["task"], r["run_seed"]) in ks:
                         own[(r["task"], r["run_seed"])] = own.get((r["task"], r["run_seed"]), 0.0) + r["cost_usd"]
+                for k in list(own):
+                    own[k] += abandoned.get((m, "skills", k[0], "notebook", True, k[1]), 0.0)
                 op = float(np.mean(list(own.values()))) if own else float("nan")
                 ev = lambda c: mean([r for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True) if (r["task"], r["run_seed"]) in ks], "cost_usd")
                 own_ep, bor_ep = ev("notebook"), ev("borrowed")
                 be_f = f"{fp / (fr_ep - bor_ep):,.0f} episodes" if fr_ep > bor_ep else "never"
                 be_o = f"{(fp - op) / (own_ep - bor_ep):,.0f} episodes" if own_ep > bor_ep else "never (not cheaper per episode)"
                 cr.append((m, f"${fp:.2f}", f"${f1:.2f}", f"${op:.3f}", f"${fr_ep:.4f}", f"${own_ep:.4f}", f"${bor_ep:.4f}", be_f, be_o))
-            L += ["**What the notebook costs, practice only on both sides** (evaluation episodes are not part of making a notebook; retries are inside the dollar figures once). Fable's 12 practice episodes and rewrites against the cheap model's own 12, and the number of episodes of the same job after which the one-off cost is repaid:", "",
+            L += ["**What the notebook costs, practice only on both sides** (evaluation episodes are not part of making a notebook; retries are inside the dollar figures once; the dollars of attempts that were abandoned and redone are added; the few cents of run files deleted in deviation 2 cannot be allocated and are not included). Fable's 12 practice episodes and rewrites against the cheap model's own 12, and the number of episodes of the same job after which the one-off cost is repaid:", "",
                   table(["cheap model", "Fable notebook, per run", "of which practice episode 1 and its rewrite", "cheap model's own notebook, per run", "Fable first try, per episode", "cheap model with own notebook, per episode", "cheap model with Fable's notebook, per episode", "repaid against running Fable directly after", "repaid against the cheap model's own notebook after"], cr), "",
                   "`results/notebook_audit.md` counts in how many Fable runs the notebook already names the fixing setting after practice episode 1 (a keyword check, outcome-informed, see there); Fable also never failed a practice episode, so a one-episode notebook might cost about the 'practice episode 1' column. That was not tested: it is a guess, not a result. "
                   "The comparison assumes the notebook is reused for the same job, and Fable's notebook is a one-off cost that a deployment would pay once per job, not per run.", ""]

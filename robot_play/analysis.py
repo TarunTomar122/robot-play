@@ -81,7 +81,7 @@ def load(*dirs: str | Path, complete_only: bool = False) -> list[dict]:
     for d in dirs:
         for f in sorted(Path(d).glob("*.jsonl")):
             cfg, lines, _ = _parse(f)
-            if complete_only and cfg and len(lines) < len(cfg["plan"]) and (any(p["phase"] == "practice" for p in cfg["plan"]) or cfg.get("condition") in ("borrowed", "borrowed_other")):
+            if complete_only and cfg and len(lines) < len(cfg["plan"]) and (any(p["phase"] == "practice" for p in cfg["plan"]) or str(cfg.get("condition", "")).startswith("borrowed")):
                 continue                         # a run with practice (or one that reads a borrowed notebook) is only meaningful whole; only the frontier first-try files count per finished layout
             for r in lines:
                 res = r["result"]

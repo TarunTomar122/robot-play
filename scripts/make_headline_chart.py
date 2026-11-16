@@ -90,7 +90,8 @@ def main():
         ax.set_title(m, loc="left", fontsize=11, color=INK)
     axes[0][0].set_ylabel("held-out layouts solved (%)", color=INK)
     fl = {fm: min([len([r for r in A.select(rows, model=fm, condition="none", phase="eval", quirk=True) if r["task"] == t]) for t, _ in JOBS] or [0]) for fm, _ in FRONT}
-    note = "Bars in one group use the same runs (one run = a job and a run seed). Frontier lines: first try on " + " / ".join(f"{n} layouts per job" for n in sorted(set(fl.values()))) + ", not the same layouts as the bars."
+    fr_txt = "; ".join(f"{fm.replace('claude-', '')} " + ", ".join(f"{sum(r['success'] for r in A.select(rows, model=fm, condition='none', phase='eval', quirk=True) if r['task'] == t)}/{len([r for r in A.select(rows, model=fm, condition='none', phase='eval', quirk=True) if r['task'] == t])}" for t, _ in JOBS) for fm, _ in FRONT)
+    note = f"Bars in one group use the same runs (one run = a job and a run seed). Frontier lines are single first tries on separate layouts (stack, sort, flasks solved: {fr_txt}); 20 of 20 has a 95% interval of about 84 to 100%, so a line is not a matched comparison with a bar."
     if daggers:
         note += "\n\u2020 Most failures in this bar contain a call the simulator answered wrongly (a false 'holding' or a move that stopped short): " + "; ".join(f"{m.replace('claude-', '')} {t} {c}: {tc} of {f_}" for m, t, c, f_, tc in daggers) + ". The true gap is bounded in report sections 2a and 6b."
     fig.text(0.01, -0.06, note, fontsize=8, color=MUTED, ha="left", va="top")
