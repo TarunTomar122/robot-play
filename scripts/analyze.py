@@ -29,7 +29,8 @@ FRONTIER_FLOOR = 0.5               # a frontier first try below this is not a ta
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 COLORS = {"none": "#2a78d6", "notebook": "#eb6834", "replay": "#1baf7a"}          # dataviz skill categorical slots 1-3 (validated all-pairs)
 TASKS = ["stack", "bins", "flasks"]
-NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job"}
+NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job",
+         "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes"}
 
 
 def f(x, pct=False):
@@ -97,7 +98,7 @@ def main():
     ap.add_argument("--control", nargs="*", default=["runs/control"])
     ap.add_argument("--frontier", nargs="*", default=["runs/frontier", "runs/frontier_exp"])
     ap.add_argument("--pose", nargs="*", default=["runs/pose"])
-    ap.add_argument("--borrowed", nargs="*", default=["runs/borrowed", "runs/borrowed_other"])
+    ap.add_argument("--borrowed", nargs="*", default=["runs/borrowed", "runs/borrowed_other", "runs/borrowed_1", "runs/borrowed_3"])
     ap.add_argument("--ext", nargs="*", default=["runs/main_ext"], help="exploratory room-cell extension (Haiku, stack and bins, run seeds 10-19); never enters a confirmatory number")
     ap.add_argument("--meter", default="runs/spend")
     ap.add_argument("--out", default="results/RESULTS.md")
@@ -416,6 +417,41 @@ def main():
                   table(["cheap model", "Fable notebook, per run", "of which practice episode 1 and its rewrite", "cheap model's own notebook, per run", "Fable first try, per episode", "cheap model with own notebook, per episode", "cheap model with Fable's notebook, per episode", "repaid against running Fable directly after", "repaid against the cheap model's own notebook after"], cr), "",
                   "`results/notebook_audit.md` counts in how many Fable runs the notebook already names the fixing setting after practice episode 1 (a keyword check, outcome-informed, see there); Fable also never failed a practice episode, so a one-episode notebook might cost about the 'practice episode 1' column. That was not tested: it is a guess, not a result. "
                   "The comparison assumes the notebook is reused for the same job, and Fable's notebook is a one-off cost that a deployment would pay once per job, not per run.", ""]
+
+    # --- Q5b: how short can the expensive practice be? (v1.5, exploratory)
+    short = [r for r in skills if r["condition"] in ("borrowed_1", "borrowed_3")]
+    if short:
+        L += ["## 6a. Exploratory: how short can the expensive practice be?", "",
+              "Registered before it ran (PROTOCOL.md v1.5). The same borrowed cell, but each cheap model reads Fable's notebook as it stood after **1** or **3** practice episodes instead of 12, for the same finished Fable runs. "
+              "Prediction written beforehand: Haiku on `stack` solves at least 90% of held-out layouts with the one-episode notebook. Plain 95% intervals, paired by (task, run seed).", ""]
+        sh = []
+        for m in cheap:
+            for first, other in (("borrowed_1", "none"), ("borrowed_3", "none"), ("borrowed_1", "borrowed"), ("borrowed_3", "borrowed")):
+                d = A.paired_difference(skills, m, first, other)
+                dc = A.paired_difference(skills, m, first, other, metric="calls_to_success")
+                if d.get("n_pairs"):
+                    sh.append((m, f"{NAMES[first]} against {NAMES[other]}", d["n_pairs"], f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True), ci(dc)))
+        L += [table(["model", "comparison", "pairs", "first", "second", "success difference", "calls-to-success difference"], sh), ""]
+        sj = []
+        for m in cheap:
+            keys = None
+            for c in ("none", "borrowed", "borrowed_1", "borrowed_3"):
+                kc = {(r["task"], r["run_seed"]) for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True)}
+                keys = kc if keys is None else keys & kc
+            for c in ("none", "borrowed_1", "borrowed_3", "borrowed"):
+                for t in TASKS:
+                    y = [r for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True, task=t) if (r["task"], r["run_seed"]) in (keys or set())]
+                    if y:
+                        sj.append((m, t, NAMES[c], len(y), f"{sum(r['success'] for r in y)}/{len(y)}", f"{mean(y, 'calls_to_success'):.1f}"))
+        L += ["Per job, on exactly the runs that every arm in this table has:", "", table(["model", "job", "memory", "episodes", "solved", "calls to success"], sj), ""]
+        cum = {1: [], 3: [], 12: []}
+        for k in (1, 3, 12):
+            by = {}
+            for r in skills:
+                if r["model"] == "claude-fable-5-2" and r["condition"] == "notebook" and r["phase"] == "practice" and r["idx"] < k:
+                    by[(r["task"], r["run_seed"])] = by.get((r["task"], r["run_seed"]), 0.0) + r["cost_usd"]
+            cum[k] = list(by.values())
+        L += ["What the Fable practice behind each notebook cost (mean per run, practice episodes and rewrites only): " + ", ".join(f"{k} episode{'s' if k > 1 else ''}: ${np.mean(v):.2f}" for k, v in cum.items() if v) + ".", ""]
 
     # --- pose
     if pose:
