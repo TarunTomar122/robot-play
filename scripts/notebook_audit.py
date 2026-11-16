@@ -59,19 +59,25 @@ def main():
         texts = [v["practice"][i] for i in sorted(v["practice"])]
         named = [FIX[task](t) for t in texts]
         first = next((i + 1 for i, n in enumerate(named) if n), None)
-        by[(model, task)].append({"final": named[-1], "first": first, "eval": float(np.mean(v["eval"]))})
+        by[(model, task)].append({"final": named[-1], "first": first, "eval": float(np.mean(v["eval"])), "after1": named[0]})
     L = ["# Did the notebooks name the fix?", "",
          "Exploratory and descriptive: a keyword check of each run's notebooks (the notebook after each of the 12 practice episodes), not a judgement of quality. Complete notebook runs only. "
          "'Names the fix' means the notebook contains the setting that fixes the job: " + "; ".join(f"{NAMES[t]}" for t in FIX) + ".", "",
-         "| model | job | runs | final notebook names the fix | practice episodes until it first does (mean, of the runs that do) | held-out success, notebook names the fix | held-out success, it does not |", "|---|---|---|---|---|---|---|"]
+         "| model | job | runs | final notebook names the fix | names it already after practice episode 1 | practice episodes until it first does (mean, of the runs that do) | held-out success, notebook names the fix | held-out success, it does not |", "|---|---|---|---|---|---|---|---|"]
     for (model, task), rs in sorted(by.items()):
         yes = [r for r in rs if r["final"]]
         no = [r for r in rs if not r["final"]]
         firsts = [r["first"] for r in rs if r["first"]]
-        L.append(f"| {model} | {task} | {len(rs)} | {len(yes)}/{len(rs)} | {np.mean(firsts):.1f} | " if firsts else f"| {model} | {task} | {len(rs)} | {len(yes)}/{len(rs)} | never | ")
+        a1 = f"{sum(r['after1'] for r in rs)}/{len(rs)}"
+        L.append(f"| {model} | {task} | {len(rs)} | {len(yes)}/{len(rs)} | {a1} | {np.mean(firsts):.1f} | " if firsts else f"| {model} | {task} | {len(rs)} | {len(yes)}/{len(rs)} | {a1} | never | ")
         L[-1] += (f"{100 * np.mean([r['eval'] for r in yes]):.0f}% ({len(yes)} runs)" if yes else "n/a") + " | " + (f"{100 * np.mean([r['eval'] for r in no]):.0f}% ({len(no)} runs)" if no else "n/a") + " |"
     if not by:
-        L.append("| no complete notebook runs yet | | | | | | |")
+        L.append("| no complete notebook runs yet | | | | | | | |")
+    L += ["", "**How to read this.** It is exploratory and outcome-informed: the keyword rules are mine, written before the full data but with the pilots in view. "
+          "The flasks threshold started as `grasp_height` 0.85, a guess from the pose gate (the catch bites below about 80% of the flask height); I changed it to **0.8** after reading Fable's finished notebooks, which use 0.8 and succeed, so that rule is fitted to the outcome it is checked against. "
+          "The thresholds in force are: stack `grip_level` firm; sort `release_height` 0.14 or more; flasks `grasp_height` 0.8 or more. "
+          "A regular expression also matches negated or ineffective advice ('do not use firm'), and it checks neither that the plan is complete nor that the advice is right. "
+          "For sort the rule misses most working notebooks (Haiku succeeds on 99% of held-out sort episodes without writing a release height of 0.14), so that row measures wording more than learning."]
     Path(a.out).write_text("\n".join(L) + "\n")
     print("\n".join(L))
 

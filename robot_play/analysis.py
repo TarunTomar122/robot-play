@@ -50,6 +50,30 @@ def coverage(*dirs: str | Path) -> list[dict]:
     return out
 
 
+FALSE_HOLD_WIDTH = 0.03          # metres: every object in these jobs is at least 0.035 m across and an empty closed hand reads 0.019 m, so 'holding' at less than 0.03 m means the fingertips rest on top of the object
+SHORT_MOVE = 0.01                # metres: a move_to that answers ok but stops more than this far from the request
+
+
+def episode_flags(log: list[dict]) -> dict:
+    """Tool-state artefacts in one episode's call log (the long log is dropped by `load`, so these are counted here).
+    false_hold: a close_gripper that answered `holding` with the fingers nearly closed, so the simulator believed an object was in the hand that was not between the fingers
+    (the model then often gets `already holding` from pick and `not holding anything` from place). short_move: a move_to that answered ok but stopped over 1 cm from the request."""
+    fh = sm = 0
+    for c in log or []:
+        res = c.get("result") or {}
+        if c.get("tool") == "close_gripper" and res.get("holding") and float(res.get("gripper_width_m", 1.0)) < FALSE_HOLD_WIDTH:
+            fh += 1
+        if c.get("tool") == "move_to" and res.get("ok") and res.get("tcp_m"):
+            a = c.get("args") or {}
+            try:
+                want = np.array([a["x"], a["y"], a["z"]], dtype=float)
+            except KeyError:
+                continue
+            if float(np.linalg.norm(np.array(res["tcp_m"], dtype=float) - want)) > SHORT_MOVE:
+                sm += 1
+    return {"false_hold": fh, "short_move": sm}
+
+
 def load(*dirs: str | Path, complete_only: bool = False) -> list[dict]:
     """One flat row per finished episode (the long tool-call log is dropped). With complete_only, runs that did not finish their whole plan are left
     out, so a paired comparison never mixes runs that stopped early with runs that did not (the incomplete runs are listed by `coverage`)."""
@@ -57,11 +81,12 @@ def load(*dirs: str | Path, complete_only: bool = False) -> list[dict]:
     for d in dirs:
         for f in sorted(Path(d).glob("*.jsonl")):
             cfg, lines, _ = _parse(f)
-            if complete_only and cfg and len(lines) < len(cfg["plan"]) and any(p["phase"] == "practice" for p in cfg["plan"]):
-                continue                         # a run with practice is only meaningful whole; first-try files (no practice) count per finished layout
+            if complete_only and cfg and len(lines) < len(cfg["plan"]) and (any(p["phase"] == "practice" for p in cfg["plan"]) or cfg.get("condition") in ("borrowed", "borrowed_other")):
+                continue                         # a run with practice (or one that reads a borrowed notebook) is only meaningful whole; only the frontier first-try files count per finished layout
             for r in lines:
                 res = r["result"]
                 row = {k: r.get(k) for k in KEEP}
+                row.update(episode_flags(r.get("log")))
                 row.update(success=int(res["success"]), calls=res["calls"], sim_time_s=res["sim_time_s"], claimed_done=int(res["claimed_done"]),
                            false_claim=int(res["false_success_claim"]), fired=int(res["disturbance_fired"]),
                            tokens_in=r["usage"]["input"] + r["usage"]["cache_read"] + r["usage"]["cache_write"], tokens_out=r["usage"]["output"])

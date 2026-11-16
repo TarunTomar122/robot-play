@@ -277,3 +277,33 @@ def test_recovery_drop_floor_is_open_when_every_layout_behaves_the_same():
                     rows += [clean, dist]
     d = recovery_drop_difference(rows, "m", "notebook", "none", n_boot=300)
     assert d["diff"] == -1.0 and d["hi"] - d["lo"] > 0.15
+
+
+def test_episode_flags_count_false_holds_and_short_moves():
+    from robot_play.analysis import episode_flags
+    log = [{"tool": "close_gripper", "args": {}, "result": {"ok": True, "gripper_width_m": 0.021, "holding": "cube_green"}},      # fingertips on top: false hold
+           {"tool": "close_gripper", "args": {}, "result": {"ok": True, "gripper_width_m": 0.04, "holding": "cube_green"}},       # a real hold
+           {"tool": "close_gripper", "args": {}, "result": {"ok": True, "gripper_width_m": 0.019, "holding": None}},              # nothing held
+           {"tool": "move_to", "args": {"x": 0.5, "y": 0.0, "z": 0.03}, "result": {"ok": True, "tcp_m": [0.5, 0.0, 0.042]}},       # stopped 1.2 cm short
+           {"tool": "move_to", "args": {"x": 0.5, "y": 0.0, "z": 0.2}, "result": {"ok": True, "tcp_m": [0.5, 0.0, 0.2]}}]
+    assert episode_flags(log) == {"false_hold": 1, "short_move": 1}
+    assert episode_flags(None) == {"false_hold": 0, "short_move": 0}
+
+
+def test_complete_only_drops_unfinished_borrowed_runs_but_keeps_partial_frontier_first_tries(tmp_path):
+    import json
+    from robot_play.analysis import load
+
+    def write(name, condition, plan, done):
+        lines = [json.dumps({"_config": {"model": "m", "task": "stack", "condition": condition, "quirk": True, "run_seed": 0, "plan": plan}})]
+        for i in range(done):
+            lines.append(json.dumps({"run": name, "model": "m", "task": "stack", "condition": condition, "quirk": True, "run_seed": 0, "phase": "eval", "idx": i, "seed": i, "disturbance": None, "toolset": "skills",
+                                     "max_calls": 20, "cost_usd": 0.0, "retry_usd": 0.0, "turns": 1, "nudges": 0, "refusal": 0, "memory_tokens_in": 0,
+                                     "result": {"success": True, "calls": 5, "sim_time_s": 1.0, "claimed_done": True, "false_success_claim": False, "disturbance_fired": False},
+                                     "usage": {"input": 1, "cache_read": 0, "cache_write": 0, "output": 1}, "log": []}))
+        (tmp_path / f"{name}.jsonl").write_text("\n".join(lines) + "\n")
+    plan = [{"phase": "eval", "idx": i, "seed": i} for i in range(4)]
+    write("borrowed_partial", "borrowed", plan, 2)
+    write("frontier_partial", "none", plan, 2)
+    rows = load(tmp_path, complete_only=True)
+    assert {r["condition"] for r in rows} == {"none"} and len(rows) == 2

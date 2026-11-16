@@ -143,9 +143,17 @@ def main():
     cvr = [(m, tools, NAMES[cond], scene, x[0], x[1], f"{x[3]}/{x[2]}", x[4]) for (m, tools, cond, scene), x in sorted(cv.items())]
     L += ["Coverage. Only runs that finished their whole plan enter the confirmatory comparisons below. An abandoned attempt (provider failure, cut-off reply, failed notebook rewrite, budget stop) is redone on resume and its cost is kept:", "",
           table(["model", "tools", "memory", "scene", "runs started", "runs complete", "episodes finished/planned", "abandoned attempts"], cvr) if cvr else "No runs yet.", ""]
-    hashes = sorted({c.get("code") or "unknown" for c in cov})
+    by_dir = {}
+    for c in cov + ext_cov:
+        by_dir.setdefault(c["dir"], {}).setdefault(c.get("code") or "unknown", 0)
+        by_dir[c["dir"]][c.get("code") or "unknown"] += 1
+    hashes = sorted({h for v in by_dir.values() for h in v})
     L += [(f"Code: every analysed run file carries the same code hash, `{hashes[0]}`." if len(hashes) == 1 else
-           f"**Code: the run files carry {len(hashes)} different code hashes ({', '.join(hashes)}). This is a deviation from the protocol: say which cells ran on which code before reading any comparison across them.**"), ""]
+           f"**Code: the run files carry {len(hashes)} different code hashes. This is a deviation from the protocol (results/deviations.md, deviation 2 says which cells and why): read any comparison across them with that in mind.**"), "",
+          table(["folder", "code hash (run files with it)"], [(d, ", ".join(f"`{h}` ({n})" for h, n in sorted(v.items()))) for d, v in sorted(by_dir.items())]), ""]
+    not_done = [c for c in cov + ext_cov if not c["complete"] and c["planned"] > 4]
+    L += [f"Runs with practice or a borrowed notebook that did not finish their whole plan are left out of every comparison (complete cases only, so a missing run is a missing pair, not a zero): {len(not_done)}"
+          + (" (" + ", ".join(f"{c['dir']}/{c['file']} {c['done']}/{c['planned']}" for c in not_done[:8]) + (" ..." if len(not_done) > 8 else "") + ")" if not_done else "") + ".", ""]
     try:                                                 # planned run files that were never created (a cell that never started shows up here, not only in a smaller table)
         from robot_play.runner import build_specs
         cheap_m, front_m = ["claude-haiku-5-5", "gpt-6-luna"], ["claude-fable-5-2", "gpt-6-astra"]
@@ -190,6 +198,33 @@ def main():
             d = A.paired_difference(skills, m, "notebook", "none", tasks=[t])
             per_task.append((m, t, f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
     L += ["Per task, notebook against starting fresh (exploratory, 95%, only ten runs each, so the intervals are rough):", "", table(["model", "task", "notebook", "fresh", "difference"], per_task), ""]
+
+    # --- tool-state artefacts (Fable's round 5a finding): false 'holding' and short moves, counted per cell, with sensitivity rows for Q1
+    L += ["### 2a. A tool-state artefact in the Q1 cell, and how much it could matter", "",
+          "In the skills cells a model can still call `move_to` and `close_gripper` by hand. When the fingertips rest on top of an object, `close_gripper` can answer `holding` although nothing is between the fingers "
+          f"(it reads 'holding' with the hand nearly closed, under {A.FALSE_HOLD_WIDTH * 100:.0f} cm); `pick` then says `already holding` and `place` says `not holding anything`, and calls are wasted on a false statement. "
+          f"A `move_to` can also answer ok while stopping more than {A.SHORT_MOVE * 100:.0f} cm from the request. Both come from the frozen simulator, which I will fix after the run (not mid-matrix). Counts of held-out catch-scene episodes with at least one such call:", ""]
+    art = []
+    for m in cheap:
+        for t in TASKS:
+            for c in ("none", "notebook", "replay"):
+                x = A.select(skills, model=m, task=t, condition=c, phase="eval", quirk=True)
+                if x:
+                    fh = [r for r in x if r["false_hold"]]
+                    art.append((m, t, NAMES[c], len(x), f"{len(fh)} ({sum(1 - r['success'] for r in fh)} failed)", sum(1 for r in x if r["short_move"])))
+    L += [table(["model", "job", "memory", "held-out episodes", "with a false 'holding' (of which failed)", "with a short move_to"], art), ""]
+    sens = []
+    for m in cheap:
+        for tl, tname in ((None, "all three jobs"), (["stack"], "stack only")):
+            drop = [r for r in skills if not r["false_hold"]]
+            win = [dict(r, success=1) if (r["false_hold"] and r["phase"] == "eval") else r for r in skills]
+            for label, rs in (("as run", skills), ("episodes with a false 'holding' dropped from every arm", drop), ("those episodes counted as successes in every arm", win)):
+                d = A.paired_difference(rs, m, "notebook", "none", tasks=tl)
+                if d.get("n_pairs"):
+                    sens.append((m, tname, label, f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
+    L += ["Q1 sensitivity (notebook against fresh, 95% intervals so the rows are comparable; exploratory): the effect is not made by the artefact, but its size depends on it. "
+          "The third row is the worst case in which every episode that suffered the artefact would otherwise have succeeded.", "",
+          table(["model", "jobs", "treatment of the artefact episodes", "notebook", "fresh", "difference"], sens), ""]
 
     # --- Q2
     L += ["## 3. Q2: does experience make it faster and cheaper? (exploratory, 95% intervals)", ""]
@@ -285,35 +320,64 @@ def main():
                     if d.get("n_pairs"):
                         extr.append((task or "both jobs", NAMES[cond], label, d["n_pairs"], f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
         L += [table(["job", "memory", "runs", "pairs", "with memory", "starts fresh", "difference"], extr) if extr else "No complete pairs yet.", ""]
+        fa = []
+        for task in ("stack", "bins"):
+            for cond in ("none", "notebook", "replay"):
+                x = A.select(pooled, model="claude-haiku-5-5", task=task, condition=cond, phase="eval", quirk=True)
+                if x:
+                    fh = [r for r in x if r["false_hold"]]
+                    fa.append((task, NAMES[cond], len(x), f"{len(fh)} ({sum(1 - r['success'] for r in fh)} failed)"))
+        L += ["The false-`holding` artefact of section 2a in the same 20 run seeds (held-out episodes with at least one such call):", "", table(["job", "memory", "held-out episodes", "with a false 'holding' (of which failed)"], fa), ""]
 
     # --- Q5: a stronger model's notebook (exploratory)
     bor = [r for r in skills if r["condition"] in ("borrowed", "borrowed_other")]
     if bor:
-        fx = [r for r in skills if r["model"] == "claude-fable-5-2" and r["condition"] == "notebook"]
-        fcost = {}
-        for r in fx:
-            fcost[(r["task"], r["run_seed"])] = fcost.get((r["task"], r["run_seed"]), 0.0) + r["cost_usd"] + r.get("retry_usd", 0.0)
-        L += ["## 5. Exploratory: does a stronger model's notebook help a cheaper one?", "",
-              "Each cheap model reads, frozen and with no practice of its own, the notebook that the Fable-with-notebook run of the same task and run seed ended with, and plays the same four held-out layouts (run seeds 0 to 4). Exploratory, 95% intervals, three jobs times five run seeds. "
-              "The borrowed notebook costs the frontier model's own 12 practice episodes and rewrites, which is shown separately. The control `reads Fable's notebook for another job` gives each job the notebook written for a different job (labelled as such), to tell the content of the notebook from the mere presence of one.", ""]
+        seeds5 = sorted({r["run_seed"] for r in bor})
+        L += ["## 6. Exploratory: does a stronger model's notebook help a cheaper one?", "",
+              f"Each cheap model reads, frozen and with no practice of its own, the notebook that the Fable-with-notebook run of the same task and run seed ended with, and plays the same four held-out layouts (run seeds {seeds5[0]} to {seeds5[-1]}, three jobs). "
+              "Exploratory throughout, plain 95% intervals. The control `reads Fable's notebook for another job` gives each job the notebook written for a different job. "
+              "Four things limit what the numbers can say: **(1)** the arms introduce their notebook differently ('written by a more capable assistant after it practised this same task', 'written by you', and for the control 'a DIFFERENT task ... may or may not apply'), "
+              "so borrowed against the control shows that the content matters, and borrowed against the model's own notebook cannot show that Fable's notes are better than its own. "
+              "**(2)** The replication on run seeds 5 to 9 was decided after the first five were seen. "
+              "**(3)** Fable writes its notebook after solving every practice episode, so this is a working recipe from a strong model, not experience gathered from failures. "
+              "**(4)** One frontier writer and two cheap models.", ""]
         q5 = []
         halves = (("run seeds 0-4", [r for r in skills if r["run_seed"] <= 4]), ("run seeds 5-9 (replication)", [r for r in skills if r["run_seed"] >= 5]), ("run seeds 0-9, pooled", skills))
         for m in cheap:
-            for first, other in (("borrowed", "none"), ("borrowed", "notebook"), ("borrowed", "borrowed_other"), ("borrowed_other", "none")):
+            for first, other in (("borrowed", "none"), ("borrowed", "notebook"), ("borrowed", "replay"), ("borrowed", "borrowed_other"), ("borrowed_other", "none")):
                 for label, rs in halves:
                     d = A.paired_difference(rs, m, first, other)
                     if d.get("n_pairs"):
                         q5.append((m, f"{NAMES[first]} against {NAMES[other]}", label, d["n_pairs"], f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
-        L += [table(["model", "comparison", "runs", "pairs (task, run seed)", "first", "second", "difference"], q5) if q5 else "No complete comparison yet.", ""]
-        keys5 = {(r["task"], r["run_seed"]) for r in bor if r["condition"] == "borrowed"}
-        ct = []
+        L += ["Success on held-out layouts, paired by (task, run seed) with the runs each pair has in common (the column 'pairs' is that count):", "",
+              table(["model", "comparison", "runs", "pairs (task, run seed)", "first", "second", "difference"], q5) if q5 else "No complete comparison yet.", ""]
+        L += ["Calls to success (a failure is charged the whole budget); a negative difference means the first arm needs fewer calls:", ""]
+        cs = []
         for m in cheap:
+            for first, other in (("borrowed", "notebook"), ("borrowed", "none"), ("borrowed", "replay")):
+                d = A.paired_difference(skills, m, first, other, metric="calls_to_success")
+                if d.get("n_pairs"):
+                    cs.append((m, f"{NAMES[first]} against {NAMES[other]}", d["n_pairs"], f"{d['a']:.1f}", f"{d['b']:.1f}", ci(d)))
+        L += [table(["model", "comparison", "pairs", "first", "second", "difference in calls to success"], cs) if cs else "No pairs yet.", ""]
+        mt, pj = [], []
+        for m in cheap:
+            conds = [c for c in ("none", "notebook", "replay", "borrowed", "borrowed_other") if A.select(skills, model=m, condition=c, phase="eval", quirk=True)]
+            keys = None
             for c in ("none", "notebook", "borrowed", "borrowed_other"):
-                x = [r for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True) if (r["task"], r["run_seed"]) in keys5]
+                kc = {(r["task"], r["run_seed"]) for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True)}
+                keys = kc if keys is None else keys & kc
+            keys = keys or set()
+            for c in conds:
+                x = [r for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True) if (r["task"], r["run_seed"]) in keys]
                 if x:
-                    ct.append((m, NAMES[c], len(x), f(mean(x, "success"), True), f"{mean(x, 'calls'):.1f}", f"{mean(x, 'calls_to_success'):.1f}", f"${mean(x, 'cost_usd'):.4f}"))
-        if ct:
-            L += ["Held-out episodes on exactly the runs the borrowed cell has (same layouts in every row):", "", table(["model", "memory", "episodes", "success", "mean calls", "calls to success (a failure is charged the budget)", "dollars per episode"], ct), ""]
+                    mt.append((m, NAMES[c], len({(r["task"], r["run_seed"]) for r in x}), len(x), f(mean(x, "success"), True), f"{mean(x, 'calls'):.1f}", f"{mean(x, 'calls_to_success'):.1f}", f"${mean(x, 'cost_usd'):.4f}"))
+                for t in TASKS:
+                    y = [r for r in x if r["task"] == t]
+                    if y:
+                        pj.append((m, t, NAMES[c], len(y), f"{sum(r['success'] for r in y)}/{len(y)}"))
+        L += ["Held-out episodes on exactly the runs that start, no memory, notebook, borrowed and wrong-task arms all have (same runs in every row of a model):", "",
+              table(["model", "memory", "runs", "episodes", "success", "mean calls", "calls to success", "dollars per episode"], mt), ""]
+        L += ["**The same, per job.** Most of the pooled effect is one cell; read the pooled rows with this table beside them:", "", table(["model", "job", "memory", "episodes", "solved"], pj), ""]
         gaps = []
         for fr in [m for m in models if m in ("claude-fable-5-2", "gpt-6-astra")]:
             for ch in cheap:
@@ -323,14 +387,39 @@ def main():
         if gaps:
             L += ["Frontier first try against a cheap model that only reads Fable's notebook, on the same layouts (exploratory, same interval rule as Q3 at 95%; the cheap arm carries the design effect because the four layouts of a run share one notebook):", "",
                   table(["frontier first try", "cheap model with Fable's notebook", "layouts", "frontier", "cheap", "gap (frontier minus cheap)"], gaps), ""]
-        ks = sorted({(r["task"], r["run_seed"]) for r in bor})
-        if ks and fcost:
-            own = [r for m in cheap for r in skills if r["model"] == m and r["condition"] == "notebook" and r["phase"] in ("practice", "eval") and (r["task"], r["run_seed"]) in ks]
-            L += [f"Dollars per run: Fable's practice and notebook writing {mean_over(fcost, ks)}; a cheap model's own 12 practice episodes and rewrites (the cost of its whole notebook run, per run) ${sum(r['cost_usd'] for r in own) / max(1, len({(r['model'], r['task'], r['run_seed']) for r in own})):.3f}.", ""]
+        # cost: practice only on both sides (cost_usd already contains retries; evaluation episodes are not part of making a notebook)
+        ks = {(r["task"], r["run_seed"]) for r in bor if r["condition"] == "borrowed"}
+        fprac, ffirst = {}, {}
+        for r in skills:
+            if r["model"] == "claude-fable-5-2" and r["condition"] == "notebook" and r["phase"] == "practice" and (r["task"], r["run_seed"]) in ks:
+                k = (r["task"], r["run_seed"])
+                fprac[k] = fprac.get(k, 0.0) + r["cost_usd"]
+                if r["idx"] == 0:
+                    ffirst[k] = r["cost_usd"]
+        ftry = A.select(skills, model="claude-fable-5-2", condition="none", phase="eval", quirk=True)
+        if fprac:
+            fp, f1 = float(np.mean(list(fprac.values()))), float(np.mean(list(ffirst.values()))) if ffirst else float("nan")
+            fr_ep = mean(ftry, "cost_usd")
+            cr = []
+            for m in cheap:
+                own = {}
+                for r in skills:
+                    if r["model"] == m and r["condition"] == "notebook" and r["phase"] == "practice" and (r["task"], r["run_seed"]) in ks:
+                        own[(r["task"], r["run_seed"])] = own.get((r["task"], r["run_seed"]), 0.0) + r["cost_usd"]
+                op = float(np.mean(list(own.values()))) if own else float("nan")
+                ev = lambda c: mean([r for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True) if (r["task"], r["run_seed"]) in ks], "cost_usd")
+                own_ep, bor_ep = ev("notebook"), ev("borrowed")
+                be_f = f"{fp / (fr_ep - bor_ep):,.0f} episodes" if fr_ep > bor_ep else "never"
+                be_o = f"{(fp - op) / (own_ep - bor_ep):,.0f} episodes" if own_ep > bor_ep else "never (not cheaper per episode)"
+                cr.append((m, f"${fp:.2f}", f"${f1:.2f}", f"${op:.3f}", f"${fr_ep:.4f}", f"${own_ep:.4f}", f"${bor_ep:.4f}", be_f, be_o))
+            L += ["**What the notebook costs, practice only on both sides** (evaluation episodes are not part of making a notebook; retries are inside the dollar figures once). Fable's 12 practice episodes and rewrites against the cheap model's own 12, and the number of episodes of the same job after which the one-off cost is repaid:", "",
+                  table(["cheap model", "Fable notebook, per run", "of which practice episode 1 and its rewrite", "cheap model's own notebook, per run", "Fable first try, per episode", "cheap model with own notebook, per episode", "cheap model with Fable's notebook, per episode", "repaid against running Fable directly after", "repaid against the cheap model's own notebook after"], cr), "",
+                  "`results/notebook_audit.md` counts in how many Fable runs the notebook already names the fixing setting after practice episode 1 (a keyword check, outcome-informed, see there); Fable also never failed a practice episode, so a one-episode notebook might cost about the 'practice episode 1' column. That was not tested: it is a guess, not a result. "
+                  "The comparison assumes the notebook is reused for the same job, and Fable's notebook is a one-off cost that a deployment would pay once per job, not per run.", ""]
 
     # --- pose
     if pose:
-        L += ["## 6. Skill-level against pose-level tools", "", "Pose-level runs have no `pick` or `place`: the model builds them from `move_to` and the gripper, with three times the call budget.", ""]
+        L += ["## 7. Skill-level against pose-level tools", "", "Pose-level runs have no `pick` or `place`: the model builds them from `move_to` and the gripper, with three times the call budget.", ""]
         pr = []
         for m in sorted({r["model"] for r in pose}):
             for tools, rs in (("skills", skills), ("pose", pose)):
@@ -354,10 +443,10 @@ def main():
         x = A.select(skills, model=m, phase="eval", quirk=True)
         if x:
             fc.append((m, len(x), f(mean(x, "claimed_done"), True), f(sum(r["false_claim"] for r in x) / len(x), True)))
-    L += ["## 7. Saying 'done' when the job is not done", "", table(["model", "held-out episodes", "said done", "said done but the simulator disagreed"], fc), ""]
+    L += ["## 8. Saying 'done' when the job is not done", "", table(["model", "held-out episodes", "said done", "said done but the simulator disagreed"], fc), ""]
 
     dev = ROOT / "results/deviations.md"
-    L += ["## 8. Deviations from the protocol", "", dev.read_text() if dev.exists() else "None recorded.", ""]
+    L += ["## 9. Deviations from the protocol", "", dev.read_text() if dev.exists() else "None recorded.", ""]
     Path(a.out).write_text("\n".join(L))
     Path(a.img).mkdir(parents=True, exist_ok=True)
     if cheap and any(r["phase"] == "practice" for r in skills):
