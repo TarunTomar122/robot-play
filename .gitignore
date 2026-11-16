@@ -7,3 +7,4 @@ runs/
 *.egg-info/
 .pytest_cache/
 council/raw/
+logs/

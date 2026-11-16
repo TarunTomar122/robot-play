@@ -105,7 +105,7 @@ The plan is about 5,300 episodes. The money is capped in code: Anthropic stops a
 ## Run it yourself
 
 ```bash
-uv sync                                  # installs MuJoCo 4.0.1 and the pinned packages from uv.lock
+uv sync --extra dev                      # installs MuJoCo 4.0.1, the pinned packages from uv.lock and pytest
 bash scripts/fetch_models.sh             # downloads the Franka Panda model at the pinned revision
 .venv/bin/python -m pytest -q            # the automated tests (no network, no money)
 .venv/bin/python scripts/play.py start stack 11
