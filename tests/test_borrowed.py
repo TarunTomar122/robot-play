@@ -46,3 +46,14 @@ def test_a_borrowed_run_shows_the_notebook_labelled_as_another_assistants_and_ne
     from robot_play.runner import ConfigMismatch
     with pytest.raises(ConfigMismatch):
         run_one(spec2, FakeProvider([]))                                          # a changed notebook is a different run, never resumed
+
+
+def test_the_wrong_task_control_reads_another_tasks_notebook_and_says_so(tmp_path):
+    for t, text in (("stack", "STACK NOTES"), ("bins", "BINS NOTES"), ("flasks", "FLASK NOTES")):
+        _write_frontier_run(tmp_path, t, 0, text)
+    specs = {s.task: s for s in build_specs("borrowed_other", ["claude-haiku-5-5"], [0], "o", source_dir=str(tmp_path))}
+    assert specs["stack"].borrowed_notebook == "BINS NOTES" and specs["bins"].borrowed_notebook == "FLASK NOTES" and specs["flasks"].borrowed_notebook == "STACK NOTES"
+    from robot_play.agent import Memory
+    block = Memory("borrowed_other", notebook="x").prompt_block()
+    assert "DIFFERENT task" in block and "this same task" not in block and "written by you" not in block
+    assert len({s.key for s in specs.values()} | {s.key for s in build_specs("borrowed", ["claude-haiku-5-5"], [0], "o", source_dir=str(tmp_path))}) == 6      # separate files from the matching cell

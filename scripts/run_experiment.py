@@ -25,7 +25,7 @@ def parse_seeds(s: str) -> list[int]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cell", required=True, choices=["main", "control", "frontier", "frontier_exp", "pilot", "pilot_pose", "pose", "borrowed"])
+    ap.add_argument("--cell", required=True, choices=["main", "control", "frontier", "frontier_exp", "pilot", "pilot_pose", "pose", "borrowed", "borrowed_other"])
     ap.add_argument("--models", nargs="+", required=True)
     ap.add_argument("--tasks", nargs="+", default=None)
     ap.add_argument("--seeds", default="0")

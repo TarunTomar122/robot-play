@@ -261,6 +261,14 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
                     text = frontier_notebook(source_dir, source_model, t, s)
                     if text:
                         specs.append(RunSpec(m, t, "borrowed", s, True, practice=0, borrowed_notebook=text, **common))
+    elif cell == "borrowed_other":              # the control for "borrowed": the notebook of a DIFFERENT task (stack reads the sort notebook, sort the flask one, flasks the stack one)
+        shift = {"stack": "bins", "bins": "flasks", "flasks": "stack"}
+        for m in models:
+            for t in tasks:
+                for s in run_seeds:
+                    text = frontier_notebook(source_dir, source_model, shift[t], s)
+                    if text:
+                        specs.append(RunSpec(m, t, "borrowed_other", s, True, practice=0, borrowed_notebook=text, **common))
     else:
         raise ValueError(cell)
     return specs
