@@ -456,7 +456,7 @@ def main():
                 cr.append((m, f"${fp:.2f}", f"${f1:.2f}", f"${op:.3f}", f"${fr_ep:.4f}", f"${own_ep:.4f}", f"${bor_ep:.4f}", be_f, be_o))
             L += ["**What the notebook costs, practice only on both sides** (evaluation episodes are not part of making a notebook; retries are inside the dollar figures once; the dollars of attempts that were abandoned and redone are added; the few cents of run files deleted in deviation 2 cannot be allocated and are not included). Fable's 12 practice episodes and rewrites against the cheap model's own 12, and the number of episodes of the same job after which the one-off cost is repaid:", "",
                   table(["cheap model", "Fable notebook, per run", "of which practice episode 1 and its rewrite", "cheap model's own notebook, per run", "Fable first try, per episode", "cheap model with own notebook, per episode", "cheap model with Fable's notebook, per episode", "repaid against running Fable directly after", "repaid against the cheap model's own notebook after"], cr), "",
-                  "`results/notebook_audit.md` counts in how many Fable runs the notebook already names the fixing setting after practice episode 1 (a keyword check, outcome-informed, see there); Fable also never failed a practice episode, so a one-episode notebook might cost about the 'practice episode 1' column. That was not tested: it is a guess, not a result. "
+                  "`results/notebook_audit.md` counts in how many Fable runs the notebook already names the fixing setting after practice episode 1 (a keyword check, outcome-informed, see there); Fable also never failed a practice episode, so a one-episode notebook costs about the 'practice episode 1' column; section 6a tests exactly that (the cheap models read Fable's notebook as it stood after one practice episode) on the same finished runs. "
                   "The comparison assumes the notebook is reused for the same job, and Fable's notebook is a one-off cost that a deployment would pay once per job, not per run.", ""]
 
     # --- Q5b: how short can the expensive practice be? (v1.5, exploratory)
@@ -517,9 +517,22 @@ def main():
             dc = A.paired_difference(rs, "claude-haiku-5-5", "notebook", "none", metric="calls_to_success")
             if d.get("n_pairs"):
                 cmp_.append((label, d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True), ci(dc)))
+        gaps = {}
+        for label, rs in sims:
+            ma = A._run_means(A.select(rs, model="claude-haiku-5-5", task="stack", condition="notebook", phase="eval", quirk=True), "success")
+            mb = A._run_means(A.select(rs, model="claude-haiku-5-5", task="stack", condition="none", phase="eval", quirk=True), "success")
+            gaps[label] = {k[1]: ma[k] - mb[k] for k in set(ma) & set(mb)}
+        gap_rows = []
+        for other in ("symptom fixed (v1.5B)", "cause fixed too (v1.5C)"):
+            common = sorted(set(gaps["registered simulator"]) & set(gaps.get(other, {})))
+            if len(common) >= 5:
+                est, lo, hi = A.bootstrap([np.array([gaps["registered simulator"][k] - gaps[other][k]]) for k in common], np.mean, 10_000)
+                gap_rows.append((f"registered minus {other}", len(common), f"{100 * est:+.1f} points (95% CI {100 * lo:+.1f} to {100 * hi:+.1f})"))
         L += [table(["simulator", "memory", "runs", "held-out episodes", "solved", "calls to success", "episodes with a false 'holding'", "episodes with a short move_to"], fx), "",
               "Notebook against no memory on the same ten run seeds, per simulator (a run needs both arms complete):", "",
-              table(["simulator", "pairs", "notebook", "no memory", "success difference", "calls-to-success difference"], cmp_), ""]
+              table(["simulator", "pairs", "notebook", "no memory", "success difference", "calls-to-success difference"], cmp_), "",
+              "How much smaller is the notebook gain on a simulator with the defect removed? Difference of the gains, paired by run seed (a run-level bootstrap of the ten per-seed differences, exploratory and not pre-registered). The observed gain is smaller; with ten run seeds and one model the size of that change is uncertain, and an interval that includes zero means the data do not exclude no change at all:", "",
+              table(["difference of gains", "run seeds", "estimate"], gap_rows), ""]
 
     # --- 6c: the registered Q1 comparison replicated on the corrected simulator (v1.6; exploratory)
     rep_rows = A.load(*ex(a.rep), complete_only=True) if ex(a.rep) else []
@@ -548,28 +561,35 @@ def main():
                 if x:
                     art.append((m, NAMES[c], len(x), sum(1 for r in x if r["false_hold"]), sum(1 for r in x if r["short_move"]), f"{sum(r['success'] for r in x)}/{len(x)}"))
         L += ["The artefact symptoms of section 2a on this code (both should now be 0):", "", table(["model", "memory", "held-out episodes", "with a false 'holding'", "with a short move_to", "solved"], art), ""]
-        # the predictions of v1.6, scored mechanically
+        # the predictions of v1.6, scored mechanically, and only once every required cell and pair exists
+        expected_pairs = {"all three jobs": 30, "stack": 10, "bins": 10, "flasks": 10}
+        missing = [f"{m} {t}: {verdict.get((m, t), {}).get('n_pairs', 0)} of {n} pairs" for m in cheap for t, n in expected_pairs.items() if verdict.get((m, t), {}).get("n_pairs", 0) < n]
+        bad_files = [c["file"] for c in rcov if c.get("code") != "8fdcf6b2491b68a3" or not 20 <= c["run_seed"] <= 29]
+        L += [f"Validation of the included files: {len(rcov)} run files, every one with code hash `8fdcf6b2491b68a3` and a run seed from 20 to 29: {'yes' if not bad_files else 'NO, ' + ', '.join(bad_files[:5])}. "
+              + (f"**Incomplete: {len(missing)} of {len(cheap) * len(expected_pairs)} model and job cells are missing pairs ({'; '.join(missing[:6])}{' ...' if len(missing) > 6 else ''}). Every prediction below is pending until all 120 runs are complete.**" if missing else "All 120 planned runs are complete."), ""]
         pr = []
         hs, hall = verdict.get(("claude-haiku-5-5", "stack")), verdict.get(("claude-haiku-5-5", "all three jobs"))
         ls_ = verdict.get(("gpt-6-luna", "all three jobs"))
         if hs:
             pr.append(("1. Haiku `stack`: notebook at or above 90%, no memory 30% to 75%, gain at least +20 points",
-                       f"notebook {f(hs['a'], True)}, no memory {f(hs['b'], True)}, gain {hs['diff'] * 100:+.1f}", "met" if hs["a"] >= 0.90 and 0.30 <= hs["b"] <= 0.75 and hs["diff"] >= 0.20 else "MISSED"))
+                       f"notebook {f(hs['a'], True)}, no memory {f(hs['b'], True)}, gain {hs['diff'] * 100:+.1f}", "pending" if missing else ("met" if hs["a"] >= 0.90 and 0.30 <= hs["b"] <= 0.75 and hs["diff"] >= 0.20 else "MISSED")))
         if hall:
             pr.append(("2. Haiku pooled: gain at least +10 points with the 95% interval above zero", f"gain {hall['diff'] * 100:+.1f}, interval {hall['lo'] * 100:+.1f} to {hall['hi'] * 100:+.1f}",
-                       "met" if hall["diff"] >= 0.10 and hall["lo"] > 0 else "MISSED"))
+                       "pending" if missing else ("met" if hall["diff"] >= 0.10 and hall["lo"] > 0 else "MISSED")))
         if ls_:
             pr.append(("3. Luna pooled: a small positive gain below +15 points (interval may include zero)", f"gain {ls_['diff'] * 100:+.1f}, interval {ls_['lo'] * 100:+.1f} to {ls_['hi'] * 100:+.1f}",
-                       "met" if 0 < ls_["diff"] < 0.15 else "MISSED"))
+                       "pending" if missing else ("met" if 0 < ls_["diff"] < 0.15 else "MISSED")))
         worst = [(k, v) for k, v in verdict.items() if k[1] != "all three jobs" and v["diff"] < -0.05]
-        pr.append(("4. No job where the notebook arm is more than 5 points below no memory", "none" if not worst else "; ".join(f"{k[0]} {k[1]} {v['diff'] * 100:+.1f}" for k, v in worst), "met" if not worst else "MISSED"))
+        pr.append(("4. No job where the notebook arm is more than 5 points below no memory", "none" if not worst else "; ".join(f"{k[0]} {k[1]} {v['diff'] * 100:+.1f}" for k, v in worst), "pending" if missing else ("met" if not worst else "MISSED")))
         against = []
         if hs and hs["b"] >= 0.85:
             against.append("Haiku `stack` no memory at 85% or more")
         if hall and hall["diff"] < 0.05:
             against.append("pooled Haiku gain below +5 points")
         L += ["Predictions of PROTOCOL.md v1.6, scored by the generator:", "", table(["prediction", "result", "status"], pr), "",
-              ("**The registered headline did not replicate on the corrected simulator** (" + "; ".join(against) + ")." if against else "The pre-stated condition against the claim (Haiku `stack` no memory at 85% or more, or a pooled Haiku gain below +5 points) did not occur."), ""]
+              ("Pending: the pre-stated conditions against the claim (Haiku `stack` no memory at 85% or more, or a pooled Haiku gain below +5 points) are judged only when all runs are complete." if missing else
+               ("**The registered headline did not replicate on the corrected simulator** (" + "; ".join(against) + ")." if against else "The pre-stated condition against the claim (Haiku `stack` no memory at 85% or more, or a pooled Haiku gain below +5 points) did not occur.")),
+              "The four predictions were written after the registered and three-simulator results were known, so they are predictions about a replication, not independent forecasts; the condition against the claim leaves a middle zone (a pooled Haiku gain between +5 and +10 points) in which the replication is neither confirmed nor refuted, and the report says so if it lands there.", ""]
         dr = []
         for m in cheap:
             for c in ("none", "notebook"):
