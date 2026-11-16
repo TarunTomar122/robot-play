@@ -3,7 +3,8 @@
 For every notebook run (a model, a job, a run seed) this reads the notebook the model wrote after each practice episode and checks whether it names the fixing setting:
   stack  : a firm grip      -> grip_level set to firm
   bins   : letting go high  -> release_height of 0.14 or more
-  flasks : a high grasp     -> grasp_height of 0.85 or more
+  flasks : a high grasp     -> grasp_height of 0.8 or more (the pose gate found the catch bites below about 80% of the flask height; I first wrote 0.85, a guess, and changed it
+                               to 0.8 after reading Fable's finished notebooks, which use 0.8 and succeed; this is stated in the report)
 It reports, per model and job, the share of runs whose final notebook names the fix, how many practice episodes it took on average, and the held-out success of runs whose
 notebook names the fix against runs whose notebook does not. A notebook can name the fix and the model can still fail, or succeed without naming it; this table says which.
   python scripts/notebook_audit.py runs/main --out results/notebook_audit.md"""
@@ -18,9 +19,9 @@ import numpy as np
 FIX = {
     "stack": lambda t: re.search(r"grip_level[\"'\s:=]*firm", t, re.I) is not None,
     "bins": lambda t: any(float(v) >= 0.14 for v in re.findall(r"release_height[\"'\s:=]*([0-9]*\.?[0-9]+)", t)),
-    "flasks": lambda t: any(float(v) >= 0.85 for v in re.findall(r"grasp_height[\"'\s:=]*([0-9]*\.?[0-9]+)", t)),
+    "flasks": lambda t: any(float(v) >= 0.8 for v in re.findall(r"grasp_height[\"'\s:=]*([0-9]*\.?[0-9]+)", t)),
 }
-NAMES = {"stack": "stack (firm grip)", "bins": "sort (release from 14 cm or higher)", "flasks": "stand the flasks (grasp at 0.85 or higher)"}
+NAMES = {"stack": "stack (firm grip)", "bins": "sort (release from 14 cm or higher)", "flasks": "stand the flasks (grasp at 0.8 or higher)"}
 
 
 def _text(mem) -> str:
