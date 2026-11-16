@@ -102,6 +102,7 @@ def main():
     ap.add_argument("--ext", nargs="*", default=["runs/main_ext"], help="exploratory room-cell extension (Haiku, stack and bins, run seeds 10-19); never enters a confirmatory number")
     ap.add_argument("--fixhold", nargs="*", default=["runs/main_fixhold"], help="exploratory rerun of Haiku on stack with only the false-holding symptom fixed (PROTOCOL.md v1.5B); never pooled with the registered rows")
     ap.add_argument("--fixcollide", nargs="*", default=["runs/main_fixcollide"], help="exploratory rerun of Haiku on stack with the cause fixed too: move_to planned with the real finger opening (PROTOCOL.md v1.5C)")
+    ap.add_argument("--rep", nargs="*", default=["runs/rep_fixed"], help="exploratory replication of the registered Q1 comparison on the corrected simulator, run seeds 20-29 (PROTOCOL.md v1.6); never pooled with the registered rows")
     ap.add_argument("--meter", default="runs/spend")
     ap.add_argument("--out", default="results/RESULTS.md")
     ap.add_argument("--img", default="docs/img")
@@ -147,7 +148,7 @@ def main():
     L += ["Coverage. Only runs that finished their whole plan enter the confirmatory comparisons below. An abandoned attempt (provider failure, cut-off reply, failed notebook rewrite, budget stop) is redone on resume and its cost is kept:", "",
           table(["model", "tools", "memory", "scene", "runs started", "runs complete", "episodes finished/planned", "abandoned attempts"], cvr) if cvr else "No runs yet.", ""]
     by_dir = {}
-    extra_cov = A.coverage(*ex(a.fixhold + a.fixcollide)) if ex(a.fixhold + a.fixcollide) else []
+    extra_cov = A.coverage(*ex(a.fixhold + a.fixcollide + a.rep)) if ex(a.fixhold + a.fixcollide + a.rep) else []
     for c in cov + ext_cov + extra_cov:
         by_dir.setdefault(c["dir"], {}).setdefault(c.get("code") or "unknown", 0)
         by_dir[c["dir"]][c.get("code") or "unknown"] += 1
@@ -170,7 +171,8 @@ def main():
                 planned.append((cell, cheap_m, range(10), d, {"source_dir": "runs/frontier_exp"}))      # planned only where the Fable notebook it reads finished
         missing = {}
         planned += [("main", ["claude-haiku-5-5"], range(10), "runs/main_fixhold", {"tasks": ["stack"], "only": ("none", "notebook")}),
-                    ("main", ["claude-haiku-5-5"], range(10), "runs/main_fixcollide", {"tasks": ["stack"], "only": ("none", "notebook")})]
+                    ("main", ["claude-haiku-5-5"], range(10), "runs/main_fixcollide", {"tasks": ["stack"], "only": ("none", "notebook")}),
+                    ("main", cheap_m, range(20, 30), "runs/rep_fixed", {"only": ("none", "notebook")})]
         for cell, ms, seeds, d, kw in planned:
             kw = dict(kw)
             only = kw.pop("only", None)
@@ -518,6 +520,65 @@ def main():
         L += [table(["simulator", "memory", "runs", "held-out episodes", "solved", "calls to success", "episodes with a false 'holding'", "episodes with a short move_to"], fx), "",
               "Notebook against no memory on the same ten run seeds, per simulator (a run needs both arms complete):", "",
               table(["simulator", "pairs", "notebook", "no memory", "success difference", "calls-to-success difference"], cmp_), ""]
+
+    # --- 6c: the registered Q1 comparison replicated on the corrected simulator (v1.6; exploratory)
+    rep_rows = A.load(*ex(a.rep), complete_only=True) if ex(a.rep) else []
+    if rep_rows:
+        rcov = A.coverage(*ex(a.rep))
+        L += ["## 6c. Exploratory: the registered Q1 comparison replicated on the corrected simulator, fresh layouts", "",
+              "Registered before it ran (PROTOCOL.md v1.6, 23:51). Both cheap models, all three jobs, run seeds 20 to 29 (layouts no other cell uses), memory `none` and `notebook`, on the code with the false-holding cause fixed (tag `code-fixed`). "
+              "Plain 95% intervals, the same interval rule as Q1, paired by (task, run seed); **never pooled** with the registered Q1 rows above, which stay the confirmatory result. "
+              f"Runs complete: {sum(int(c['complete']) for c in rcov)} of {len(rcov)} started (120 planned); episodes finished {sum(c['done'] for c in rcov)} of {sum(c['planned'] for c in rcov)}.", ""]
+        rr = []
+        verdict = {}
+        for m in cheap:
+            for tl, tname in ((None, "all three jobs"), (["stack"], "stack"), (["bins"], "bins"), (["flasks"], "flasks")):
+                d = A.paired_difference(rep_rows, m, "notebook", "none", tasks=tl)
+                dc = A.paired_difference(rep_rows, m, "notebook", "none", metric="calls_to_success", tasks=tl)
+                if d.get("n_pairs"):
+                    rr.append((m, tname, d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True), ci(dc)))
+                    verdict[(m, tname)] = d
+        L += [table(["model", "jobs", "pairs (task, run seed)", "notebook", "no memory", "success difference", "calls-to-success difference"], rr), "",
+              "The registered Q1 rows for comparison (run seeds 0 to 9, registered simulator): " + "; ".join(
+                  f"{m}: {ci(A.paired_difference(skills, m, 'notebook', 'none'), pct=True)}" for m in cheap) + ".", ""]
+        art = []
+        for m in cheap:
+            for c in ("none", "notebook"):
+                x = A.select(rep_rows, model=m, condition=c, phase="eval", quirk=True)
+                if x:
+                    art.append((m, NAMES[c], len(x), sum(1 for r in x if r["false_hold"]), sum(1 for r in x if r["short_move"]), f"{sum(r['success'] for r in x)}/{len(x)}"))
+        L += ["The artefact symptoms of section 2a on this code (both should now be 0):", "", table(["model", "memory", "held-out episodes", "with a false 'holding'", "with a short move_to", "solved"], art), ""]
+        # the predictions of v1.6, scored mechanically
+        pr = []
+        hs, hall = verdict.get(("claude-haiku-5-5", "stack")), verdict.get(("claude-haiku-5-5", "all three jobs"))
+        ls_ = verdict.get(("gpt-6-luna", "all three jobs"))
+        if hs:
+            pr.append(("1. Haiku `stack`: notebook at or above 90%, no memory 30% to 75%, gain at least +20 points",
+                       f"notebook {f(hs['a'], True)}, no memory {f(hs['b'], True)}, gain {hs['diff'] * 100:+.1f}", "met" if hs["a"] >= 0.90 and 0.30 <= hs["b"] <= 0.75 and hs["diff"] >= 0.20 else "MISSED"))
+        if hall:
+            pr.append(("2. Haiku pooled: gain at least +10 points with the 95% interval above zero", f"gain {hall['diff'] * 100:+.1f}, interval {hall['lo'] * 100:+.1f} to {hall['hi'] * 100:+.1f}",
+                       "met" if hall["diff"] >= 0.10 and hall["lo"] > 0 else "MISSED"))
+        if ls_:
+            pr.append(("3. Luna pooled: a small positive gain below +15 points (interval may include zero)", f"gain {ls_['diff'] * 100:+.1f}, interval {ls_['lo'] * 100:+.1f} to {ls_['hi'] * 100:+.1f}",
+                       "met" if 0 < ls_["diff"] < 0.15 else "MISSED"))
+        worst = [(k, v) for k, v in verdict.items() if k[1] != "all three jobs" and v["diff"] < -0.05]
+        pr.append(("4. No job where the notebook arm is more than 5 points below no memory", "none" if not worst else "; ".join(f"{k[0]} {k[1]} {v['diff'] * 100:+.1f}" for k, v in worst), "met" if not worst else "MISSED"))
+        against = []
+        if hs and hs["b"] >= 0.85:
+            against.append("Haiku `stack` no memory at 85% or more")
+        if hall and hall["diff"] < 0.05:
+            against.append("pooled Haiku gain below +5 points")
+        L += ["Predictions of PROTOCOL.md v1.6, scored by the generator:", "", table(["prediction", "result", "status"], pr), "",
+              ("**The registered headline did not replicate on the corrected simulator** (" + "; ".join(against) + ")." if against else "The pre-stated condition against the claim (Haiku `stack` no memory at 85% or more, or a pooled Haiku gain below +5 points) did not occur."), ""]
+        dr = []
+        for m in cheap:
+            for c in ("none", "notebook"):
+                ds = A.disturbance_summary(rep_rows, m, c)
+                if ds.get("n_disturbed"):
+                    dr.append((m, NAMES[c], ds["n_disturbed"], f(ds["fire_rate"], True), f(ds["success_all_assigned"], True), f(ds["success_same_layouts_clean"], True)))
+        if dr:
+            L += ["Disturbed held-out episodes on the same code (catch scenes, exploratory replication of the catch-scene recovery rows of section 5):", "",
+                  table(["model", "memory", "disturbed episodes", "disturbance fired", "success, all assigned", "same layouts, no disturbance"], dr), ""]
 
     # --- pose
     if pose:

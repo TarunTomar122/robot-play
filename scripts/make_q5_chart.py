@@ -42,13 +42,14 @@ def main():
     if not models:
         print("no borrowed runs yet")
         return
-    fig, axes = plt.subplots(1, len(models), figsize=(6.8 * len(models), 4.4), facecolor=SURFACE, squeeze=False, sharey=True)
+    fig, axes = plt.subplots(1, len(models), figsize=(8.6 * len(models), 4.6), facecolor=SURFACE, squeeze=False, sharey=True)
+    runs_per_model = []
     for ax, m in zip(axes[0], models):
         keys = None
         for cond, _, _ in COND:
             kc = set(run_success(rows, m, cond))
             keys = kc if keys is None else keys & kc
-        w = 0.19
+        w = 0.205
         for ci, (cond, label, color) in enumerate(COND):
             for gi, (task, _) in enumerate(JOBS):
                 by = {k: v for k, v in run_success(rows, m, cond, task).items() if k in keys}
@@ -65,7 +66,7 @@ def main():
                 if lo == lo:
                     ax.errorbar(x, 100 * est, yerr=[[100 * (est - lo)], [100 * (hi - est)]], color=INK, lw=1, capsize=2, zorder=3)
                 top = max(est, hi) if hi == hi else est                                  # the label sits above the top of the error bar, never on it
-                ax.text(x, 100 * top + 1.5, f"{100 * est:.0f}", ha="center", va="bottom", fontsize=8, color=INK)
+                ax.text(x, 100 * top + 1.5, f"{100 * est:.0f}", ha="center", va="bottom", fontsize=7, color=INK)
         ax.set_xticks(range(len(JOBS)))
         ax.set_xticklabels([n for _, n in JOBS], color=INK)
         ax.set_ylim(0, 118)
@@ -76,12 +77,13 @@ def main():
             ax.spines[s].set_visible(False)
         ax.tick_params(length=0, colors=MUTED)
         ax.set_title(m, loc="left", fontsize=11, color=INK)
-        n = len(keys)
-        ax.text(0.0, -0.16, f"{n} runs (task and run seed) behind the pooled bar, the same runs split by job in the others; 4 held-out layouts per run", transform=ax.transAxes, fontsize=8, color=MUTED)
+        runs_per_model.append(f"{m}: {len(keys)} runs")
     axes[0][0].set_ylabel("held-out layouts solved (%)", color=INK)
     axes[0][0].legend(frameon=False, fontsize=8, loc="lower left", bbox_to_anchor=(0, 1.16), ncol=2)
     fig.suptitle("Can a cheap model use a stronger model's notes? (exploratory)", x=0.01, y=1.02, ha="left", fontsize=13, fontweight="bold", color=INK)
     fig.tight_layout()
+    fig.text(0.01, -0.03, "Same runs (task and run seed) in every bar of a model; the pooled bar uses all of them and the job bars split them. " + "; ".join(runs_per_model)
+             + ", 4 held-out layouts per run. Error bars: 95%, the wider of the run-level bootstrap and a sampling-noise floor.", fontsize=8, color=MUTED, ha="left")
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(a.out, dpi=140, bbox_inches="tight", facecolor=SURFACE)
     print("wrote", a.out)
