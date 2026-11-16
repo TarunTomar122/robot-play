@@ -303,6 +303,15 @@ def main():
                 if d.get("n_pairs"):
                     q5.append((m, f"{NAMES[first]} against {NAMES[other]}", d["n_pairs"], f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
         L += [table(["model", "comparison", "runs (task, run seed)", "first", "second", "difference"], q5) if q5 else "No complete comparison yet.", ""]
+        gaps = []
+        for fr in [m for m in models if m in ("claude-fable-5-2", "gpt-6-astra")]:
+            for ch in cheap:
+                g = A.q3_gap(skills, fr, ch, cheap_condition="borrowed", alpha=0.05)
+                if g.get("n_layouts"):
+                    gaps.append((fr, ch, f"{g['n_layouts']} in {g['n_clusters']} runs", f(g["frontier"], True), f(g["cheap"], True), ci(g, "gap", pct=True)))
+        if gaps:
+            L += ["Frontier first try against a cheap model that only reads Fable's notebook, on the same layouts (exploratory, same interval rule as Q3 at 95%; the cheap arm carries the design effect because the four layouts of a run share one notebook):", "",
+                  table(["frontier first try", "cheap model with Fable's notebook", "layouts", "frontier", "cheap", "gap (frontier minus cheap)"], gaps), ""]
         ks = sorted({(r["task"], r["run_seed"]) for r in bor})
         if ks and fcost:
             own = [r for m in cheap for r in skills if r["model"] == m and r["condition"] == "notebook" and r["phase"] in ("practice", "eval") and (r["task"], r["run_seed"]) in ks]

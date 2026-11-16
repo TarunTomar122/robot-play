@@ -194,10 +194,10 @@ def intraclass(rows, model: str, m: int = 4, condition: str = "notebook") -> flo
 def q3_deff(rows, cheap: str, m: int = 4, condition: str = "notebook") -> float:
     """Design effect of the cheap arm, fixed in PROTOCOL.md section 1. With a notebook the four layouts of a run share it: 1 + (m - 1) x the intraclass correlation of that
     model's own notebook held-out outcomes, never below 2 (an intraclass correlation of at least one third is assumed even where the data show none, because at
-    ceiling there is nothing to estimate it from). With no memory nothing is shared and the design effect is 1 (the exploratory no-memory row)."""
-    if condition != "notebook":
+    ceiling there is nothing to estimate it from). With no memory nothing is shared and the design effect is 1 (the exploratory no-memory row). The exploratory borrowed-notebook rows are treated like the notebook rows."""
+    if condition == "none":
         return 1.0
-    return max(2.0, 1.0 + (m - 1) * intraclass(rows, cheap, m, condition))
+    return max(2.0, 1.0 + (m - 1) * intraclass(rows, cheap, m, condition))      # any memory shared by the four layouts of a run: its own notebook or a borrowed one
 
 
 def q3_gap(rows, frontier: str, cheap: str, cheap_condition: str = "notebook", margin: float = 0.10, n_boot: int = 10_000, alpha: float = ALPHA_Q3) -> dict:
