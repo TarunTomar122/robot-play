@@ -449,7 +449,8 @@ def main():
                 ev = lambda c: mean([r for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True) if (r["task"], r["run_seed"]) in ks], "cost_usd")
                 own_ep, bor_ep = ev("notebook"), ev("borrowed")
                 be_f = f"{fp / (fr_ep - bor_ep):,.0f} episodes" if fr_ep > bor_ep else "never"
-                be_o = f"{(fp - op) / (own_ep - bor_ep):,.0f} episodes" if own_ep > bor_ep else "never (not cheaper per episode)"
+                be_o = ("never (not cheaper per episode)" if own_ep <= bor_ep else
+                        (f"{(fp - op) / (own_ep - bor_ep):,.0f} episodes" if (fp - op) / (own_ep - bor_ep) < 100_000 else "effectively never (over 100,000 episodes)"))
                 cr.append((m, f"${fp:.2f}", f"${f1:.2f}", f"${op:.3f}", f"${fr_ep:.4f}", f"${own_ep:.4f}", f"${bor_ep:.4f}", be_f, be_o))
             L += ["**What the notebook costs, practice only on both sides** (evaluation episodes are not part of making a notebook; retries are inside the dollar figures once; the dollars of attempts that were abandoned and redone are added; the few cents of run files deleted in deviation 2 cannot be allocated and are not included). Fable's 12 practice episodes and rewrites against the cheap model's own 12, and the number of episodes of the same job after which the one-off cost is repaid:", "",
                   table(["cheap model", "Fable notebook, per run", "of which practice episode 1 and its rewrite", "cheap model's own notebook, per run", "Fable first try, per episode", "cheap model with own notebook, per episode", "cheap model with Fable's notebook, per episode", "repaid against running Fable directly after", "repaid against the cheap model's own notebook after"], cr), "",
