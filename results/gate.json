@@ -2,7 +2,7 @@
  "seeds": 100,
  "table": {
   "bins|control|naive": {
-   "success": 100,
+   "success": 99,
    "n": 100
   },
   "bins|control|oracle": {

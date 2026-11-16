@@ -28,7 +28,7 @@ def test_matrix_sizes_match_the_protocol():
     assert len(main) == 2 * 3 * 3 * 5
     assert sum(len(s.episodes()) for s in main) == 1440 + 2 * 3 * 2 * 5 * 4          # 1,440 plus the 120 disturbed evaluation episodes
     control = build_specs("control", ["claude-haiku-5-5", "gpt-6-luna"], [0, 1, 2], "x")
-    assert sum(len(s.episodes()) for s in control) == 576
+    assert sum(len(s.episodes()) for s in control) == 576 + 2 * 3 * 2 * 3 * 4         # 576 plus the disturbed evaluation of the control scenes
 
 
 def test_calling_done_at_once_is_a_false_success_claim():
@@ -121,8 +121,55 @@ def test_a_provider_error_is_not_saved_as_a_failed_episode_and_changes_no_memory
     p = Dying([])
     res = run_one(spec, p)
     assert res["status"] == "aborted" and p.completes == 0
-    assert len(spec.path.read_text().splitlines()) == 1                       # header only: no episode row
+    lines = [json.loads(x) for x in spec.path.read_text().splitlines()]
+    assert len(lines) == 2 and "_config" in lines[0] and "_aborted" in lines[1]          # header and the abandoned-attempt line: no episode row
     assert run_one(spec, FakeProvider([[("done", {})]] * 10))["status"] == "ok"      # the redo then runs from the start
+    assert any("_aborted" in json.loads(x) for x in spec.path.read_text().splitlines())   # and the abandoned attempt stays on record
+
+
+def test_a_failed_notebook_rewrite_aborts_the_run_keeps_the_cost_and_is_redone_without_a_stale_notebook(tmp_path):
+    spec = RunSpec("claude-haiku-5-5", "stack", "notebook", 0, True, practice=2, eval_seed_list=[20_000], out_dir=str(tmp_path), meter_root=str(tmp_path / "m"))
+    bad = FakeProvider([[("done", {})]] * 20, notebook_text="")           # the rewrite comes back empty (failed or cut off)
+    res = run_one(spec, bad)
+    assert res["status"] == "aborted" and "notebook" in res["note"]
+    rows = [json.loads(x) for x in spec.path.read_text().splitlines()]
+    assert [("_aborted" in r) for r in rows] == [False, True]             # header, then the abandoned attempt; no episode row
+    assert rows[1]["_aborted"]["usd"] > 0                                  # the episode and the rewrite were paid for and stay on record
+    ok = FakeProvider([[("done", {})]] * 20, notebook_text="note B")
+    assert run_one(spec, ok)["status"] == "ok"
+    eps = [json.loads(x) for x in spec.path.read_text().splitlines() if '"result"' in x]
+    assert [e["idx"] for e in eps if e["phase"] == "practice"] == [0, 1] and eps[0]["memory"]["notebook"] == "note B"   # redone from the start with an empty notebook
+
+
+def test_resume_is_bound_to_the_code_revision_unless_a_change_is_declared(tmp_path, monkeypatch):
+    import robot_play.runner as R
+    spec = RunSpec("claude-haiku-5-5", "stack", "none", 0, True, practice=1, eval_seed_list=[20_000], out_dir=str(tmp_path), meter_root=str(tmp_path / "m"))
+    run_one(spec, FakeProvider([[("done", {})]] * 5))
+    monkeypatch.setattr(R, "code_hash", lambda: "different0000000")
+    with pytest.raises(ConfigMismatch, match="code"):
+        run_one(spec, FakeProvider([[("done", {})]] * 5))
+    monkeypatch.setenv(R.ALLOW_CODE_CHANGE, "1")
+    run_one(spec, FakeProvider([[("done", {})]] * 5))
+    cfg = json.loads(spec.path.read_text().splitlines()[0])["_config"]
+    assert cfg["code"] == "different0000000" and cfg["code_history"][0]["to"] == "different0000000"        # the declared change is logged in the file
+
+
+def test_the_matrix_has_the_episode_counts_the_protocol_promises(tmp_path):
+    cheap, front = ["claude-haiku-5-5", "gpt-6-luna"], ["claude-fable-5-2", "gpt-6-astra"]
+    cells = {"main": build_specs("main", cheap, list(range(10)), "o"), "control": build_specs("control", cheap, list(range(5)), "o"),
+             "frontier": build_specs("frontier", front, [0], "o"), "frontier_exp": build_specs("frontier_exp", ["claude-fable-5-2"], list(range(5)), "o"),
+             "pose": build_specs("pose", cheap, list(range(3)), "o")}
+    counts = {k: sum(len(s.episodes()) for s in v) for k, v in cells.items()}
+    assert counts == {"main": 3360, "control": 1200, "frontier": 120, "frontier_exp": 240, "pose": 576}      # 2,880 + 480 disturbed; 960 + 240 disturbed; then the other cells
+    assert sum(counts.values()) == 5496
+    assert len({s.key for s in cells["frontier_exp"]}) == 15 and len({s.run_seed for s in cells["frontier_exp"]}) == 5
+    all_specs = [s for v in cells.values() for s in v]
+    assert len({(s.out_dir, s.key) for s in all_specs}) == len(all_specs)                                   # no two runs write the same file within a cell
+    for s in all_specs:
+        seeds = [e["seed"] for e in s.episodes()]
+        prac = {e["seed"] for e in s.episodes() if e["phase"] == "practice"}
+        ev = {e["seed"] for e in s.episodes() if e["phase"] != "practice"}
+        assert not prac & ev and min(seeds) >= 10_000 and max(seeds) < 50_000        # clear of the gates (below 10,000) and of the pilot (50,000 and up)
 
 
 def test_one_provider_hitting_its_cap_skips_only_its_own_runs(tmp_path):
@@ -158,3 +205,12 @@ def test_pose_specs_are_separate_runs_with_their_own_budget_in_the_config():
     from robot_play.runner import build_specs
     specs = build_specs("pose", ["claude-haiku-5-5"], [0], "x")
     assert len(specs) == 6 and all(s.key.endswith("__pose") and s.config()["max_calls"] == 60 for s in specs if s.task == "bins")
+
+
+def test_disturbed_evaluation_uses_slip_and_nudge_except_in_the_control_flask_scene():
+    def kinds(task, quirk):
+        s = RunSpec("claude-haiku-5-5", task, "none", 0, quirk, disturb_eval=True)
+        return [e["disturbance"] for e in s.episodes() if e["phase"] == "eval_disturbed"]
+    assert kinds("stack", True) == ["slip", "nudge", "slip", "nudge"] and kinds("stack", False) == ["slip", "nudge", "slip", "nudge"]
+    assert kinds("flasks", True) == ["slip", "nudge", "slip", "nudge"]
+    assert kinds("flasks", False) == ["slip"] * 4                  # the nudge topples a plain cylinder for good (results/disturbance_control.md)

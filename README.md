@@ -14,7 +14,7 @@ Each job has one physical catch. The catch is not stated anywhere the model can 
 
 | Job | The catch | Can the model see it? | What a failure looks like | What fixes it |
 |---|---|---|---|---|
-| **Stack** three cubes into a tower | The green cube is heavy (250 g against 50 g) and slippery. A normal squeeze cannot hold it. | **No.** Weight and friction are never shown. | The fingers close to 1.9 cm and the cube stays on the table. | A firm grip. |
+| **Stack** three cubes into a tower | The green cube is heavy (250 g against 50 g) and slippery. A normal squeeze did not hold it in any of 100 test layouts. | **No.** Weight and friction are never shown. | The fingers close to 1.9 cm and the cube stays on the table. | A firm grip. |
 | **Sort** four cubes into a red bin and a blue bin | The bin walls are 12 cm tall, higher than the hand can reach over when it lowers the cube. | **Partly.** The wall heights are in the observation. What they mean for the hand is not stated. | `arm/hand would touch bin_red_wall2` | Letting go from 14 cm up or higher. |
 | **Stand** two flasks upright on rings | Each flask has a wide base (10 cm) that the fully open hand (8 cm) cannot get around. | **Partly.** The flask sizes are in the observation. What they mean for the fingers is not stated. | `hand stopped 1.4 cm short of the requested grasp point` | Grabbing the narrow neck near the top (`grasp_height` 0.9). |
 
@@ -58,7 +58,7 @@ A badly made job would give meaningless results. So before any AI is allowed nea
 
 ![dose response](docs/img/dose_response.png)
 
-**3. We know which settings matter** ([full table](results/settings_audit.md), 20 layouts per cell). Changing one setting at a time from its default, exactly one fixes each catch: a firm grip for the stack (20 of 20), letting go from 14 cm or higher for the sort (20 of 20), and a high grasp for the flasks (20 of 20). Speed, lift height and the pause after letting go change nothing in these jobs. A few settings do harm even without a catch (a light grip, turning the hand 45 degrees, a low grasp on the flasks). Turning the hand 45 degrees also happens to build the tower about half the time with the default grip, so there is more than one way to fix the stack. We do not call any setting a harmless decoy.
+**3. We know which settings matter** ([full table](results/settings_audit.md), 20 layouts per cell). Changing one setting at a time from its default, exactly one setting rescues each catch: a firm grip for the stack (20 of 20), letting go from 14 cm or higher for the sort (20 of 20), and a high grasp for the flasks (20 of 20). Speed, lift height and the pause after letting go never rescue a catch (all stay at 0 of 20), and fast placing even lowers success in the no-catch scenes (16 to 17 of 20). A few settings do harm without any catch (a light grip, a low grasp on the flasks, letting go at 0 cm). Turning the hand 45 degrees also builds the tower about half the time with the default grip (10 of 20), so there is more than one way to fix the stack. We do not call any setting a harmless decoy.
 
 **4. The disturbances work** ([table](results/disturbance.md), 50 fresh layouts per row, not the layouts the nudge was tuned on). Both the slip (the gripper lets go 3 cm into the lift) and the shove (a sideways push on the object) happened in every episode. A script that knows the catch but does not react never recovered (0 of 50 in every row). A script that tries again recovered in 47 to 50 of 50.
 

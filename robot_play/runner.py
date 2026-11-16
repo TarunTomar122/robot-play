@@ -5,6 +5,7 @@ last line instead of starting again.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import multiprocessing as mp
 import os
@@ -19,13 +20,25 @@ from .llm import load_env_keys, make_provider
 from .tools import CALL_BUDGET_FACTOR
 from .spend import PROVIDER_OF, BudgetExceeded, SpendMeter
 
-PROTOCOL_VERSION = "1.2"
+PROTOCOL_VERSION = "1.3"
 TASK_LIST = ["stack", "bins", "flasks"]
+DISTURBANCES = ["slip", "nudge"]
+ROOT = Path(__file__).resolve().parent.parent
+ALLOW_CODE_CHANGE = "ROBOT_PLAY_ALLOW_CODE_CHANGE"      # set to 1 to continue a run after a deliberate code change (it is then logged in the file)
 
 
 class ConfigMismatch(Exception):
-    """A run file exists but was written with a different setup (budget, seeds, prompts, tools, caps...). It is never silently continued."""
-DISTURBANCES = ["slip", "nudge"]
+    """A run file exists but was written with a different setup (budget, seeds, prompts, tools, caps, code...). It is never silently continued."""
+
+
+def code_hash() -> str:
+    """Hash of every source file of the package plus the pinned model download script: the code and the robot model a run was written with."""
+    h = hashlib.sha256()
+    code = [f for f in sorted((ROOT / "robot_play").glob("*.py")) if f.name not in ("analysis.py", "render.py")]       # analysis and charts never change what a run does
+    for f in code + [ROOT / "scripts" / "fetch_models.sh", ROOT / "uv.lock"]:
+        h.update(f.name.encode())
+        h.update(f.read_bytes() if f.exists() else b"")
+    return h.hexdigest()[:16]
 
 
 @dataclass
@@ -56,23 +69,27 @@ class RunSpec:
         """Everything that defines this run, stored as the first line of its file and compared on resume."""
         return {"protocol": PROTOCOL_VERSION, "model": self.model, "task": self.task, "condition": self.condition, "run_seed": self.run_seed,
                 "quirk": self.quirk, "practice": self.practice, "disturb_eval": self.disturb_eval,
-                "toolset": self.toolset, "max_calls": self.max_calls or TASKS[self.task].max_calls * CALL_BUDGET_FACTOR[self.toolset], "plan": self.episodes(), "setup": fingerprint(TASKS[self.task].instruction)}
+                "toolset": self.toolset, "max_calls": self.max_calls or TASKS[self.task].max_calls * CALL_BUDGET_FACTOR[self.toolset], "plan": self.episodes(), "setup": fingerprint(TASKS[self.task].instruction),
+                "code": code_hash()}
 
     def episodes(self) -> list[dict]:
         """The full ordered plan of episodes for this run."""
         plan = [{"phase": "practice", "idx": i, "seed": s, "disturbance": None} for i, s in enumerate(practice_seeds(self.run_seed)[: self.practice])]
         seeds = self.eval_seed_list if self.eval_seed_list is not None else eval_seeds(self.run_seed)
         plan += [{"phase": "eval", "idx": j, "seed": s, "disturbance": None} for j, s in enumerate(seeds)]
-        if self.disturb_eval and self.quirk:
-            plan += [{"phase": "eval_disturbed", "idx": j, "seed": s, "disturbance": DISTURBANCES[j % 2]} for j, s in enumerate(seeds)]
+        if self.disturb_eval:
+            # in the no-catch flask scene the nudge topples the plain cylinder and nothing can stand it up again (the retry script recovers 0 of 50,
+            # results/disturbance_control.md), so that scene gets the slip on all four layouts
+            kinds = ["slip"] * 2 if (self.task == "flasks" and not self.quirk) else DISTURBANCES
+            plan += [{"phase": "eval_disturbed", "idx": j, "seed": s, "disturbance": kinds[j % 2]} for j, s in enumerate(seeds)]
         return plan
 
 
-def _read(path: Path) -> tuple[dict | None, list[dict]]:
-    """(config, finished episodes). A half-written last line is dropped and that episode is redone."""
-    cfg, rows = None, []
+def _read(path: Path) -> tuple[dict | None, list[dict], list[dict]]:
+    """(config, finished episodes, abandoned attempts). A half-written last line is dropped and that episode is redone."""
+    cfg, rows, aborts = None, [], []
     if not path.exists():
-        return cfg, rows
+        return cfg, rows, aborts
     for line in path.read_text().splitlines():
         try:
             r = json.loads(line)
@@ -80,9 +97,18 @@ def _read(path: Path) -> tuple[dict | None, list[dict]]:
             break
         if "_config" in r:
             cfg = r["_config"]
+        elif "_aborted" in r:
+            aborts.append(r["_aborted"])
         else:
             rows.append(r)
-    return cfg, rows
+    return cfg, rows, aborts
+
+
+def _log_abort(spec: RunSpec, step: dict, usd: float, reason: str) -> None:
+    """An attempt that was paid for but produced no episode (provider failure, cut-off reply, failed notebook rewrite, budget stop, crash). Its cost stays
+    in the file so no paid call is ever missing from the totals, and the episode is redone on resume."""
+    with open(spec.path, "a") as f:
+        f.write(json.dumps({"_aborted": {"phase": step["phase"], "idx": step["idx"], "seed": step["seed"], "usd": round(usd, 6), "reason": reason[:200], "ts": round(time.time())}}) + "\n")
 
 
 def run_one(spec: RunSpec, provider=None) -> dict:
@@ -90,14 +116,21 @@ def run_one(spec: RunSpec, provider=None) -> dict:
     plan = spec.episodes()
     cfg = json.loads(json.dumps(spec.config()))
     spec.path.parent.mkdir(parents=True, exist_ok=True)
-    old_cfg, done = _read(spec.path)
-    if old_cfg is not None and old_cfg != cfg:
-        diff = sorted(k for k in set(cfg) | set(old_cfg) if cfg.get(k) != old_cfg.get(k))
-        raise ConfigMismatch(f"{spec.path.name} was written with a different setup (differs in: {', '.join(diff)}); move it away or use a new output folder")
+    old_cfg, done, aborts = _read(spec.path)
+    if old_cfg is not None:
+        cmp_old = {k: v for k, v in old_cfg.items() if k != "code_history"}
+        if cmp_old != cfg:
+            diff = sorted(k for k in set(cfg) | set(cmp_old) if cfg.get(k) != cmp_old.get(k))
+            if diff == ["code"] and os.environ.get(ALLOW_CODE_CHANGE) == "1":
+                cfg["code_history"] = old_cfg.get("code_history", []) + [{"from": old_cfg.get("code"), "to": cfg["code"], "at_episode": len(done), "ts": round(time.time())}]
+            else:
+                raise ConfigMismatch(f"{spec.path.name} was written with a different setup (differs in: {', '.join(diff)}); move it away or use a new output folder")
+        elif "code_history" in old_cfg:
+            cfg["code_history"] = old_cfg["code_history"]
     if old_cfg is None and done:
         raise ConfigMismatch(f"{spec.path.name} has episodes but no config header")
-    # rewrite the file with the header and only the complete lines, so a torn tail cannot confuse later readers
-    spec.path.write_text(json.dumps({"_config": cfg}) + "\n" + "".join(json.dumps(r) + "\n" for r in done))
+    # rewrite the file with the header, the abandoned-attempt lines and only the complete lines, so a torn tail cannot confuse later readers
+    spec.path.write_text(json.dumps({"_config": cfg}) + "\n" + "".join(json.dumps({"_aborted": a}) + "\n" for a in aborts) + "".join(json.dumps(r) + "\n" for r in done))
     memory = Memory(spec.condition)
     if done:
         memory.notebook, memory.replay = done[-1]["memory"]["notebook"], done[-1]["memory"]["replay"]
@@ -107,21 +140,32 @@ def run_one(spec: RunSpec, provider=None) -> dict:
     if provider is None:
         load_env_keys()
         provider = make_provider(spec.model, SpendMeter(spec.meter_root), run_id=spec.key)
+    n_done = len(done)
+    max_calls = spec.max_calls or task.max_calls * CALL_BUDGET_FACTOR[spec.toolset]
     try:
-        for step in plan[len(done):]:
+        for step in plan[n_done:]:
             mem_tokens = memory.tokens()
-            rec = play_episode(provider, spec.task, step["seed"], spec.quirk, memory, step["disturbance"], spec.max_calls, spec.toolset)
-            if rec.aborted:                          # a provider failure or a cut-off reply is not a task outcome: record nothing, change no memory
-                return {"key": spec.key, "status": "aborted", "episodes": len(_read(spec.path)[1]), "note": rec.notes[-1]}
-            if step["phase"] == "practice":          # evaluation episodes never change the memory
-                update_memory(provider, memory, rec, spec.task, task.instruction, spec.max_calls or task.max_calls * CALL_BUDGET_FACTOR[spec.toolset])
+            paid0 = provider.tally.usd
+            rec = None
+            try:
+                rec = play_episode(provider, spec.task, step["seed"], spec.quirk, memory, step["disturbance"], spec.max_calls, spec.toolset)
+                ok = not rec.aborted                 # a provider failure or a cut-off reply is not a task outcome: record nothing, change no memory
+                if ok and step["phase"] == "practice":          # evaluation episodes never change the memory
+                    ok = update_memory(provider, memory, rec, spec.task, task.instruction, max_calls)       # False: the rewrite failed, so stop rather than go on with a stale notebook
+            except BaseException as e:               # budget stop or crash: the calls already paid for are kept in the file
+                _log_abort(spec, step, provider.tally.usd - paid0, f"{type(e).__name__}: {e}")
+                raise
+            if not ok:
+                _log_abort(spec, step, provider.tally.usd - paid0, rec.notes[-1])
+                return {"key": spec.key, "status": "aborted", "episodes": n_done, "note": rec.notes[-1]}
             row = {"run": spec.key, "model": spec.model, "task": spec.task, "condition": spec.condition, "quirk": spec.quirk, "run_seed": spec.run_seed,
-                   **step, "toolset": spec.toolset, "max_calls": spec.max_calls or task.max_calls * CALL_BUDGET_FACTOR[spec.toolset], "memory_tokens_in": mem_tokens, **rec.to_dict(),
+                   **step, "toolset": spec.toolset, "max_calls": max_calls, "memory_tokens_in": mem_tokens, **rec.to_dict(),
                    "memory": {"notebook": memory.notebook, "replay": memory.replay}, "ts": round(time.time())}
             with open(spec.path, "a") as f:
                 f.write(json.dumps(row) + "\n")
+            n_done += 1
     except BudgetExceeded as e:
-        return {"key": spec.key, "status": "budget", "note": str(e), "episodes": len(_read(spec.path)[1])}
+        return {"key": spec.key, "status": "budget", "note": str(e), "episodes": n_done}
     return {"key": spec.key, "status": "ok", "episodes": len(plan)}
 
 
@@ -164,7 +208,7 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
             for t in tasks:
                 for c in ("none", "notebook"):
                     for s in run_seeds:
-                        specs.append(RunSpec(m, t, c, s, False, **common))
+                        specs.append(RunSpec(m, t, c, s, False, disturb_eval=True, **common))
     elif cell == "frontier":
         first_twenty = [x for r in range(5) for x in eval_seeds(r)]          # run seeds 0 to 4: 20 evaluation layouts
         for m in models:
@@ -174,6 +218,10 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
         for m in models:
             for t in tasks:
                 specs.append(RunSpec(m, t, "none", 0, True, practice=0, eval_seed_list=[50_000 + s for s in run_seeds], **common))
+    elif cell == "pilot_pose":                  # the same no-memory pilot with the pose toolset (a check that a model can really work through it)
+        for m in models:
+            for t in tasks:
+                specs.append(RunSpec(m, t, "none", 0, True, practice=0, eval_seed_list=[50_000 + s for s in run_seeds], toolset="pose", **common))
     elif cell == "pose":                        # skill-level versus pose-level tools: the same runs with pick and place removed
         for m in models:
             for t in tasks:
@@ -183,7 +231,8 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
     elif cell == "frontier_exp":
         for m in models:
             for t in tasks:
-                specs.append(RunSpec(m, t, "notebook", 0, True, **common))
+                for s in run_seeds:
+                    specs.append(RunSpec(m, t, "notebook", s, True, **common))
     else:
         raise ValueError(cell)
     return specs

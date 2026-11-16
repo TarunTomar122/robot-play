@@ -1,4 +1,8 @@
-"""Spend meter: a hard, cross-process budget cap that is checked BEFORE every paid call.
+"""Spend meter: a cross-process budget cap, checked BEFORE every paid call, on estimated worst-case cost plus settled cost at assumed list prices.
+
+What it guarantees and what it does not (PROTOCOL.md section 6): it bounds the sum of (settled cost + worst-case reservations of calls in flight) at
+the cap, and it halts a provider's runs early if the estimate was ever too low (overruns are summed and above OVERRUN_STOP_USD the provider counts as
+exhausted). It is not an audit against the provider's invoice; the hard stops leave $10 (Anthropic) and $5 (OpenAI) of headroom for that.
 
 How it works, in plain words:
   1. Before a call, `reserve()` works out the most the call could possibly cost (estimated input tokens plus the full `max_tokens` of output)
@@ -31,12 +35,14 @@ PRICES = {
     "gpt-6-astra": (10.00, 50.00),
 }
 CACHE_READ = {"anthropic": 0.10, "openai": 0.50}
+CACHE_READ_MODEL = {"claude-fable-5-2": 0.025, "claude-sonnet-5-5": 0.05}      # Anthropic's published cache-read multiple differs by model (model docs, checked 2026-11-16)
 CACHE_WRITE = {"anthropic": 1.25, "openai": 1.00}
-# Anthropic prices match the published list (checked 2026-11-03). OpenAI prices could not be checked against an official list from here, so the meter
+# Anthropic prices (input, output, cache reads and writes) match Anthropic's own model documentation (checked 2026-11-16; Haiku 5.5 prompts here stay under its 100K-token cheap tier). OpenAI prices could not be checked against an official list from here, so the meter
 # charges twice the assumed OpenAI price: the cap can only be reached early, never late. Reported dollars in the results use the plain list price.
 PRICE_SAFETY = {"anthropic": 1.0, "openai": 2.0}
 PROVIDER_OF = lambda model: "anthropic" if model.startswith("claude") else "openai"
 DEFAULT_CAPS = {"anthropic": 90.0, "openai": 45.0}
+OVERRUN_STOP_USD = 1.0         # if reservations were ever too low by this much in total, the provider is treated as exhausted
 
 
 class BudgetExceeded(Exception):
@@ -53,7 +59,7 @@ def cost_usd(model: str, input_tokens: int = 0, output_tokens: int = 0, cache_re
     pin, pout = PRICES[model]
     prov = PROVIDER_OF(model)
     k = PRICE_SAFETY[prov] if safety else 1.0
-    return k * (input_tokens * pin + output_tokens * pout + cache_read_tokens * pin * CACHE_READ[prov] + cache_write_tokens * pin * CACHE_WRITE[prov]) / 1e6
+    return k * (input_tokens * pin + output_tokens * pout + cache_read_tokens * pin * CACHE_READ_MODEL.get(model, CACHE_READ[prov]) + cache_write_tokens * pin * CACHE_WRITE[prov]) / 1e6
 
 
 def worst_case_usd(model: str, est_input_tokens: int, max_output_tokens: int) -> float:
@@ -115,6 +121,8 @@ class SpendMeter:
         """True once spent plus reserved is within 2% of the provider's cap: the runner then skips that provider's remaining runs."""
         with self._locked():
             st = self._load()
+        if st.get("overrun", {}).get(provider, 0.0) >= OVERRUN_STOP_USD:
+            return True
         return st["spent"].get(provider, 0.0) + st["reserved"].get(provider, 0.0) >= frac * self.caps[provider]
 
     def reserve(self, model: str, est_input_tokens: int, max_output_tokens: int, run_id: str = "") -> Reservation:
@@ -123,6 +131,9 @@ class SpendMeter:
         with self._locked():
             st = self._load()
             committed = st["spent"].get(prov, 0.0) + st["reserved"].get(prov, 0.0)
+            if st.get("overrun", {}).get(prov, 0.0) >= OVERRUN_STOP_USD:
+                self._log(kind="refused", provider=prov, model=model, run_id=run_id, why="overruns passed the stop level", committed=round(committed, 6))
+                raise BudgetExceeded(f"{prov}: reservations were too low by ${st['overrun'][prov]:.2f} in total; stopping this provider")
             if committed + worst > self.caps[prov]:
                 self._log(kind="refused", provider=prov, model=model, run_id=run_id, worst_case=round(worst, 6), committed=round(committed, 6), cap=self.caps[prov])
                 raise BudgetExceeded(f"{prov}: committed ${committed:.4f} + worst case ${worst:.4f} would pass the ${self.caps[prov]:.2f} cap")

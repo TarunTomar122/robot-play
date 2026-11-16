@@ -230,6 +230,18 @@ class PandaWorld:
         mujoco.mj_forward(self.model, d)
         return self.robot_contacts(d, ignore)
 
+    def fingers_touching(self, name: str) -> int:
+        """How many different fingers (0, 1 or 2) are touching the named object."""
+        gid = self.obj_geoms[name]
+        fingers = set()
+        for i in range(self.data.ncon):
+            c = self.data.contact[i]
+            if gid in (c.geom1, c.geom2):
+                other = self._geom_body(c.geom2 if c.geom1 == gid else c.geom1)
+                if self.model.body(other).name in ("left_finger", "right_finger"):
+                    fingers.add(other)
+        return len(fingers)
+
     def finger_force_contacts(self, name: str) -> int:
         """Number of fingertip-pad contacts currently touching the named object."""
         gid = self.obj_geoms[name]

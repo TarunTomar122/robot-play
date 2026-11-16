@@ -186,8 +186,10 @@ def verdict_text(result: dict) -> str:
     return ("SUCCESS" if result["success"] else "FAILED") + f" ({result['detail']})"
 
 
-def update_memory(provider, memory: Memory, rec: EpisodeRecord, task: str, instruction: str, max_calls: int) -> None:
-    """Called after each *practice* episode only. Evaluation episodes never change the memory."""
+def update_memory(provider, memory: Memory, rec: EpisodeRecord, task: str, instruction: str, max_calls: int) -> bool:
+    """Called after each *practice* episode only. Evaluation episodes never change the memory.
+    Returns False if the notebook rewrite failed or was cut off. The caller then stops and redoes the episode, so a run never carries on with a stale notebook
+    that is silently one episode behind."""
     if memory.condition == "notebook":
         transcript = render_transcript(rec.log, 6000)
         paid0, retry0 = provider.tally.usd, provider.tally.retry_usd
@@ -195,7 +197,10 @@ def update_memory(provider, memory: Memory, rec: EpisodeRecord, task: str, instr
         rec.mem_usage = add_usage(rec.mem_usage, u)
         rec.cost_usd += provider.tally.usd - paid0         # the notebook rewrite is part of the episode's cost, retries included
         rec.retry_usd += provider.tally.retry_usd - retry0
-        if text:
-            memory.notebook = text[: NOTEBOOK_TOKENS * CHARS_PER_TOKEN]
+        if not text:
+            rec.notes.append("notebook rewrite failed or was cut off at the output limit")
+            return False
+        memory.notebook = text[: NOTEBOOK_TOKENS * CHARS_PER_TOKEN]
     elif memory.condition == "replay" and rec.result["success"]:
         memory.replay = render_transcript(rec.log, REPLAY_TOKENS * CHARS_PER_TOKEN)
+    return True

@@ -50,6 +50,65 @@ def run_script(task: str, seed: int, quirk: bool, policy: str, disturbance: str 
     if not ep.finished:
         ep.call("home")
     if not ep.finished:
+        ep.call("home")
+    if not ep.finished:
+        ep.call("done")
+    res = ep.result()
+    return {"ok": bool(res["success"]), "detail": res["detail"], "trace": trace, "sim_time": res["sim_time_s"], "fired": res["disturbance_fired"],
+            "calls": res["calls"], "over_budget": ep.over_budget}
+
+
+NAIVE_FLASK_GRASP = 0.7       # control scenes work from about 0.65 up, catch scenes from about 0.8 up (results/gate_pose.md)
+
+
+def run_pose_script(task: str, seed: int, quirk: bool, policy: str, max_calls: int | None = None, disturbance: str | None = None) -> dict:
+    """The pose-level counterpart of `run_script`: builds pick and place out of `move_to`, `close_gripper` and `open_gripper` through the same
+    `Episode` wrapper with the pose toolset and its larger call budget. policy: naive (default grip, release 2 cm above the target, grasp at 60% of
+    the object height) or oracle (knows the catch). It reads zone heights from the simulator, which a model gets from `observe`, to aim the release."""
+    ep = Episode(task, seed, quirk=quirk, max_calls=max_calls, disturbance=disturbance, toolset="pose")
+    sk = ep.env.skills
+    oracle = policy == "oracle"
+    grip = "firm" if oracle and task == "stack" else "normal"
+    release = 0.14 if oracle and task == "bins" else 0.02
+    gh = 0.9 if oracle and task == "flasks" else NAIVE_FLASK_GRASP if task == "flasks" else 0.6       # at pose level the planner will not put the palm on a flask top, so the naive grasp is 0.8, not 0.6
+    safe = 0.40
+    trace = []
+    def go(name, args, obj):
+        if name == "move_to" and sk.mv.held:
+            args = {**args, "speed": "slow"}       # both scripts carry at slow speed: a swinging load can slip, which is not the catch under test
+        r = ep.call(name, args)
+        trace.append((name, obj, r.get("ok"), r.get("error")))
+        return r.get("ok") is not False
+
+    for obj in ORDER[task]:
+        if ep.finished:
+            break
+        if sk.mv.held and sk.mv.held != obj:
+            go("open_gripper", {}, obj)
+        obs = ep.call("observe")
+        o = next(x for x in obs["objects"] if x["name"] == obj)
+        px, py, pz = o["position_m"]
+        h = o["size_xyz_m"][2]
+        zg = max(0.012, pz - h / 2 + gh * h)
+        (tx, ty), top_z = (lambda s_: (s_[0], s_[1]))(sk._support(_dest(task, obj)))
+        ok = (go("move_to", {"x": px, "y": py, "z": safe}, obj) and go("move_to", {"x": px, "y": py, "z": zg}, obj)
+              and go("close_gripper", {"grip_level": grip}, obj) and go("move_to", {"x": px, "y": py, "z": safe}, obj)
+              and go("move_to", {"x": tx, "y": ty, "z": safe}, obj))
+        off = (0.0, 0.0)
+        if ok and not ep.finished:
+            obs = ep.call("observe")                                 # above the target and at rest: where is the object in the grip? aim the object, not the hand
+            o = next(x for x in obs["objects"] if x["name"] == obj)
+            tcp = obs["tcp_m"]
+            off = (o["position_m"][0] - tcp[0], o["position_m"][1] - tcp[1])
+            dz = tcp[2] - (o["position_m"][2] - h / 2)
+            ok = (go("move_to", {"x": tx - off[0], "y": ty - off[1], "z": safe}, obj)
+                  and go("move_to", {"x": tx - off[0], "y": ty - off[1], "z": top_z + release + dz}, obj))
+        if ok and not ep.finished:                                   # a failed step is not retried; the object stays in the hand until the next pick, as in the skill-level naive script
+            go("open_gripper", {}, obj)
+            go("move_to", {"x": tx - off[0], "y": ty - off[1], "z": safe}, obj)
+    if not ep.finished:
+        ep.call("home")
+    if not ep.finished:
         ep.call("done")
     res = ep.result()
     return {"ok": bool(res["success"]), "detail": res["detail"], "trace": trace, "sim_time": res["sim_time_s"], "fired": res["disturbance_fired"],

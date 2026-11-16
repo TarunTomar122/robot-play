@@ -140,7 +140,7 @@ class AnthropicProvider:
             r = self._create(system=system, messages=[{"role": "user", "content": user}])
             return r, self._usage(r)
         r, usage, _, _ = _metered(self, estimate_tokens(system + user), go)
-        if r is None:
+        if r is None or r.stop_reason in ("max_tokens", "refusal"):          # failed or cut off: no text, so the caller treats it as a failed rewrite
             return "", usage
         return "".join(b.text for b in r.content if b.type == "text").strip(), usage
 
@@ -220,7 +220,7 @@ class OpenAIProvider:
             r = self._create(instructions=system, input=user)
             return r, self._usage(r)
         r, usage, _, _ = _metered(self, estimate_tokens(system + user), go)
-        if r is None:
+        if r is None or getattr(r, "status", "") == "incomplete":
             return "", usage
         return (r.output_text or "").strip(), usage
 

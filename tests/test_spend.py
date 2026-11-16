@@ -30,9 +30,9 @@ def test_settle_replaces_reservation_with_real_cost(tmp_path):
 
 
 def test_cache_tokens_are_priced(tmp_path):
-    base = cost_usd("claude-sonnet-5-5", input_tokens=1000)
-    assert cost_usd("claude-sonnet-5-5", cache_read_tokens=1000) == pytest.approx(0.1 * base)
-    assert cost_usd("claude-sonnet-5-5", cache_write_tokens=1000) == pytest.approx(1.25 * base)
+    base = cost_usd("claude-haiku-5-5", input_tokens=1000)
+    assert cost_usd("claude-haiku-5-5", cache_read_tokens=1000) == pytest.approx(0.1 * base)
+    assert cost_usd("claude-haiku-5-5", cache_write_tokens=1000) == pytest.approx(1.25 * base)
 
 
 def test_unknown_outcome_charges_the_whole_reservation(tmp_path):
@@ -103,3 +103,22 @@ def test_openai_is_priced_pessimistically_in_the_meter_but_at_list_price_in_resu
 def test_the_reservation_prices_input_at_the_cache_write_rate(tmp_path):
     from robot_play.spend import worst_case_usd
     assert worst_case_usd("claude-haiku-5-5", 1_000_000, 0) == 0.10 * 1.25
+
+
+def test_a_provider_whose_reservations_were_too_low_is_stopped(tmp_path):
+    import pytest
+    from robot_play.spend import BudgetExceeded, SpendMeter
+    m = SpendMeter(tmp_path / "m", {"anthropic": 90.0, "openai": 45.0})
+    r = m.reserve("claude-haiku-5-5", 10, 10)                       # reserve almost nothing...
+    m.settle(r, 20_000_000, 0)                                      # ...then the real call cost $2: an overrun of about $2
+    assert m.totals()["anthropic"]["overrun_usd"] > 1.0
+    assert m.exhausted("anthropic") and not m.exhausted("openai")
+    with pytest.raises(BudgetExceeded, match="too low"):
+        m.reserve("claude-haiku-5-5", 10, 10)
+
+
+def test_cache_reads_are_priced_per_model():
+    from robot_play.spend import cost_usd
+    assert abs(cost_usd("claude-fable-5-2", cache_read_tokens=1_000_000) - 0.20) < 1e-9          # 0.025 x $8
+    assert abs(cost_usd("claude-haiku-5-5", cache_read_tokens=1_000_000) - 0.01) < 1e-9          # 0.1 x $0.10
+    assert abs(cost_usd("claude-sonnet-5-5", cache_read_tokens=1_000_000) - 0.10) < 1e-9         # 0.05 x $2

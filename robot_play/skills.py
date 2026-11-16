@@ -94,7 +94,12 @@ class Skills:
             return self._fail("grip_level must be light|normal|firm")
         self.w.data.ctrl[7] = GRIP[grip_level]
         self.w.settle(0.5)
-        return {"ok": True, "gripper_width_m": round(self.w.gripper_width(), 3)}
+        if not self.mv.held:                       # an object squeezed between both fingers is part of the hand from now on: the planner carries it and does not treat it as an obstacle
+            for o in self.w.scene.objects:
+                if self.w.fingers_touching(o.name) == 2:
+                    self.mv.attach(o.name)
+                    break
+        return {"ok": True, "gripper_width_m": round(self.w.gripper_width(), 3), "holding": self.mv.held}
 
     def home(self, speed: str = "normal") -> dict:
         try:
@@ -109,6 +114,7 @@ class Skills:
             self._tcp_to([x, y, z], self.yaw, speed)
         except (IKFailure, Collision) as e:
             return self._fail(str(e))
+        self.w.settle(0.3)                          # let anything hanging in the fingers stop swinging before the next command
         return {"ok": True, "tcp_m": _r(self.w.tcp()), "touched": sorted(self.mv.touched)}
 
     def pick(self, object: str, grasp_height: float = 0.6, speed: str = "normal", grip_level: str = "normal",
@@ -176,7 +182,7 @@ class Skills:
             self._descend([w.tcp()[0], w.tcp()[1], z_up], yaw, speed, set(mv.held_ignore) | {object})
         except (IKFailure, Collision) as e:
             return self._fail(str(e), gripper_width_m=round(width, 3), holding=mv.held)
-        w.settle(0.3)
+        w.settle(1.0)                              # hold still for a second, so an object that is slipping out of the fingers is not reported as held
         mv.held_ignore = set()
         p1 = w.obj_pos(object)
         rise = float(p1[2] - z_before)
