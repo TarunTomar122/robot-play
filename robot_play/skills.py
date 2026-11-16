@@ -121,10 +121,13 @@ class Skills:
         return {"ok": True, "tcp_m": _r(self.w.tcp())}
 
     def move_to(self, x: float, y: float, z: float, speed: str = "normal") -> dict:
+        self.mv.real_fingers = True                 # a plain move is planned for the hand as it is: after a failed pick the fingers are still closed, and a closed hand cannot go down onto a cube as if it were open
         try:
             self._tcp_to([x, y, z], self.yaw, speed)
         except (IKFailure, Collision) as e:
             return self._fail(str(e))
+        finally:
+            self.mv.real_fingers = False
         self.w.settle(0.3)                          # let anything hanging in the fingers stop swinging before the next command
         self._refresh_held()
         return {"ok": True, "tcp_m": _r(self.w.tcp()), "touched": sorted(self.mv.touched)}

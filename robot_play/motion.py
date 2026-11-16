@@ -89,6 +89,7 @@ class Mover:
         self.held_rel_R = np.eye(3)
         self.touched: set[str] = set()      # non-target bodies the arm touched during the last motion
         self.held_ignore: set[str] = set()  # supports the object was resting on when it was picked
+        self.real_fingers = False           # True while a plain `move_to` is planned: the hand is then planned with the finger opening it really has, not with an open hand
 
     # ------------------------------------------------------------ held-object handling
     def attach(self, name: str):
@@ -128,7 +129,7 @@ class Mover:
         d = w.scratch
         d.qpos[:] = w.data.qpos
         d.qpos[w.arm_qadr] = q
-        if self.held is None:
+        if self.held is None and not self.real_fingers:
             d.qpos[w.finger_qadr] = 0.04
         mujoco.mj_kinematics(w.model, d)
         if self.held:
