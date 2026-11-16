@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 
+from .disturb import Disturbance
 from .env import TaskEnv
 
 TOOLS = [
@@ -53,6 +54,7 @@ class Episode:
     seed: int
     quirk: bool = True
     max_calls: int | None = None
+    disturbance: str | None = None
     env: TaskEnv = field(init=False)
     log: list = field(default_factory=list)
     calls: int = 0
@@ -61,6 +63,9 @@ class Episode:
 
     def __post_init__(self):
         self.env = TaskEnv(self.task, self.seed, quirk=self.quirk)
+        self.dist = Disturbance(self.disturbance, self.seed) if self.disturbance else None
+        if self.dist:
+            self.dist.attach(self.env)
         if self.max_calls is None:
             self.max_calls = self.env.task.max_calls
 
@@ -113,7 +118,8 @@ class Episode:
         ok, detail = self.env.success()
         return {"task": self.task, "seed": self.seed, "quirk": self.quirk, "success": bool(ok), "detail": detail,
                 "claimed_done": self.claimed_done, "false_success_claim": bool(self.claimed_done and not ok),
-                "calls": self.calls, "sim_time_s": round(self.env.sim_time, 1)}
+                "calls": self.calls, "sim_time_s": round(self.env.sim_time, 1),
+                "disturbance": self.disturbance, "disturbance_fired": bool(self.dist and self.dist.fired)}
 
     def to_json(self) -> str:
         return json.dumps({"result": self.result(), "log": self.log})

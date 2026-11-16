@@ -1,0 +1,74 @@
+{
+ "seeds": 100,
+ "table": {
+  "bins|control|naive": {
+   "success": 99,
+   "n": 100
+  },
+  "bins|control|oracle": {
+   "success": 100,
+   "n": 100
+  },
+  "bins|quirk|naive": {
+   "success": 0,
+   "n": 100
+  },
+  "bins|quirk|oracle": {
+   "success": 100,
+   "n": 100
+  },
+  "flasks|control|naive": {
+   "success": 100,
+   "n": 100
+  },
+  "flasks|control|oracle": {
+   "success": 100,
+   "n": 100
+  },
+  "flasks|quirk|naive": {
+   "success": 0,
+   "n": 100
+  },
+  "flasks|quirk|oracle": {
+   "success": 100,
+   "n": 100
+  },
+  "stack|control|naive": {
+   "success": 100,
+   "n": 100
+  },
+  "stack|control|oracle": {
+   "success": 100,
+   "n": 100
+  },
+  "stack|quirk|naive": {
+   "success": 0,
+   "n": 100
+  },
+  "stack|quirk|oracle": {
+   "success": 100,
+   "n": 100
+  }
+ },
+ "gates": {
+  "stack": {
+   "oracle_quirk>=0.95": true,
+   "naive_quirk<=0.30": true,
+   "naive_control>=0.90": true,
+   "oracle_control>=0.90": true
+  },
+  "bins": {
+   "oracle_quirk>=0.95": true,
+   "naive_quirk<=0.30": true,
+   "naive_control>=0.90": true,
+   "oracle_control>=0.90": true
+  },
+  "flasks": {
+   "oracle_quirk>=0.95": true,
+   "naive_quirk<=0.30": true,
+   "naive_control>=0.90": true,
+   "oracle_control>=0.90": true
+  }
+ },
+ "crashes": []
+}

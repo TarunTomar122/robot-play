@@ -1,0 +1,1 @@
+{"task": "flasks", "seed": 7, "quirk": true, "calls": [["observe", {}], ["pick", {"object": "flask_a"}], ["pick", {"object": "flask_a", "grasp_height": 0.9}], ["place", {"target": "ring_a"}], ["pick", {"object": "flask_b", "grasp_height": 0.9}], ["place", {"target": "ring_b"}], ["done", {}]]}

@@ -1,0 +1,1 @@
+{"task": "stack", "seed": 11, "quirk": true, "calls": [["observe", {}], ["pick", {"object": "cube_green"}], ["pick", {"object": "cube_green", "grip_level": "firm"}], ["place", {"target": "cube_red"}], ["pick", {"object": "cube_blue"}], ["place", {"target": "cube_green"}], ["done", {}]]}

@@ -89,6 +89,7 @@ class Mover:
         self.held_rel_R = np.eye(3)
         self.touched: set[str] = set()      # non-target bodies the arm touched during the last motion
         self.held_ignore: set[str] = set()  # supports the object was resting on when it was picked
+        self.hooks: list = []               # callables run every 50 ms of simulated time while the arm moves (disturbances)
 
     # ------------------------------------------------------------ held-object handling
     def attach(self, name: str):
@@ -256,6 +257,8 @@ class Mover:
                 w.data.ctrl[:7] = pts[i] + (pts[i + 1] - pts[i]) * f
                 w.step(1)
                 if k % 25 == 0:
+                    for hook in self.hooks:
+                        hook()
                     for name in w.robot_contacts(ignore={self.held} if self.held else set()):
                         self.touched.add(name)
         w.data.ctrl[:7] = path[-1]
