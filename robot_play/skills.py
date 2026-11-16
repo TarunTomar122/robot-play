@@ -69,8 +69,15 @@ class Skills:
     def _fail(self, reason: str, **extra):
         return {"ok": False, "error": reason, **extra}
 
+    def _refresh_held(self):
+        """The hand only holds what both fingers still touch. If the object has slipped out (or was knocked away), forget it: `observe` and `close_gripper` then
+        say what is true, and the planner treats the object as an obstacle again instead of as part of the hand."""
+        if self.mv.held and self.w.fingers_touching(self.mv.held) < 2:
+            self.mv.detach()
+
     # ------------------------------------------------------------------ tools
     def observe(self) -> dict:
+        self._refresh_held()
         w = self.w
         objs = []
         for o in w.scene.objects:
@@ -92,8 +99,10 @@ class Skills:
     def close_gripper(self, grip_level: str = "normal") -> dict:
         if grip_level not in GRIP:
             return self._fail("grip_level must be light|normal|firm")
+        self._refresh_held()
         self.w.data.ctrl[7] = GRIP[grip_level]
         self.w.settle(0.5)
+        self._refresh_held()
         if not self.mv.held:                       # an object squeezed between both fingers is part of the hand from now on: the planner carries it and does not treat it as an obstacle
             for o in self.w.scene.objects:
                 if self.w.fingers_touching(o.name) == 2:
@@ -115,6 +124,7 @@ class Skills:
         except (IKFailure, Collision) as e:
             return self._fail(str(e))
         self.w.settle(0.3)                          # let anything hanging in the fingers stop swinging before the next command
+        self._refresh_held()
         return {"ok": True, "tcp_m": _r(self.w.tcp()), "touched": sorted(self.mv.touched)}
 
     def pick(self, object: str, grasp_height: float = 0.6, speed: str = "normal", grip_level: str = "normal",
@@ -213,6 +223,7 @@ class Skills:
 
     def place(self, target: str, release_height: float = 0.02, speed: str = "normal", settle_time: float = 0.3) -> dict:
         w, mv = self.w, self.mv
+        self._refresh_held()
         if not mv.held:
             return self._fail("not holding anything")
         sup = self._support(target)

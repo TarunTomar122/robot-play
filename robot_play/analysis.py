@@ -57,8 +57,8 @@ def load(*dirs: str | Path, complete_only: bool = False) -> list[dict]:
     for d in dirs:
         for f in sorted(Path(d).glob("*.jsonl")):
             cfg, lines, _ = _parse(f)
-            if complete_only and cfg and len(lines) < len(cfg["plan"]):
-                continue
+            if complete_only and cfg and len(lines) < len(cfg["plan"]) and any(p["phase"] == "practice" for p in cfg["plan"]):
+                continue                         # a run with practice is only meaningful whole; first-try files (no practice) count per finished layout
             for r in lines:
                 res = r["result"]
                 row = {k: r.get(k) for k in KEEP}
@@ -89,7 +89,8 @@ def bootstrap(clusters: list[np.ndarray], stat, n_boot: int = 10_000, seed: int 
         idx = np.concatenate([g[rng.integers(0, len(g), len(g))] for g in groups])
         vals[b] = stat(np.concatenate([clusters[i] for i in idx]))
     lo, hi = np.percentile(vals, [100 * alpha / 2, 100 * (1 - alpha / 2)])
-    return est, float(lo), float(hi)
+    f = float(np.sqrt(k / (k - 1)))                  # small-sample correction fixed in PROTOCOL.md section 1: percentile intervals from few clusters are too narrow
+    return est, float(est - f * (est - lo)), float(est + f * (hi - est))
 
 
 def _run_means(rows, metric: str) -> dict:
@@ -129,7 +130,7 @@ def curve(rows, model: str, condition: str, metric: str = "success", quirk: bool
         for r in rs:
             if r["idx"] == i:
                 by_run.setdefault((r["task"], r["run_seed"]), []).append(r[metric])
-        est, lo, hi = bootstrap([np.array(v, dtype=float) for v in by_run.values()], np.mean, n_boot)
+        est, lo, hi = bootstrap([np.array(v, dtype=float) for v in by_run.values()], np.mean, n_boot, strata=[k[0] for k in by_run])
         out.append({"idx": i, "mean": est, "lo": lo, "hi": hi, "n_runs": len(by_run)})
     return out
 
@@ -141,20 +142,49 @@ def per_success(rows, model: str, condition: str, metric: str, phase: str = "eva
     return float(sum(r[metric] for r in rs) / wins) if wins else float("nan")
 
 
-def _agresti_caffo(s1: int, n1: int, s2: int, n2: int, z: float, deff: float = 1.0) -> tuple[float, float, float]:
-    """Difference of two proportions with one pseudo-success and one pseudo-failure added to each arm (Agresti and Caffo), the variance multiplied by a
+def _agresti_caffo(s1: int, n1: int, s2: int, n2: int, z: float, deff1: float = 1.0, deff2: float = 1.0) -> tuple[float, float, float]:
+    """Difference of two proportions with one pseudo-success and one pseudo-failure added to each arm (Agresti and Caffo), the variance of each arm multiplied by its
     design effect. Unlike a bootstrap it does not collapse to zero width when every episode succeeds (or every episode fails)."""
     p1, p2 = (s1 + 1) / (n1 + 2), (s2 + 1) / (n2 + 2)
-    se = float(np.sqrt(deff * (p1 * (1 - p1) / (n1 + 2) + p2 * (1 - p2) / (n2 + 2))))
+    se = float(np.sqrt(deff1 * p1 * (1 - p1) / (n1 + 2) + deff2 * p2 * (1 - p2) / (n2 + 2)))
     return p1 - p2, p1 - p2 - z * se, p1 - p2 + z * se
+
+
+def intraclass(rows, model: str, m: int = 4) -> float:
+    """One-way ANOVA intraclass correlation of a model's held-out outcomes within a run (clusters of m layouts sharing one memory), computed inside each
+    (task, memory condition) stratum and pooled by summing sums of squares. Returns 0.0 when it cannot be estimated (no variation, or no clusters)."""
+    strata: dict = {}
+    for r in select(rows, model=model, phase="eval", quirk=True):
+        strata.setdefault((r["task"], r["condition"]), {}).setdefault(r["run_seed"], []).append(r["success"])
+    ssb = ssw = dfb = dfw = 0.0
+    for clusters in strata.values():
+        ys = [np.array(v, dtype=float) for v in clusters.values() if len(v) == m]
+        if len(ys) < 2:
+            continue
+        means = np.array([y.mean() for y in ys])
+        grand = means.mean()
+        ssb += m * float(((means - grand) ** 2).sum())
+        ssw += float(sum(((y - y.mean()) ** 2).sum() for y in ys))
+        dfb += len(ys) - 1
+        dfw += len(ys) * (m - 1)
+    if dfb == 0 or dfw == 0:
+        return 0.0
+    msb, msw = ssb / dfb, ssw / dfw
+    return max(0.0, (msb - msw) / (msb + (m - 1) * msw)) if (msb + (m - 1) * msw) > 0 else 0.0
+
+
+def q3_deff(rows, cheap: str, m: int = 4) -> float:
+    """Design effect of the cheap arm, fixed in PROTOCOL.md section 1: 1 + (m - 1) x the intraclass correlation of that model's own held-out outcomes, never below 2
+    (an intraclass correlation of at least one third is assumed even where the data show none, because at ceiling there is nothing to estimate it from)."""
+    return max(2.0, 1.0 + (m - 1) * intraclass(rows, cheap, m))
 
 
 def q3_gap(rows, frontier: str, cheap: str, cheap_condition: str = "notebook", margin: float = 0.10, n_boot: int = 10_000, alpha: float = ALPHA_Q3) -> dict:
     """Frontier first-try success minus cheap-with-experience success on the *same* layouts.
-    Layouts are nested inside clusters: the (task, run seed) runs whose four held-out layouts all use one notebook. The bootstrap resamples those clusters.
+    Layouts are nested inside clusters: the (task, run seed) runs whose four held-out layouts all use one notebook. The bootstrap resamples those clusters inside each task.
     Because a bootstrap interval has zero width when every episode succeeds, the reported interval is the wider of the cluster bootstrap and an
-    Agresti-Caffo interval (variance times a design effect estimated from the cluster structure). 'Within the margin' needs the whole interval of the gap
-    below +margin."""
+    Agresti-Caffo interval whose cheap-arm variance is multiplied by the design effect of `q3_deff` (the frontier arm has no shared memory, so its design effect is 1).
+    'Within the margin' needs the whole interval of the gap below +margin."""
     fr = {(r["task"], r["seed"]): r["success"] for r in select(rows, model=frontier, condition="none", quirk=True, phase="eval")}
     ch = {(r["task"], r["seed"]): (r["run_seed"], r["success"]) for r in select(rows, model=cheap, condition=cheap_condition, quirk=True, phase="eval")}
     keys = sorted(set(fr) & set(ch))
@@ -167,12 +197,8 @@ def q3_gap(rows, frontier: str, cheap: str, cheap_condition: str = "notebook", m
     est, blo, bhi = bootstrap(clusters, np.mean, n_boot, alpha=alpha, strata=[k[0] for k in by_cluster])
     n = len(keys)
     s_fr, s_ch = sum(fr[k] for k in keys), sum(ch[k][1] for k in keys)
-    d_all = np.concatenate(clusters)
-    var_srs = d_all.var(ddof=1) / n if n > 1 else 0.0
-    cmeans = np.array([c.mean() for c in clusters])
-    var_cl = cmeans.var(ddof=1) / len(clusters) if len(clusters) > 1 else 0.0
-    deff = max(1.0, var_cl / var_srs) if var_srs > 0 else 1.0
-    _, alo, ahi = _agresti_caffo(s_fr, n, s_ch, n, Z[alpha], deff)
+    deff = q3_deff(rows, cheap)
+    _, alo, ahi = _agresti_caffo(s_fr, n, s_ch, n, Z[alpha], 1.0, deff)
     lo = min(x for x in (blo, alo) if x == x)
     hi = max(x for x in (bhi, ahi) if x == x)
     return {"n_layouts": n, "n_clusters": len(clusters), "clusters": sorted(by_cluster), "frontier": s_fr / n, "cheap": s_ch / n, "gap": est, "lo": lo, "hi": hi,
@@ -182,7 +208,8 @@ def q3_gap(rows, frontier: str, cheap: str, cheap_condition: str = "notebook", m
 def q3_cost(rows, frontier: str, cheap: str, cheap_condition: str = "notebook", abandoned: dict | None = None) -> dict:
     """Everything the Q3 comparison cost, so a cheap-model-with-practice is never compared to a frontier first try on evaluation cost alone.
     Cheap side: all 12 practice episodes with their notebook rewrites, the clean evaluation episodes, and abandoned attempts, for exactly the runs in the gap.
-    Frontier side: its first-try episodes on the same layouts. `abandoned` maps (model, task, condition, quirk, run_seed) to dollars."""
+    Frontier side: its first-try episodes on the same layouts plus its own abandoned attempts on those tasks.
+    `abandoned` maps (model, toolset, task, condition, quirk, run_seed) to dollars; only skill-level runs are ever counted here."""
     g = q3_gap(rows, frontier, cheap, cheap_condition, n_boot=10)
     if not g.get("n_layouts"):
         return {}
@@ -190,10 +217,14 @@ def q3_cost(rows, frontier: str, cheap: str, cheap_condition: str = "notebook", 
     cr = [r for r in select(rows, model=cheap, condition=cheap_condition, quirk=True) if (r["task"], r["run_seed"]) in cl and r["phase"] in ("practice", "eval")]
     layouts = {(r["task"], r["seed"]) for r in select(rows, model=cheap, condition=cheap_condition, quirk=True, phase="eval") if (r["task"], r["run_seed"]) in cl}
     fr = [r for r in select(rows, model=frontier, condition="none", quirk=True, phase="eval") if (r["task"], r["seed"]) in layouts]
-    ab = sum(v for (m, t, c, q, s), v in (abandoned or {}).items() if m == cheap and c == cheap_condition and q and (t, s) in cl)
+    ab = abandoned or {}
+    ab_cheap = sum(v for (m, tools, t, c, q, s), v in ab.items() if m == cheap and tools == "skills" and c == cheap_condition and q and (t, s) in cl)
+    tasks = {t for t, _ in cl}
+    ab_front = sum(v for (m, tools, t, c, q, s), v in ab.items() if m == frontier and tools == "skills" and c == "none" and q and t in tasks)
     ev = sum(r["cost_usd"] for r in cr if r["phase"] == "eval")
-    return {"cheap_eval_only_usd": ev, "cheap_practice_usd": sum(r["cost_usd"] for r in cr if r["phase"] == "practice"), "cheap_abandoned_usd": ab,
-            "cheap_total_usd": sum(r["cost_usd"] for r in cr) + ab, "frontier_usd": sum(r["cost_usd"] for r in fr), "n_frontier_episodes": len(fr), "n_cheap_eval_episodes": len(layouts)}
+    return {"cheap_eval_only_usd": ev, "cheap_practice_usd": sum(r["cost_usd"] for r in cr if r["phase"] == "practice"), "cheap_abandoned_usd": ab_cheap,
+            "cheap_total_usd": sum(r["cost_usd"] for r in cr) + ab_cheap, "frontier_usd": sum(r["cost_usd"] for r in fr) + ab_front, "frontier_abandoned_usd": ab_front,
+            "n_frontier_episodes": len(fr), "n_cheap_eval_episodes": len(layouts)}
 
 
 def did(rows, model: str, a: str, b: str, metric: str = "success", phase: str = "eval", tasks: list[str] | None = None, n_boot: int = 10_000, alpha: float = 0.05) -> dict:
@@ -207,16 +238,41 @@ def did(rows, model: str, a: str, b: str, metric: str = "success", phase: str = 
                 rs = [r for r in rs if r["task"] in tasks]
             return _run_means(rs, metric)
         ma, mb = pick(a), pick(b)
-        return [ma[k] - mb[k] for k in sorted(set(ma) & set(mb))]
-    dq, dc = diffs(True), diffs(False)
+        ks = sorted(set(ma) & set(mb))
+        return [k[0] for k in ks], [ma[k] - mb[k] for k in ks]
+    tq, dq = diffs(True)
+    tc, dc = diffs(False)
     if not dq or not dc:
         return {"n_catch_pairs": len(dq), "n_control_pairs": len(dc)}
     rng = np.random.default_rng(0)
-    dq, dc = np.array(dq), np.array(dc)
-    boots = [rng.choice(dq, len(dq)).mean() - rng.choice(dc, len(dc)).mean() for _ in range(n_boot)]
+    dq, dc, tq, tc = np.array(dq), np.array(dc), np.array(tq), np.array(tc)
+
+    def draw(d, t):                                              # resample inside each task, so every resample keeps the task mix
+        return np.concatenate([d[t == g][rng.integers(0, int((t == g).sum()), int((t == g).sum()))] for g in dict.fromkeys(t)])
+    boots = np.array([draw(dq, tq).mean() - draw(dc, tc).mean() for _ in range(n_boot)])
+    est = float(dq.mean() - dc.mean())
     lo, hi = np.percentile(boots, [100 * alpha / 2, 100 * (1 - alpha / 2)])
+    n_small = min(len(dq), len(dc))
+    f = float(np.sqrt(n_small / (n_small - 1))) if n_small > 1 else 1.0
     return {"n_catch_pairs": len(dq), "n_control_pairs": len(dc), "gain_catch": float(dq.mean()), "gain_control": float(dc.mean()),
-            "did": float(dq.mean() - dc.mean()), "lo": float(lo), "hi": float(hi)}
+            "did": est, "lo": float(est - f * (est - lo)), "hi": float(est + f * (hi - est))}
+
+
+def tool_interaction(skills_rows, pose_rows, model: str, n_boot: int = 10_000) -> dict:
+    """Does the notebook help more (or less) through pose-level tools than through skill-level tools? For each (task, run seed) that exists in the pose cell:
+    (notebook minus fresh success with pose tools) minus (the same with skill tools), on the same run seeds and the same layouts. Exploratory."""
+    def gains(rows):
+        out = {}
+        a, b = _run_means(select(rows, model=model, condition="notebook", phase="eval", quirk=True), "success"), _run_means(select(rows, model=model, condition="none", phase="eval", quirk=True), "success")
+        for k in set(a) & set(b):
+            out[k] = a[k] - b[k]
+        return out
+    gp, gs = gains(pose_rows), gains(skills_rows)
+    keys = sorted(set(gp) & set(gs))
+    if not keys:
+        return {"n_pairs": 0}
+    est, lo, hi = bootstrap([np.array([gp[k] - gs[k]]) for k in keys], np.mean, n_boot, strata=[k[0] for k in keys])
+    return {"n_pairs": len(keys), "gain_pose": float(np.mean([gp[k] for k in keys])), "gain_skills": float(np.mean([gs[k] for k in keys])), "diff": est, "lo": lo, "hi": hi}
 
 
 def disturbance_summary(rows, model: str, condition: str, quirk: bool = True) -> dict:

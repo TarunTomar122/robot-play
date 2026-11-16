@@ -260,7 +260,13 @@ class OpenAISession:
                 except json.JSONDecodeError:
                     args = {}
                 calls.append(ToolCall(item.call_id, item.name, args if isinstance(args, dict) else {}))
-        stop = "tool_use" if calls else ("max_tokens" if getattr(r, "status", "") == "incomplete" else "end")
+        refused = any(getattr(part, "type", "") == "refusal" for item in r.output if item.type == "message" for part in (getattr(item, "content", None) or []))
+        if getattr(r, "status", "") == "incomplete":                   # cut off, possibly in the middle of a call: its arguments cannot be trusted, so the turn carries no calls
+            calls, stop = [], "max_tokens"
+        elif refused and not calls:
+            stop = "refusal"
+        else:
+            stop = "tool_use" if calls else "end"
         return Turn((r.output_text or "").strip(), calls, usage, stop, dt)
 
 

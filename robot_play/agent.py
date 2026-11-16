@@ -150,11 +150,11 @@ def play_episode(provider, task: str, seed: int, quirk: bool, memory: Memory, di
             notes.append("provider error: " + turn.error)
             aborted = True
             break
-        if turn.stop == "max_tokens" and not turn.calls:
+        if turn.stop == "max_tokens":              # cut off, even if it carries a call: a half-written call is not an action the model chose
             notes.append("reply cut off at the output limit")
             aborted = True
             break
-        if turn.stop == "refusal" and not turn.calls:
+        if turn.stop == "refusal":
             notes.append("model declined (refusal)")
             refusal = True
             break

@@ -156,12 +156,12 @@ def test_resume_is_bound_to_the_code_revision_unless_a_change_is_declared(tmp_pa
 
 def test_the_matrix_has_the_episode_counts_the_protocol_promises(tmp_path):
     cheap, front = ["claude-haiku-5-5", "gpt-6-luna"], ["claude-fable-5-2", "gpt-6-astra"]
-    cells = {"main": build_specs("main", cheap, list(range(10)), "o"), "control": build_specs("control", cheap, list(range(5)), "o"),
+    cells = {"main": build_specs("main", cheap, list(range(10)), "o"), "control": build_specs("control", cheap, list(range(10)), "o"),
              "frontier": build_specs("frontier", front, [0], "o"), "frontier_exp": build_specs("frontier_exp", ["claude-fable-5-2"], list(range(5)), "o"),
              "pose": build_specs("pose", cheap, list(range(3)), "o")}
     counts = {k: sum(len(s.episodes()) for s in v) for k, v in cells.items()}
-    assert counts == {"main": 3360, "control": 1200, "frontier": 120, "frontier_exp": 240, "pose": 576}      # 2,880 + 480 disturbed; 960 + 240 disturbed; then the other cells
-    assert sum(counts.values()) == 5496
+    assert counts == {"main": 3360, "control": 2400, "frontier": 120, "frontier_exp": 240, "pose": 576}      # 2,880 + 480 disturbed; 1,920 + 480 disturbed; then the other cells
+    assert sum(counts.values()) == 6696
     assert len({s.key for s in cells["frontier_exp"]}) == 15 and len({s.run_seed for s in cells["frontier_exp"]}) == 5
     all_specs = [s for v in cells.values() for s in v]
     assert len({(s.out_dir, s.key) for s in all_specs}) == len(all_specs)                                   # no two runs write the same file within a cell
@@ -214,3 +214,27 @@ def test_disturbed_evaluation_uses_slip_and_nudge_except_in_the_control_flask_sc
     assert kinds("stack", True) == ["slip", "nudge", "slip", "nudge"] and kinds("stack", False) == ["slip", "nudge", "slip", "nudge"]
     assert kinds("flasks", True) == ["slip", "nudge", "slip", "nudge"]
     assert kinds("flasks", False) == ["slip"] * 4                  # the nudge topples a plain cylinder for good (results/disturbance_control.md)
+
+
+def test_a_cut_off_turn_aborts_the_episode_even_when_it_carries_a_call():
+    from robot_play.llm import ToolCall, Turn
+
+    class Cut(FakeProvider):
+        def session(self, system, first_user, tools=None):
+            sess = super().session(system, first_user, tools)
+            sess.send = lambda results=None, nudge=None: Turn("", [ToolCall("c1", "pick", {"object": "cube_re"})], {"input": 5, "output": 6000, "cache_read": 0, "cache_write": 0}, "max_tokens")
+            return sess
+    rec = play_episode(Cut([]), "stack", 10_000, True, Memory("none"))
+    assert rec.aborted and rec.result["calls"] == 0               # the half-written call was not executed
+
+
+def test_a_refusal_with_a_call_is_recorded_as_a_refusal():
+    from robot_play.llm import ToolCall, Turn
+
+    class Refuse(FakeProvider):
+        def session(self, system, first_user, tools=None):
+            sess = super().session(system, first_user, tools)
+            sess.send = lambda results=None, nudge=None: Turn("no", [], {"input": 5, "output": 5, "cache_read": 0, "cache_write": 0}, "refusal")
+            return sess
+    rec = play_episode(Refuse([]), "stack", 10_000, True, Memory("none"))
+    assert rec.refusal and not rec.aborted

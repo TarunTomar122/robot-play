@@ -68,7 +68,7 @@ def test_q3_cost_counts_practice_notebook_and_abandoned_attempts():
         for rs in range(5):
             for i in range(12):
                 rows.append(row("small", t, "notebook", rs, "practice", i, 1, seed=i))
-    c = q3_cost(rows, "big", "small", abandoned={("small", "stack", "notebook", True, 0): 0.25})
+    c = q3_cost(rows, "big", "small", abandoned={("small", "skills", "stack", "notebook", True, 0): 0.25, ("small", "pose", "stack", "notebook", True, 0): 9.0})
     assert abs(c["cheap_practice_usd"] - 0.01 * 12 * 15) < 1e-9 and abs(c["cheap_abandoned_usd"] - 0.25) < 1e-9
     assert c["cheap_total_usd"] > c["cheap_eval_only_usd"] + c["cheap_practice_usd"] and c["n_frontier_episodes"] == 60
 
@@ -172,3 +172,68 @@ def test_conditional_recovery_has_no_floor_effect_and_the_stratified_bootstrap_k
     cl = [np.array([1.0])] * 4 + [np.array([0.0])] * 4
     est, lo, hi = bootstrap(cl, np.mean, 500, strata=["a"] * 4 + ["b"] * 4)
     assert est == 0.5 and lo == hi == 0.5                                       # every resample keeps four clusters of each task
+
+
+def _cluster_rows(model, outcomes_by_run, tasks=("stack", "bins", "flasks")):
+    """held-out rows for one model, notebook condition: outcomes_by_run maps run seed -> list of 4 outcomes, repeated for every task"""
+    rows = []
+    for t in tasks:
+        for rs, outs in outcomes_by_run.items():
+            for j, o in enumerate(outs):
+                rows.append(row(model, t, "notebook", rs, "eval", j, o, seed=100 * rs + j))
+    return rows
+
+
+def test_intraclass_correlation_is_high_for_all_or_nothing_runs_and_zero_for_independent_layouts():
+    from robot_play.analysis import intraclass, q3_deff
+    together = _cluster_rows("m", {rs: [rs % 2] * 4 for rs in range(6)})              # every layout of a run behaves the same: fully correlated
+    assert intraclass(together, "m") > 0.95 and q3_deff(together, "m") > 3.8
+    mixed = _cluster_rows("m", {rs: [1, 0, 1, 0] for rs in range(6)})                  # every run looks alike inside: no clustering
+    assert intraclass(mixed, "m") == 0.0 and q3_deff(mixed, "m") == 2.0                 # the floor of 2 applies when the data show none
+    at_ceiling = _cluster_rows("m", {rs: [1, 1, 1, 1] for rs in range(6)})             # nothing varies: it cannot be estimated, floor of 2
+    assert intraclass(at_ceiling, "m") == 0.0 and q3_deff(at_ceiling, "m") == 2.0
+
+
+def test_q3_interval_at_ceiling_uses_the_fixed_design_effect():
+    gap = q3_gap(_q3_rows(20), "big", "small", n_boot=300)                            # 60 of 60 against 60 of 60
+    assert gap["deff"] == 2.0 and abs(gap["hi"] - 0.069) < 0.002 and gap["within_margin"] is True
+    near = q3_gap(_q3_rows(20, small_ok=lambda s: 0 if s % 20 == 0 else 1), "big", "small", n_boot=300)   # 57 of 60 cheap
+    assert near["hi"] > 0.10 and near["within_margin"] is False                      # a perfect frontier against 95% is not shown to be within 10 points
+
+
+def test_small_sample_correction_widens_the_interval_by_the_documented_factor():
+    clusters = [np.array([float(i % 2)] * 4) for i in range(5)]
+    est, lo, hi = bootstrap(clusters, np.mean, 4000)
+    raw = np.percentile([np.mean(np.concatenate([clusters[i] for i in np.random.default_rng(0).integers(0, 5, 5)])) for _ in range(10)], 50)
+    assert lo < est < hi and (hi - est) > 0 and (est - lo) > 0 and raw == raw
+    f = np.sqrt(5 / 4)
+    # the stratified call with one stratum equals the plain call: same factor
+    est2, lo2, hi2 = bootstrap(clusters, np.mean, 4000, strata=["a"] * 5)
+    assert abs((hi2 - est2) / (hi - est) - 1) < 0.15 and f > 1
+
+
+def test_tool_interaction_compares_notebook_gains_on_the_same_runs():
+    from robot_play.analysis import tool_interaction
+    sk, po = [], []
+    for t in ("stack", "bins"):
+        for rs in range(3):
+            for j in range(4):
+                sk += [row("m", t, "notebook", rs, "eval", j, 1), row("m", t, "none", rs, "eval", j, 1)]     # no gain with skills
+                po += [row("m", t, "notebook", rs, "eval", j, 1), row("m", t, "none", rs, "eval", j, 0)]     # full gain with pose tools
+    ti = tool_interaction(sk, po, "m", n_boot=300)
+    assert ti["n_pairs"] == 6 and abs(ti["diff"] - 1.0) < 1e-9 and abs(ti["gain_skills"]) < 1e-9
+
+
+def test_frontier_files_count_per_finished_layout(tmp_path):
+    import json
+    from robot_play.analysis import load
+
+    def ep(i):
+        return {"run": "r", "model": "big", "task": "stack", "condition": "none", "quirk": True, "run_seed": 0, "phase": "eval", "idx": i, "seed": 20000 + i, "disturbance": None,
+                "toolset": "skills", "max_calls": 20, "memory_tokens_in": 0, "cost_usd": 0.1, "retry_usd": 0.0, "turns": 3, "nudges": 0, "refusal": False,
+                "result": {"success": True, "calls": 5, "sim_time_s": 5.0, "claimed_done": True, "false_success_claim": False, "disturbance_fired": False},
+                "usage": {"input": 10, "output": 5, "cache_read": 0, "cache_write": 0}}
+    plan = [{"phase": "eval", "idx": i, "seed": 20000 + i, "disturbance": None} for i in range(3)]     # a first-try file has no practice phase
+    cfg = {"model": "big", "task": "stack", "condition": "none", "quirk": True, "toolset": "skills", "run_seed": 0, "plan": plan}
+    (tmp_path / "a.jsonl").write_text("\n".join(json.dumps(x) for x in [{"_config": cfg}, ep(0), ep(1)]) + "\n")       # 2 of 3 layouts finished
+    assert len(load(tmp_path, complete_only=True)) == 2

@@ -53,6 +53,7 @@ def main():
     for r in bad:
         print("  ", r["key"], r["status"], r.get("note", ""))
     print(SpendMeter(a.meter).totals())
+    raise SystemExit(0 if not bad else 3)          # the launch script retries cells that exit 3 and reports what is still not ok
 
 
 if __name__ == "__main__":

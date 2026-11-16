@@ -8,7 +8,7 @@
   "stack|catch|naive": {
    "n": 100,
    "ok": 17,
-   "calls": 2371
+   "calls": 2316
   },
   "stack|control|naive": {
    "n": 100,

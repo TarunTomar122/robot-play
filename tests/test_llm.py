@@ -116,3 +116,40 @@ def test_later_calls_reserve_from_the_providers_own_token_count_and_never_overru
     assert p.meter.totals()["anthropic"]["overrun_calls"] == 0
     reserves = [__import__("json").loads(x) for x in p.meter.ledger.read_text().splitlines() if '"kind": "reserve"' in x]
     assert reserves[1]["amount"] > reserves[0]["amount"] * 0.5            # the second reservation is based on the first call's real 2,300 tokens plus the new text
+
+
+def _openai_provider(tmp_path, create):
+    p = OpenAIProvider.__new__(OpenAIProvider)
+    import openai
+    p.openai, p.model, p.meter, p.run_id = openai, "gpt-6-luna", SpendMeter(tmp_path, {"anthropic": 1.0, "openai": 1.0}), "t"
+    p.client = NS(responses=NS(create=create))
+    p.tally = llm.Tally()
+    return p
+
+
+def _oai(output, status="completed", text=""):
+    return NS(id="r1", output=output, output_text=text, status=status,
+              usage=NS(input_tokens=500, output_tokens=100, input_tokens_details=NS(cached_tokens=0), output_tokens_details=NS(reasoning_tokens=0)))
+
+
+def test_openai_response_cut_off_mid_call_is_not_executed(tmp_path):
+    out = [NS(type="function_call", call_id="fc1", name="pick", arguments='{"object": "cube_re')]
+    p = _openai_provider(tmp_path, lambda **kw: _oai(out, status="incomplete"))
+    t = p.session("sys", "go").send()
+    assert t.stop == "max_tokens" and t.calls == []              # a half-written call is dropped and the turn counts as cut off
+
+
+def test_openai_refusal_content_is_a_refusal_not_a_normal_end(tmp_path):
+    out = [NS(type="message", content=[NS(type="refusal", refusal="I cannot help with that")])]
+    p = _openai_provider(tmp_path, lambda **kw: _oai(out))
+    assert p.session("sys", "go").send().stop == "refusal"
+    ok = [NS(type="message", content=[NS(type="output_text", text="fine")])]
+    p2 = _openai_provider(tmp_path / "b", lambda **kw: _oai(ok, text="fine"))
+    assert p2.session("sys", "go").send().stop == "end"
+
+
+def test_anthropic_max_tokens_with_a_tool_block_is_a_cut_off_turn(tmp_path):
+    blocks = [NS(type="tool_use", id="t1", name="pick", input={"object": "cube_re"})]
+    p = _anthropic(tmp_path, lambda **kw: _msg("max_tokens", blocks))
+    t = p.session("sys", "go").send()
+    assert t.stop == "max_tokens" and t.calls                     # the provider layer reports it; play_episode aborts on any max_tokens turn

@@ -5,6 +5,7 @@ last line instead of starting again.
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import multiprocessing as mp
@@ -31,13 +32,25 @@ class ConfigMismatch(Exception):
     """A run file exists but was written with a different setup (budget, seeds, prompts, tools, caps, code...). It is never silently continued."""
 
 
+@functools.lru_cache(maxsize=1)
+def asset_hash() -> str:
+    """Hash of the contents of the Panda model files the simulator actually loads (every XML and every mesh), not of the script that downloads them."""
+    h = hashlib.sha256()
+    d = ROOT / "third_party" / "mujoco_menagerie" / "franka_emika_panda"
+    for f in sorted(x for x in d.rglob("*") if x.is_file() and x.suffix.lower() in (".xml", ".obj", ".stl", ".png")):
+        h.update(str(f.relative_to(d)).encode())
+        h.update(f.read_bytes())
+    return h.hexdigest()[:16]
+
+
 def code_hash() -> str:
-    """Hash of every source file of the package plus the pinned model download script: the code and the robot model a run was written with."""
+    """Hash of every source file of the package, the pinned dependency lock and the robot model files: the code and the world a run was written with."""
     h = hashlib.sha256()
     code = [f for f in sorted((ROOT / "robot_play").glob("*.py")) if f.name not in ("analysis.py", "render.py")]       # analysis and charts never change what a run does
-    for f in code + [ROOT / "scripts" / "fetch_models.sh", ROOT / "uv.lock"]:
+    for f in code + [ROOT / "uv.lock"]:
         h.update(f.name.encode())
         h.update(f.read_bytes() if f.exists() else b"")
+    h.update(asset_hash().encode())
     return h.hexdigest()[:16]
 
 
@@ -183,6 +196,11 @@ def _worker(spec: RunSpec) -> dict:
 def run_all(specs: list[RunSpec], workers: int = 8, log=print) -> list[dict]:
     """Run many runs in parallel processes. A provider that reaches its cap has its remaining runs skipped; the other provider carries on."""
     out: list[dict] = []
+    by_provider: dict[str, list[RunSpec]] = {}
+    for sp in specs:
+        by_provider.setdefault(PROVIDER_OF(sp.model), []).append(sp)
+    queues = list(by_provider.values())          # alternate between providers so every worker is not rate-limited by the same one at once
+    specs = [q[i] for i in range(max(map(len, queues), default=0)) for q in queues if i < len(q)]
     ctx = mp.get_context("spawn")
     with ctx.Pool(workers, maxtasksperchild=4) as pool:
         for res in pool.imap_unordered(_worker, specs):

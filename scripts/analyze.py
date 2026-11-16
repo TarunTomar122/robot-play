@@ -24,7 +24,7 @@ from robot_play.spend import SpendMeter
 ROOT = Path(__file__).resolve().parents[1]
 MIN_Q1_PAIRS = 24                  # of 30 (task, run seed) pairs per model; fewer complete pairs and the claim is reported as inconclusive
 MIN_Q3_CLUSTERS = 12               # of 15 (task, run seed) clusters per cheap model
-MIN_Q4_PAIRS = 12                  # of 15 (task, run seed) pairs per model in the control cell
+MIN_Q4_PAIRS = 24                  # of 30 (task, run seed) pairs per model in the control cell (3 tasks x 10 run seeds)
 FRONTIER_FLOOR = 0.5               # a frontier first try below this is not a target worth matching
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 COLORS = {"none": "#2a78d6", "notebook": "#eb6834", "replay": "#1baf7a"}          # dataviz skill categorical slots 1-3 (validated all-pairs)
@@ -102,7 +102,7 @@ def main():
     cov = A.coverage(*dirs)
     abandoned = {}
     for c in cov:
-        k = (c["model"], c["task"], c["condition"], c["quirk"], c["run_seed"])
+        k = (c["model"], c["toolset"], c["task"], c["condition"], c["quirk"], c["run_seed"])
         abandoned[k] = abandoned.get(k, 0.0) + c["aborted_usd"]
     skills = [r for r in rows if r.get("toolset") in (None, "skills")]
     pose = [r for r in rows if r.get("toolset") == "pose"]
@@ -189,7 +189,7 @@ def main():
     # --- Q3
     L += ["## 4. Q3: can a cheap model with experience come close to a frontier model's first try?", "",
           f"Confirmatory for the notebook rows (4 gaps, 98.75% intervals). The frontier models ran at reasoning effort `low`, like every model here, so this compares models at the same low setting, not at their best. Clusters are (task, run seed) runs, because the four layouts of a run share one notebook; the interval is the wider of the cluster bootstrap and an Agresti-Caffo interval "
-          f"with a design effect, so it does not shrink to zero when every episode succeeds. Fewer than {MIN_Q3_CLUSTERS} of 15 complete clusters is inconclusive. A frontier first try below {int(100 * FRONTIER_FLOOR)}% is not treated as a target. The rows with no memory show how much of the gap the notebook closes (exploratory, 95%).", ""]
+          f"whose cheap-arm variance carries the design effect fixed in PROTOCOL.md (max(2, 1 + 3 x rho), rho measured on that cheap model's own held-out outcomes; the frontier arm has none), so it does not shrink to zero when every episode succeeds. Fewer than {MIN_Q3_CLUSTERS} of 15 complete clusters is inconclusive. A frontier first try below {int(100 * FRONTIER_FLOOR)}% is not treated as a target. The rows with no memory show how much of the gap the notebook closes (exploratory, 95%).", ""]
     q3, q3c = [], []
     for fr in [m for m in models if m in ("claude-fable-5-2", "gpt-6-astra")]:
         for ch in cheap:
@@ -220,7 +220,7 @@ def main():
 
     # --- Q4
     L += ["## 5. Q4: does experience help recovery from a disturbance?", "",
-          f"Confirmatory measure: the **no-catch control scenes**, 97.5% intervals, one test per cheap model, inconclusive below {MIN_Q4_PAIRS} complete (task, run seed) pairs of 15. There both conditions solve the clean layouts about equally often, so the clean-to-disturbed drop is not floored by a failure that has nothing to do with the disturbance. "
+          f"Confirmatory measure: the **no-catch control scenes**, 97.5% intervals, one test per cheap model, inconclusive below {MIN_Q4_PAIRS} complete (task, run seed) pairs of 30. There both conditions solve the clean layouts about equally often, so the clean-to-disturbed drop is not floored by a failure that has nothing to do with the disturbance. "
           "The catch-scene results are exploratory: a condition that already fails the clean layout cannot drop. For those the table also gives the share of clean wins that survive the disturbance. "
           "A difference of drops is an association, not proof that the notebook taught recovery: the notebook was written from clean practice, so it can only help through general habits. The disturbance fired in every episode of the validation gate, and the tables show how often it fired here.", ""]
     for scene, quirk, primary in (("no-catch control scenes (confirmatory)", False, True), ("catch scenes (exploratory)", True, False)):
@@ -252,10 +252,15 @@ def main():
                     x = A.select(rs, model=m, condition=c, phase="eval", quirk=True)
                     if x:
                         pr.append((m, tools, NAMES[c], len(x), f(mean(x, "success"), True), f"{mean(x, 'calls'):.1f}", f"${mean(x, 'cost_usd'):.4f}"))
-        L += [table(["model", "tools", "memory", "episodes", "held-out success", "calls", "dollars per episode"], pr), ""]
+        L += [table(["model", "tools", "memory", "episodes", "held-out success", "calls", "dollars per episode"], pr), "",
+              "The skills rows above use all ten run seeds; the interaction below uses only run seeds 0 to 2, the seeds the pose cell has, so both toolsets see the same layouts. Exploratory, 95%, three runs per task is few.", ""]
         for m in sorted({r["model"] for r in pose}):
             d = A.paired_difference(pose, m, "notebook", "none")
             L += [f"{m}, pose-level tools, notebook against fresh: {ci(d, pct=True)}", ""]
+            sk3 = [r for r in skills if r["run_seed"] in (0, 1, 2)]
+            ti = A.tool_interaction(sk3, pose, m)
+            if ti.get("n_pairs"):
+                L += [f"{m}, notebook gain with pose tools ({f(ti['gain_pose'], True)}) minus the gain with skill tools ({f(ti['gain_skills'], True)}) on the same {ti['n_pairs']} runs: {ci(ti, 'diff', pct=True)}", ""]
 
     # --- honesty about claims
     fc = []

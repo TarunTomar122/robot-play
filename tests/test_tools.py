@@ -64,3 +64,17 @@ def test_pose_level_close_gripper_attaches_what_is_between_the_fingers_and_a_pos
     assert ep.call("close_gripper", {"grip_level": "firm"})["holding"] == "cube_green"
     assert ep.call("move_to", {"x": x, "y": y, "z": 0.3, "speed": "slow"})["ok"]          # carrying the cube straight up works: it is not an obstacle to its own hand
     assert run_pose_script("stack", 3, True, "oracle")["ok"] and not run_pose_script("stack", 3, True, "naive")["ok"]
+
+
+def test_a_lost_object_is_no_longer_reported_as_held():
+    ep = Episode("stack", 3, quirk=True, toolset="pose")
+    o = [x for x in ep.call("observe")["objects"] if x["name"] == "cube_green"][0]
+    x, y, z = o["position_m"]
+    ep.call("move_to", {"x": x, "y": y, "z": 0.4})
+    ep.call("move_to", {"x": x, "y": y, "z": 0.024})
+    ep.call("close_gripper", {})                                           # the default squeeze cannot hold the heavy cube: it slips out on the way up
+    ep.call("move_to", {"x": x, "y": y, "z": 0.3, "speed": "slow"})
+    obs = ep.call("observe")
+    green = [o for o in obs["objects"] if o["name"] == "cube_green"][0]
+    assert green["position_m"][2] < 0.05 and green["held"] is False and obs["gripper"]["holding"] is None      # it lies on the table, and the tools say so
+    assert ep.call("close_gripper", {})["holding"] is None
