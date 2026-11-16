@@ -32,6 +32,9 @@ PRICES = {
 }
 CACHE_READ = {"anthropic": 0.10, "openai": 0.50}
 CACHE_WRITE = {"anthropic": 1.25, "openai": 1.00}
+# Anthropic prices match the published list (checked 2026-11-03). OpenAI prices could not be checked against an official list from here, so the meter
+# charges twice the assumed OpenAI price: the cap can only be reached early, never late. Reported dollars in the results use the plain list price.
+PRICE_SAFETY = {"anthropic": 1.0, "openai": 2.0}
 PROVIDER_OF = lambda model: "anthropic" if model.startswith("claude") else "openai"
 DEFAULT_CAPS = {"anthropic": 90.0, "openai": 45.0}
 
@@ -45,10 +48,17 @@ def estimate_tokens(text: str) -> int:
     return int(len(text) / 3) + 50
 
 
-def cost_usd(model: str, input_tokens: int = 0, output_tokens: int = 0, cache_read_tokens: int = 0, cache_write_tokens: int = 0) -> float:
+def cost_usd(model: str, input_tokens: int = 0, output_tokens: int = 0, cache_read_tokens: int = 0, cache_write_tokens: int = 0, safety: bool = False) -> float:
+    """Dollars at the assumed list price. With safety=True the meter's pessimistic version (see PRICE_SAFETY)."""
     pin, pout = PRICES[model]
     prov = PROVIDER_OF(model)
-    return (input_tokens * pin + output_tokens * pout + cache_read_tokens * pin * CACHE_READ[prov] + cache_write_tokens * pin * CACHE_WRITE[prov]) / 1e6
+    k = PRICE_SAFETY[prov] if safety else 1.0
+    return k * (input_tokens * pin + output_tokens * pout + cache_read_tokens * pin * CACHE_READ[prov] + cache_write_tokens * pin * CACHE_WRITE[prov]) / 1e6
+
+
+def worst_case_usd(model: str, est_input_tokens: int, max_output_tokens: int) -> float:
+    """The most one call can cost: every input token billed as a cache write (the dearest input rate) and every output token used."""
+    return cost_usd(model, cache_write_tokens=est_input_tokens, output_tokens=max_output_tokens, safety=True)
 
 
 @dataclass
@@ -98,11 +108,18 @@ class SpendMeter:
     def totals(self) -> dict:
         with self._locked():
             st = self._load()
-        return {p: {"spent": round(st["spent"].get(p, 0.0), 6), "reserved": round(st["reserved"].get(p, 0.0), 6), "cap": self.caps[p]} for p in self.caps}
+        return {p: {"spent": round(st["spent"].get(p, 0.0), 6), "reserved": round(st["reserved"].get(p, 0.0), 6), "cap": self.caps[p],
+                    "overrun_usd": round(st.get("overrun", {}).get(p, 0.0), 6), "overrun_calls": st.get("overrun_calls", {}).get(p, 0)} for p in self.caps}
+
+    def exhausted(self, provider: str, frac: float = 0.98) -> bool:
+        """True once spent plus reserved is within 2% of the provider's cap: the runner then skips that provider's remaining runs."""
+        with self._locked():
+            st = self._load()
+        return st["spent"].get(provider, 0.0) + st["reserved"].get(provider, 0.0) >= frac * self.caps[provider]
 
     def reserve(self, model: str, est_input_tokens: int, max_output_tokens: int, run_id: str = "") -> Reservation:
         prov = PROVIDER_OF(model)
-        worst = cost_usd(model, input_tokens=est_input_tokens, output_tokens=max_output_tokens)
+        worst = worst_case_usd(model, est_input_tokens, max_output_tokens)
         with self._locked():
             st = self._load()
             committed = st["spent"].get(prov, 0.0) + st["reserved"].get(prov, 0.0)
@@ -124,13 +141,21 @@ class SpendMeter:
             prov, amount = st["open"].pop(res.id)
             st["reserved"][prov] = max(0.0, st["reserved"].get(prov, 0.0) - amount)
             st["spent"][prov] = st["spent"].get(prov, 0.0) + real
+            if real > amount + 1e-12:
+                st.setdefault("overrun", {})
+                st["overrun"][prov] = st["overrun"].get(prov, 0.0) + (real - amount)
+                st.setdefault("overrun_calls", {})
+                st["overrun_calls"][prov] = st["overrun_calls"].get(prov, 0) + 1
             self._save(st)
             self._log(kind=kind, id=res.id, provider=prov, model=res.model, amount=round(real, 6), **extra)
 
     def settle(self, res: Reservation, input_tokens: int, output_tokens: int, cache_read_tokens: int = 0, cache_write_tokens: int = 0) -> float:
-        real = cost_usd(res.model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens)
+        """Charge the real (pessimistic-priced) cost. If it is more than was reserved the estimate was too low: that is recorded as an overrun
+        in the ledger and in `totals()`, so a too-low estimate is visible instead of silent."""
+        real = cost_usd(res.model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, safety=True)
+        over = max(0.0, real - res.amount)
         self._close(res, real, "settle", input_tokens=input_tokens, output_tokens=output_tokens,
-                    cache_read_tokens=cache_read_tokens, cache_write_tokens=cache_write_tokens, reserved=round(res.amount, 6))
+                    cache_read_tokens=cache_read_tokens, cache_write_tokens=cache_write_tokens, reserved=round(res.amount, 6), overrun=round(over, 6))
         return real
 
     def settle_unknown(self, res: Reservation, why: str = "") -> float:
@@ -161,5 +186,7 @@ class SpendMeter:
                     m["cache_read"] += r.get("cache_read_tokens", 0)
                     m["cache_write"] += r.get("cache_write_tokens", 0)
         st = self._load()
-        match = all(abs(spent.get(p, 0.0) - st["spent"].get(p, 0.0)) < 1e-6 for p in set(spent) | set(st["spent"]))
+        n_rows = sum(1 for _ in self.ledger.read_text().splitlines()) if self.ledger.exists() else 0
+        tol = 5e-7 * n_rows + 1e-9          # every ledger amount is rounded to 6 decimals, so each row can be off by 5e-7
+        match = all(abs(spent.get(p, 0.0) - st["spent"].get(p, 0.0)) <= tol for p in set(spent) | set(st["spent"]))
         return {"per_model": per_model, "spent": spent, "open_reservations": len(open_res), "matches_state": match}

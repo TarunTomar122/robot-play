@@ -84,3 +84,22 @@ def test_concurrent_workers_cannot_exceed_the_cap(tmp_path):
     spent = m.totals()["anthropic"]["spent"]
     assert spent <= 1.0 + 1e-9 and done == round(spent / 0.014) and done >= 60
     assert m.reconcile()["matches_state"]
+
+
+def test_a_settlement_above_its_reservation_is_recorded_as_an_overrun(tmp_path):
+    m = SpendMeter(tmp_path, {"anthropic": 10.0, "openai": 10.0})
+    r = m.reserve("claude-haiku-5-5", 100, 100)
+    m.settle(r, input_tokens=1_000_000, output_tokens=0)
+    t = m.totals()["anthropic"]
+    assert t["overrun_calls"] == 1 and t["overrun_usd"] > 0.09 and m.reconcile()["matches_state"]
+
+
+def test_openai_is_priced_pessimistically_in_the_meter_but_at_list_price_in_results(tmp_path):
+    from robot_play.spend import cost_usd
+    assert cost_usd("gpt-6-luna", 1_000_000, 0, safety=True) == 2 * cost_usd("gpt-6-luna", 1_000_000, 0)
+    assert cost_usd("claude-haiku-5-5", 1_000_000, 0, safety=True) == cost_usd("claude-haiku-5-5", 1_000_000, 0)
+
+
+def test_the_reservation_prices_input_at_the_cache_write_rate(tmp_path):
+    from robot_play.spend import worst_case_usd
+    assert worst_case_usd("claude-haiku-5-5", 1_000_000, 0) == 0.10 * 1.25

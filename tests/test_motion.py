@@ -41,3 +41,27 @@ def test_straight_move_is_collision_checked_against_held_object_too():
     red = env.w.obj_pos("cube_red")
     r = s.move_to(red[0], red[1], 0.05)                          # would drive the held cube into the red cube
     assert not r["ok"]
+
+
+def test_arm_can_leave_a_bin_after_letting_go_inside_it():
+    """Regression: after pick, move_to inside a tall-walled bin and open_gripper, the fingers touch the walls; every later move used to fail."""
+    from robot_play.tools import Episode
+    ep = Episode("bins", 60000, quirk=True)
+    bx = ep.env.meta["bin_xy"]["bin_red"]
+    assert ep.call("pick", {"object": "cube_red1"})["ok"]
+    assert ep.call("move_to", {"x": float(bx[0]), "y": float(bx[1]), "z": 0.10})["ok"]
+    ep.call("open_gripper", {})
+    assert ep.env.skills.mv.colliding(ep.env.w.q)                         # the start pose really is in contact
+    assert ep.call("move_to", {"x": 0.4, "y": 0.0, "z": 0.3})["ok"]
+    assert ep.call("home", {})["ok"]
+
+
+def test_the_escape_cannot_be_used_to_tunnel_through_a_wall():
+    from robot_play.tools import Episode
+    ep = Episode("bins", 60000, quirk=True)
+    bx = ep.env.meta["bin_xy"]["bin_red"]
+    ep.call("pick", {"object": "cube_red1"})
+    ep.call("move_to", {"x": float(bx[0]), "y": float(bx[1]), "z": 0.10})
+    ep.call("open_gripper", {})
+    r = ep.call("move_to", {"x": float(bx[0]), "y": float(bx[1]) + 0.2, "z": 0.03})       # straight across the wall at table height
+    assert not r["ok"]

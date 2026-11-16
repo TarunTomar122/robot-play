@@ -11,13 +11,15 @@ Token caps are enforced as character caps at 4 characters per token (English tex
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from dataclasses import dataclass, field
 
 from .llm import Turn, add_usage
 from .spend import cost_usd
-from .tools import Episode
+from .llm import MAX_OUTPUT_TOKENS
+from .tools import SYSTEM_PROMPT, TOOLSETS, Episode
 
 CHARS_PER_TOKEN = 4
 NOTEBOOK_TOKENS, REPLAY_TOKENS = 600, 1200
@@ -27,6 +29,14 @@ MAX_NUDGES = 2
 NUDGE = "You did not call a tool. Keep using the tools to finish the task, or call done() if you believe it is finished."
 
 CONDITIONS = ("none", "notebook", "replay")
+
+
+def fingerprint(instruction: str) -> str:
+    """Hash of everything a model is shown or limited by. Stored with every run so a resumed run cannot silently mix two versions of the setup."""
+    blob = json.dumps({"system": SYSTEM_PROMPT, "tools": TOOLSETS, "instruction": instruction, "notebook_system": NOTEBOOK_SYSTEM, "nudge": NUDGE,
+                       "caps": [NOTEBOOK_TOKENS, REPLAY_TOKENS, CHARS_PER_TOKEN, MAX_NUDGES, MAX_OUTPUT_TOKENS],
+                       "notebook_request": notebook_request("I", "N", "V", 1, 2, "T")}, sort_keys=True)
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 
 def practice_seeds(run_seed: int) -> list[int]:
@@ -92,8 +102,9 @@ def notebook_request(instruction: str, notebook: str, verdict: str, calls: int, 
     return (f"TASK: {instruction}\n\nCURRENT NOTEBOOK:\n{notebook or '(empty)'}\n\n"
             f"The attempt that just ended used {calls} of {max_calls} tool calls. The simulator's verdict: {verdict}\n\n"
             f"WHAT THE AGENT DID (tool, arguments, what came back):\n{transcript}\n\n"
-            "Rewrite the notebook now. Replace it, do not append. Keep it under 300 words. Say which settings or approaches worked or failed and what in the "
-            "results showed that, and note anything that wasted calls. Output only the notebook text.")
+            "Object positions change at every attempt and the transcript is shortened, so do not record positions or coordinates. Rewrite the notebook now. "
+            "Replace it, do not append. Keep it under 300 words. Say which settings or approaches worked or failed and what in the results showed that, "
+            "and note anything that wasted calls. Output only the notebook text.")
 
 
 # ------------------------------------------------------------------------------------------------ episodes
@@ -108,19 +119,25 @@ class EpisodeRecord:
     nudges: int
     wall_s: float
     notes: list = field(default_factory=list)
+    retry_usd: float = 0.0
+    aborted: bool = False          # the provider failed or the reply was cut off: this is not a task outcome and must not be recorded as one
+    refusal: bool = False          # the model's safety system declined: recorded as a failed episode, and counted
 
     def to_dict(self) -> dict:
-        return {"result": self.result, "usage": self.usage, "mem_usage": self.mem_usage, "cost_usd": round(self.cost_usd, 6), "turns": self.turns,
+        return {"result": self.result, "usage": self.usage, "mem_usage": self.mem_usage, "cost_usd": round(self.cost_usd, 6), "retry_usd": round(self.retry_usd, 6), "turns": self.turns, "refusal": self.refusal,
                 "nudges": self.nudges, "wall_s": round(self.wall_s, 1), "notes": self.notes, "log": self.log}
 
 
-def play_episode(provider, task: str, seed: int, quirk: bool, memory: Memory, disturbance: str | None = None, max_calls: int | None = None) -> EpisodeRecord:
-    ep = Episode(task, seed, quirk=quirk, max_calls=max_calls, disturbance=disturbance)
+def play_episode(provider, task: str, seed: int, quirk: bool, memory: Memory, disturbance: str | None = None, max_calls: int | None = None,
+                 toolset: str = "skills") -> EpisodeRecord:
+    ep = Episode(task, seed, quirk=quirk, max_calls=max_calls, disturbance=disturbance, toolset=toolset)
     system = ep.prompt + memory.prompt_block()
-    session = provider.session(system, "Begin the task now.")
+    paid0, retry0 = provider.tally.usd, provider.tally.retry_usd
+    session = provider.session(system, "Begin the task now.", ep.tools)
     usage = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
     notes: list[str] = []
     turns = nudges = 0
+    aborted = refusal = False
     t0 = time.time()
     results = None
     nudge = None
@@ -131,9 +148,15 @@ def play_episode(provider, task: str, seed: int, quirk: bool, memory: Memory, di
         usage = add_usage(usage, turn.usage)
         if turn.stop == "error":
             notes.append("provider error: " + turn.error)
+            aborted = True
             break
-        if turn.stop in ("refusal", "max_tokens") and not turn.calls:
-            notes.append(f"model stopped with {turn.stop}")
+        if turn.stop == "max_tokens" and not turn.calls:
+            notes.append("reply cut off at the output limit")
+            aborted = True
+            break
+        if turn.stop == "refusal" and not turn.calls:
+            notes.append("model declined (refusal)")
+            refusal = True
             break
         if not turn.calls:
             if nudges >= MAX_NUDGES:
@@ -154,8 +177,9 @@ def play_episode(provider, task: str, seed: int, quirk: bool, memory: Memory, di
             notes.append("turn cap reached")
             break
     result = ep.result()
-    cost = cost_usd(provider.model, usage["input"], usage["output"], usage["cache_read"], usage["cache_write"])
-    return EpisodeRecord(result, ep.log, usage, {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}, cost, turns, nudges, time.time() - t0, notes)
+    cost = provider.tally.usd - paid0                 # every paid attempt of this episode, failed retries included
+    return EpisodeRecord(result, ep.log, usage, {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}, cost, turns, nudges, time.time() - t0, notes,
+                         retry_usd=provider.tally.retry_usd - retry0, aborted=aborted, refusal=refusal)
 
 
 def verdict_text(result: dict) -> str:
@@ -166,9 +190,11 @@ def update_memory(provider, memory: Memory, rec: EpisodeRecord, task: str, instr
     """Called after each *practice* episode only. Evaluation episodes never change the memory."""
     if memory.condition == "notebook":
         transcript = render_transcript(rec.log, 6000)
+        paid0, retry0 = provider.tally.usd, provider.tally.retry_usd
         text, u = provider.complete(NOTEBOOK_SYSTEM, notebook_request(instruction, memory.notebook, verdict_text(rec.result), rec.result["calls"], max_calls, transcript))
         rec.mem_usage = add_usage(rec.mem_usage, u)
-        rec.cost_usd += cost_usd(provider.model, u["input"], u["output"], u["cache_read"], u["cache_write"])
+        rec.cost_usd += provider.tally.usd - paid0         # the notebook rewrite is part of the episode's cost, retries included
+        rec.retry_usd += provider.tally.retry_usd - retry0
         if text:
             memory.notebook = text[: NOTEBOOK_TOKENS * CHARS_PER_TOKEN]
     elif memory.condition == "replay" and rec.result["success"]:

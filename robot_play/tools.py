@@ -35,11 +35,17 @@ TOOLS = [
          "x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"},
          "speed": {"type": "string", "enum": ["slow", "normal", "fast"]}}, "required": ["x", "y", "z"]}},
     {"name": "open_gripper", "description": "Open the fingers. Anything held is released where it is.", "input_schema": {"type": "object", "properties": {}}},
-    {"name": "close_gripper", "description": "Close the fingers at the current hand position.", "input_schema": {"type": "object", "properties": {}}},
+    {"name": "close_gripper", "description": "Close the fingers at the current hand position.", "input_schema": {"type": "object", "properties": {
+        "grip_level": {"type": "string", "enum": ["light", "normal", "firm"], "description": "How hard the fingers squeeze. Default normal."}}}},
     {"name": "home", "description": "Return the arm to its home pose.", "input_schema": {"type": "object", "properties": {
         "speed": {"type": "string", "enum": ["slow", "normal", "fast"]}}}},
     {"name": "done", "description": "Declare the task finished. The episode ends and the simulator judges the result.", "input_schema": {"type": "object", "properties": {}}},
 ]
+
+# The pose-level toolset has no pick or place: the model must build them from moves and the gripper. Used for the skill-level versus pose-level comparison.
+POSE_TOOLS = [t for t in TOOLS if t["name"] in ("observe", "move_to", "open_gripper", "close_gripper", "home", "done")]
+TOOLSETS = {"skills": TOOLS, "pose": POSE_TOOLS}
+CALL_BUDGET_FACTOR = {"skills": 1, "pose": 3}      # building a pick and a place from moves takes about three times as many calls
 
 SYSTEM_PROMPT = """You control a simulated Franka Panda arm through the tools you are given. All positions are in metres in the world frame (x forward, y left, z up, the table surface is z = 0).
 Your task is described below. You have at most {max_calls} tool calls in total, and each call (including observe) counts. When you believe the task is complete, call done().
@@ -55,6 +61,8 @@ class Episode:
     quirk: bool = True
     max_calls: int | None = None
     disturbance: str | None = None
+    toolset: str = "skills"
+    env_kw: dict = field(default_factory=dict)          # scene overrides used only by validation sweeps (cube mass, wall height, flask base)
     env: TaskEnv = field(init=False)
     log: list = field(default_factory=list)
     calls: int = 0
@@ -62,12 +70,16 @@ class Episode:
     over_budget: bool = False
 
     def __post_init__(self):
-        self.env = TaskEnv(self.task, self.seed, quirk=self.quirk)
+        self.env = TaskEnv(self.task, self.seed, quirk=self.quirk, **self.env_kw)
         self.dist = Disturbance(self.disturbance, self.seed) if self.disturbance else None
         if self.dist:
             self.dist.attach(self.env)
         if self.max_calls is None:
-            self.max_calls = self.env.task.max_calls
+            self.max_calls = self.env.task.max_calls * CALL_BUDGET_FACTOR[self.toolset]
+
+    @property
+    def tools(self) -> list:
+        return TOOLSETS[self.toolset]
 
     @property
     def finished(self) -> bool:
@@ -84,7 +96,9 @@ class Episode:
         self.calls += 1
         sk = self.env.skills
         try:
-            if name == "observe":
+            if name not in {t["name"] for t in self.tools}:
+                res = {"error": f"unknown tool '{name}'"}
+            elif name == "observe":
                 res = sk.observe()
             elif name == "pick":
                 res = sk.pick(args["object"], args.get("grasp_height", 0.6), args.get("speed", "normal"), args.get("grip_level", "normal"),
@@ -96,7 +110,7 @@ class Episode:
             elif name == "open_gripper":
                 res = sk.open_gripper()
             elif name == "close_gripper":
-                res = sk.close_gripper()
+                res = sk.close_gripper(args.get("grip_level", "normal"))
             elif name == "home":
                 res = sk.home(args.get("speed", "normal"))
             elif name == "done":
@@ -116,7 +130,7 @@ class Episode:
 
     def result(self) -> dict:
         ok, detail = self.env.success()
-        return {"task": self.task, "seed": self.seed, "quirk": self.quirk, "success": bool(ok), "detail": detail,
+        return {"task": self.task, "seed": self.seed, "quirk": self.quirk, "toolset": self.toolset, "success": bool(ok), "detail": detail,
                 "claimed_done": self.claimed_done, "false_success_claim": bool(self.claimed_done and not ok),
                 "calls": self.calls, "sim_time_s": round(self.env.sim_time, 1),
                 "disturbance": self.disturbance, "disturbance_fired": bool(self.dist and self.dist.fired)}

@@ -25,8 +25,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", type=int, default=30)
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--base", type=int, default=3000, help="first layout seed; the nudge was tuned on 2000-2029, so the reported gate uses fresh seeds")
     n = ap.parse_args()
-    jobs = [(t, 2000 + sd, k, p) for t in ("stack", "bins", "flasks") for k in ("slip", "nudge") for p in ("oracle", "oracle_retry") for sd in range(n.seeds)]
+    jobs = [(t, n.base + sd, k, p) for t in ("stack", "bins", "flasks") for k in ("slip", "nudge") for p in ("oracle", "oracle_retry") for sd in range(n.seeds)]
     with Pool(n.workers) as pool:
         res = pool.map(one, jobs)
     agg, crashes = collections.defaultdict(lambda: {"episodes": 0, "fired": 0, "success_when_fired": 0}), []
@@ -44,8 +45,8 @@ def main():
             checks[f"{t}|{k}"] = {"fires_in_>=95%": rr["fired"] >= 0.95 * rr["episodes"],
                                   "breaks_no_reaction_script(<=30%)": r["success_when_fired"] <= 0.30 * max(r["fired"], 1),
                                   "recoverable_by_retry(>=80%)": rr["success_when_fired"] >= 0.80 * max(rr["fired"], 1)}
-    (OUT / "disturbance.json").write_text(json.dumps({"seeds": n.seeds, "table": dict(agg), "checks": checks, "crashes": crashes}, indent=1))
-    lines = ["# Disturbance validation", "", f"{n.seeds} episodes per row (seeds 2000+), catch scenes. 'No reaction' = the script that knows the catch but never retries.", "",
+    (OUT / "disturbance.json").write_text(json.dumps({"seeds": n.seeds, "base": n.base, "table": dict(agg), "checks": checks, "crashes": crashes}, indent=1))
+    lines = ["# Disturbance validation", "", f"{n.seeds} episodes per row (layout seeds {n.base}+; the nudge was tuned on 2000-2029 and those results are kept in disturbance_tuning_seeds_2000.md), catch scenes, played through the same Episode wrapper and call budget a model gets. 'No reaction' = the script that knows the catch but never retries.", "",
              "| Job | Disturbance | Fired | Success, no reaction | Success, retries |", "|---|---|---|---|---|"]
     for t in ("stack", "bins", "flasks"):
         for k in ("slip", "nudge"):

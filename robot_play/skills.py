@@ -89,8 +89,10 @@ class Skills:
         self.mv.detach()
         return {"ok": True, "gripper_width_m": round(self.w.gripper_width(), 3)}
 
-    def close_gripper(self) -> dict:
-        self.w.set_gripper(True)
+    def close_gripper(self, grip_level: str = "normal") -> dict:
+        if grip_level not in GRIP:
+            return self._fail("grip_level must be light|normal|firm")
+        self.w.data.ctrl[7] = GRIP[grip_level]
         self.w.settle(0.5)
         return {"ok": True, "gripper_width_m": round(self.w.gripper_width(), 3)}
 

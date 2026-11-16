@@ -35,6 +35,24 @@ class Task:
     max_calls: int = 20
 
 
+STABLE_TOL = 0.005          # metres an object may drift during the 1 s stability window
+
+
+def settle_and_track(env, names, seconds: float = 1.0, slices: int = 10) -> dict:
+    """Let the world run for `seconds` and report, per object, the largest distance it strayed from where it was at the start of the window
+    and the largest tilt. 'Stable for 1 s' in the protocol means this drift stays under STABLE_TOL and the final checks hold."""
+    w = env.w
+    start = {n: w.obj_pos(n) for n in names}
+    drift = {n: 0.0 for n in names}
+    tilt = {n: 0.0 for n in names}
+    for _ in range(slices):
+        env.world_settle(seconds / slices)
+        for n in names:
+            drift[n] = max(drift[n], float(np.linalg.norm(w.obj_pos(n) - start[n])))
+            tilt[n] = max(tilt[n], w.obj_tilt_deg(n))
+    return {"drift": drift, "tilt": tilt}
+
+
 # ---------------------------------------------------------------------------------------------- stack
 def _build_stack(rng, quirk: bool, mass: float | None = None, mu: float | None = None):
     pts = _sample_xy(rng, 3, min_sep=0.14)
@@ -49,13 +67,15 @@ def _build_stack(rng, quirk: bool, mass: float | None = None, mu: float | None =
 
 def _check_stack(env):
     w = env.w
-    env.world_settle(1.0)
-    r, g, b = (w.obj_pos(n) for n in ("cube_red", "cube_green", "cube_blue"))
+    names = ("cube_red", "cube_green", "cube_blue")
+    tr = settle_and_track(env, names)
+    stable = max(tr["drift"].values()) < STABLE_TOL
+    r, g, b = (w.obj_pos(n) for n in names)
     ok_g = np.linalg.norm(g[:2] - r[:2]) < 0.012 and abs(g[2] - (r[2] + 0.04)) < 0.008
     ok_b = np.linalg.norm(b[:2] - r[:2]) < 0.012 and abs(b[2] - (r[2] + 0.08)) < 0.008
-    tilts = max(w.obj_tilt_deg(n) for n in ("cube_red", "cube_green", "cube_blue"))
-    ok = bool(ok_g and ok_b and tilts < 15)
-    return ok, {"green_on_red": bool(ok_g), "blue_on_green": bool(ok_b), "max_tilt_deg": round(tilts, 1)}
+    tilts = max(tr["tilt"].values())
+    ok = bool(ok_g and ok_b and tilts < 15 and stable)
+    return ok, {"green_on_red": bool(ok_g), "blue_on_green": bool(ok_b), "max_tilt_deg": round(tilts, 1), "stable_1s": bool(stable)}
 
 
 # ---------------------------------------------------------------------------------------------- bins
@@ -94,13 +114,15 @@ def _build_bins(rng, quirk: bool, wall_h: float | None = None):
 
 def _check_bins(env):
     w = env.w
-    env.world_settle(1.0)
+    names = ("cube_red1", "cube_red2", "cube_blue1", "cube_blue2")
+    tr = settle_and_track(env, names)
     inside = {}
-    for n in ("cube_red1", "cube_red2", "cube_blue1", "cube_blue2"):
+    for n in names:
         want = "bin_red" if "red" in n else "bin_blue"
         c = np.array(env.meta["bin_xy"][want])
         p = w.obj_pos(n)
-        inside[n] = bool(np.all(np.abs(p[:2] - c) < BIN_INNER / 2 - 0.005) and 0.01 < p[2] < 0.05)
+        # inside the bin's footprint, above its floor and below the height of two stacked cubes (a cube resting on the other cube in the bin is still in the bin)
+        inside[n] = bool(np.all(np.abs(p[:2] - c) < BIN_INNER / 2 - 0.005) and 0.01 < p[2] < 0.08 and tr["drift"][n] < STABLE_TOL)
     return all(inside.values()), inside
 
 
@@ -126,12 +148,12 @@ def _build_flasks(rng, quirk: bool, base_h: float | None = None):
 
 def _check_flasks(env):
     w = env.w
-    env.world_settle(1.0)
+    tr = settle_and_track(env, ("flask_a", "flask_b"))
     res = {}
     for n in ("flask_a", "flask_b"):
         p = w.obj_pos(n)
         c = np.array(env.meta["ring"][n])
-        res[n] = bool(np.linalg.norm(p[:2] - c) < 0.03 and w.obj_tilt_deg(n) < 10 and abs(p[2] - FLASK_HALF_H) < 0.01)
+        res[n] = bool(np.linalg.norm(p[:2] - c) < 0.03 and tr["tilt"][n] < 10 and abs(p[2] - FLASK_HALF_H) < 0.01 and tr["drift"][n] < STABLE_TOL)
     return all(res.values()), res
 
 
@@ -139,7 +161,7 @@ TASKS = {
     "stack": Task("stack", "Stack the three cubes into one tower. cube_red is the bottom and stays where it is, cube_green goes on top of it, "
                   "then cube_blue on top of cube_green. Call done() when the tower is finished.", _build_stack, _check_stack),
     "bins": Task("bins", "Sort the cubes: put both red cubes (cube_red1, cube_red2) into bin_red and both blue cubes (cube_blue1, cube_blue2) "
-                 "into bin_blue, resting inside the bin. Call done() when finished.", _build_bins, _check_bins),
+                 "into bin_blue, so that every cube ends up resting inside the bin of its colour. Call done() when finished.", _build_bins, _check_bins),
     "flasks": Task("flasks", "Move flask_a upright onto ring_a and flask_b upright onto ring_b, centred in each ring and standing on the floor. "
                    "Call done() when finished.", _build_flasks, _check_flasks),
 }

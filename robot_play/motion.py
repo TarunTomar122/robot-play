@@ -162,11 +162,40 @@ class Mover:
         n = max(2, int(np.linalg.norm(qb - qa) / step))
         return all(not self.colliding(qa + (qb - qa) * t, ignore) for t in np.linspace(0, 1, n + 1))
 
+    def _escape(self, q0: np.ndarray, ignore: set[str], start_hits: set[str]) -> list[np.ndarray]:
+        """The arm starts in contact with something (for example the fingers pressed against a bin wall after letting go inside it).
+        Lift the hand straight up in 2 cm steps until it is clear. The way out may not touch anything new, so this cannot be used to tunnel through an obstacle."""
+        w = self.w
+        d = w.scratch
+        d.qpos[:] = w.data.qpos
+        d.qpos[w.arm_qadr] = q0
+        mujoco.mj_kinematics(w.model, d)
+        p0, R = w.tcp(d), w.hand_R(d)
+        M = R @ R_DOWN
+        yaw = float(np.arctan2(M[1, 0], M[0, 0]))
+        qs, q = [q0], q0
+        for k in range(1, 16):
+            try:
+                q = ik_best_yaw(w, p0 + np.array([0.0, 0.0, 0.02 * k]), yaw, q)
+            except IKFailure:
+                break
+            hits = set(self.colliding(q, ignore))
+            if hits - start_hits:
+                raise Collision(sorted(hits - start_hits), "retreat from contact")
+            qs.append(q)
+            if not hits:
+                return qs
+        raise Collision(sorted(start_hits), "start pose in contact, no way up")
+
     def plan(self, q0: np.ndarray, q1: np.ndarray, ignore: set[str] = frozenset(), rng=None) -> list[np.ndarray]:
         w = self.w
         hits = self.colliding(q1, ignore)
         if hits:
             raise Collision(hits, "goal pose")
+        start_hits = set(self.colliding(q0, ignore))
+        if start_hits:
+            lift = self._escape(q0, ignore, start_hits)
+            return lift + self.plan(lift[-1], q1, ignore, rng)[1:]
         if self._segment_free(q0, q1, ignore):
             return [q0, q1]
         rng = rng or np.random.default_rng(0)

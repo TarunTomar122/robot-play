@@ -13,6 +13,7 @@ def _anthropic(tmp_path, create):
     import anthropic
     p.anthropic, p.model, p.meter, p.run_id = anthropic, "claude-haiku-5-5", SpendMeter(tmp_path, {"anthropic": 1.0, "openai": 1.0}), "t"
     p.client = NS(messages=NS(create=create))
+    p.tally = llm.Tally()
     return p
 
 
@@ -70,6 +71,8 @@ def test_a_server_error_charges_the_whole_reservation_and_a_bad_request_charges_
     kinds = [__import__("json").loads(x)["kind"] for x in p.meter.ledger.read_text().splitlines() if '"kind": "reserve"' not in x]
     assert kinds == ["settle_unknown", "release", "settle"]
     assert p.meter.reconcile()["matches_state"] and p.meter.totals()["anthropic"]["reserved"] == 0
+    # the tally counts the attempt that may have been billed (full reservation), so the episode cost cannot hide a failed retry
+    assert p.tally.attempts == 3 and p.tally.failed_attempts == 2 and p.tally.retry_usd > 0 and p.tally.usd > p.tally.retry_usd
 
 
 def test_a_refused_budget_sends_nothing(tmp_path):
@@ -93,9 +96,23 @@ def test_openai_session_chains_responses_and_reads_cached_tokens(tmp_path):
     import openai
     p.openai, p.model, p.meter, p.run_id = openai, "gpt-6-luna", SpendMeter(tmp_path, {"anthropic": 1.0, "openai": 1.0}), "t"
     p.client = NS(responses=NS(create=create))
+    p.tally = llm.Tally()
     s = p.session("sys", "go")
     t1 = s.send()
     assert t1.calls[0].name == "observe" and t1.usage == {"input": 1000, "output": 100, "cache_read": 2000, "cache_write": 0}
     t2 = s.send(results=[(t1.calls[0], "{}")])
     assert t2.stop == "end" and seen[1]["previous_response_id"] == "r1" and seen[1]["input"][0]["type"] == "function_call_output"
     assert seen[0]["reasoning"] == {"effort": "low"} and "temperature" not in seen[0] and seen[0]["parallel_tool_calls"] is False
+
+
+def test_later_calls_reserve_from_the_providers_own_token_count_and_never_overrun(tmp_path):
+    usages = iter([dict(i=2000, o=300), dict(i=2600, o=250, cr=0), dict(i=3000, o=100)])
+    blocks = [NS(type="tool_use", id="t", name="observe", input={})]
+    p = _anthropic(tmp_path, lambda **kw: _msg("tool_use", blocks, **next(usages)))
+    s = p.session("sys", "go")
+    t = s.send()
+    s.send(results=[(t.calls[0], "x" * 3000)])
+    s.send(results=[(t.calls[0], "y" * 3000)])
+    assert p.meter.totals()["anthropic"]["overrun_calls"] == 0
+    reserves = [__import__("json").loads(x) for x in p.meter.ledger.read_text().splitlines() if '"kind": "reserve"' in x]
+    assert reserves[1]["amount"] > reserves[0]["amount"] * 0.5            # the second reservation is based on the first call's real 2,300 tokens plus the new text
