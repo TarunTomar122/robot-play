@@ -31,7 +31,7 @@ def render(row, tag: str, what: str, headline: str) -> Path:
     ep = Episode(row["task"], row["seed"], quirk=row["quirk"], max_calls=row["max_calls"], disturbance=row["disturbance"], toolset=row["toolset"])
     out = ROOT / "media" / f"{row['model']}-{row['task']}-{what}-{tag}.mp4"
     out.parent.mkdir(exist_ok=True)
-    r = record_episode(ep, calls, out, f"{headline}  ({row['model']}, {row['condition']} memory)")
+    r = record_episode(ep, calls, out, f"{headline}  ({row['model'].replace('claude-', '').replace('-5-5', ' 5.5')})")
     logged = bool(row["result"]["success"])
     if bool(r["success"]) != logged:
         out.unlink(missing_ok=True)
