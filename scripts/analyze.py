@@ -77,7 +77,7 @@ def learning_chart(rows, models, out):
                     continue
                 x = [p["idx"] + 1 for p in cur]
                 ax.plot(x, [100 * p["mean"] for p in cur], color=COLORS[c], lw=2, marker="o", ms=5, label=NAMES[c])
-                ax.fill_between(x, [100 * (p["lo"] if p["lo"] == p["lo"] else p["mean"]) for p in cur], [100 * (p["hi"] if p["hi"] == p["hi"] else p["mean"]) for p in cur], color=COLORS[c], alpha=0.15, lw=0)
+                ax.fill_between(x, [max(0.0, 100 * (p["lo"] if p["lo"] == p["lo"] else p["mean"])) for p in cur], [min(100.0, 100 * (p["hi"] if p["hi"] == p["hi"] else p["mean"])) for p in cur], color=COLORS[c], alpha=0.15, lw=0)
             ax.set_title(f"{m}: {t}", loc="left", fontsize=11, color=INK)
             ax.set_ylim(-3, 103)
             ax.grid(axis="y", color=GRID, lw=0.8)
@@ -87,7 +87,7 @@ def learning_chart(rows, models, out):
             ax.tick_params(length=0)
     axes[0][0].set_ylabel("attempts that finish the job (%)")
     axes[0][0].legend(frameon=False, fontsize=9, loc="lower right")
-    fig.suptitle("Success on each practice attempt, averaged over runs (band: 95% cluster-bootstrap interval)", x=0.01, ha="left", fontsize=13, fontweight="bold", color=INK)
+    fig.suptitle("Success on each practice attempt, averaged over runs (band: 95% cluster-bootstrap interval, clipped to 0-100%)", x=0.01, ha="left", fontsize=13, fontweight="bold", color=INK)
     fig.tight_layout()
     fig.savefig(out, dpi=140, bbox_inches="tight", facecolor=SURFACE)
 
