@@ -84,3 +84,15 @@ def test_recovery_drop_difference_and_within_k():
     d = recovery_drop_difference(rows, "m", "notebook", "none", n_boot=300)
     assert d["drop_a"] == 0 and d["drop_b"] == 1 and d["diff"] == -1
     assert within_k(rows, "m", "none", ks=(6, 8))[8] == 1.0 and within_k(rows, "m", "none", ks=(6, 8))[6] == 0.0
+
+
+def test_load_skips_the_config_header_and_reads_episode_rows(tmp_path):
+    import json
+    from robot_play.analysis import load
+    ep = {"run": "r", "model": "m", "task": "stack", "condition": "none", "quirk": True, "run_seed": 0, "phase": "eval", "idx": 0, "seed": 1, "disturbance": None,
+          "toolset": "skills", "max_calls": 20, "memory_tokens_in": 0, "cost_usd": 0.01, "retry_usd": 0.0, "turns": 3, "nudges": 0, "refusal": False,
+          "result": {"success": False, "calls": 20, "sim_time_s": 5.0, "claimed_done": False, "false_success_claim": False, "disturbance_fired": False},
+          "usage": {"input": 10, "output": 5, "cache_read": 0, "cache_write": 0}}
+    (tmp_path / "a.jsonl").write_text(json.dumps({"_config": {"x": 1}}) + "\n" + json.dumps(ep) + "\n")
+    rows = load(tmp_path)
+    assert len(rows) == 1 and rows[0]["calls_to_success"] == 20 and rows[0]["success"] == 0

@@ -91,7 +91,7 @@ def test_openai_session_chains_responses_and_reads_cached_tokens(tmp_path):
         seen.append(kw)
         out = [NS(type="function_call", call_id="fc1", name="observe", arguments="{}")] if len(seen) == 1 else [NS(type="message")]
         return NS(id=f"r{len(seen)}", output=out, output_text="" if len(seen) == 1 else "ok", status="completed",
-                  usage=NS(input_tokens=3000, output_tokens=100, input_tokens_details=NS(cached_tokens=2000)))
+                  usage=NS(input_tokens=3000, output_tokens=100, input_tokens_details=NS(cached_tokens=2000), output_tokens_details=NS(reasoning_tokens=60)))
     p = OpenAIProvider.__new__(OpenAIProvider)
     import openai
     p.openai, p.model, p.meter, p.run_id = openai, "gpt-6-luna", SpendMeter(tmp_path, {"anthropic": 1.0, "openai": 1.0}), "t"
@@ -99,7 +99,7 @@ def test_openai_session_chains_responses_and_reads_cached_tokens(tmp_path):
     p.tally = llm.Tally()
     s = p.session("sys", "go")
     t1 = s.send()
-    assert t1.calls[0].name == "observe" and t1.usage == {"input": 1000, "output": 100, "cache_read": 2000, "cache_write": 0}
+    assert t1.calls[0].name == "observe" and t1.usage == {"input": 1000, "output": 100, "cache_read": 2000, "cache_write": 0, "reasoning": 60}
     t2 = s.send(results=[(t1.calls[0], "{}")])
     assert t2.stop == "end" and seen[1]["previous_response_id"] == "r1" and seen[1]["input"][0]["type"] == "function_call_output"
     assert seen[0]["reasoning"] == {"effort": "low"} and "temperature" not in seen[0] and seen[0]["parallel_tool_calls"] is False

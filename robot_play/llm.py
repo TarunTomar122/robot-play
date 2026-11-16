@@ -40,7 +40,8 @@ class Turn:
 
 
 def add_usage(a: dict, b: dict) -> dict:
-    return {k: a.get(k, 0) + b.get(k, 0) for k in ("input", "output", "cache_read", "cache_write")}
+    """`reasoning` is how many of the output tokens were spent thinking, where the provider reports it (OpenAI does; Anthropic folds it into `output`)."""
+    return {k: a.get(k, 0) + b.get(k, 0) for k in ("input", "output", "cache_read", "cache_write", "reasoning")}
 
 
 def load_env_keys(path: str | Path = "~/Documents/personal/Reset/.env") -> None:
@@ -205,7 +206,8 @@ class OpenAIProvider:
     def _usage(self, r) -> dict:
         u = r.usage
         cached = getattr(getattr(u, "input_tokens_details", None), "cached_tokens", 0) or 0
-        return {"input": max(0, (u.input_tokens or 0) - cached), "output": u.output_tokens or 0, "cache_read": cached, "cache_write": 0}
+        reasoning = getattr(getattr(u, "output_tokens_details", None), "reasoning_tokens", 0) or 0
+        return {"input": max(0, (u.input_tokens or 0) - cached), "output": u.output_tokens or 0, "cache_read": cached, "cache_write": 0, "reasoning": reasoning}
 
     def _create(self, **kw):
         return self.client.responses.create(model=self.model, max_output_tokens=MAX_OUTPUT_TOKENS, reasoning={"effort": "low"}, store=True, **kw)

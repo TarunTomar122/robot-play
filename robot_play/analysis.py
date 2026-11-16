@@ -23,6 +23,8 @@ def load(*dirs: str | Path) -> list[dict]:
                     r = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                if "_config" in r:                  # first line of every run file
+                    continue
                 res = r["result"]
                 row = {k: r.get(k) for k in KEEP}
                 row.update(success=int(res["success"]), calls=res["calls"], sim_time_s=res["sim_time_s"], claimed_done=int(res["claimed_done"]),

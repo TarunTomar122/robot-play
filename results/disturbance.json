@@ -1,0 +1,99 @@
+{
+ "seeds": 50,
+ "base": 3000,
+ "table": {
+  "stack|slip|oracle": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 0
+  },
+  "stack|slip|oracle_retry": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 50
+  },
+  "stack|nudge|oracle": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 0
+  },
+  "stack|nudge|oracle_retry": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 47
+  },
+  "bins|slip|oracle": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 0
+  },
+  "bins|slip|oracle_retry": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 50
+  },
+  "bins|nudge|oracle": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 0
+  },
+  "bins|nudge|oracle_retry": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 47
+  },
+  "flasks|slip|oracle": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 0
+  },
+  "flasks|slip|oracle_retry": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 50
+  },
+  "flasks|nudge|oracle": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 0
+  },
+  "flasks|nudge|oracle_retry": {
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 50
+  }
+ },
+ "checks": {
+  "stack|slip": {
+   "fires_in_>=95%": true,
+   "breaks_no_reaction_script(<=30%)": true,
+   "recoverable_by_retry(>=80%)": true
+  },
+  "stack|nudge": {
+   "fires_in_>=95%": true,
+   "breaks_no_reaction_script(<=30%)": true,
+   "recoverable_by_retry(>=80%)": true
+  },
+  "bins|slip": {
+   "fires_in_>=95%": true,
+   "breaks_no_reaction_script(<=30%)": true,
+   "recoverable_by_retry(>=80%)": true
+  },
+  "bins|nudge": {
+   "fires_in_>=95%": true,
+   "breaks_no_reaction_script(<=30%)": true,
+   "recoverable_by_retry(>=80%)": true
+  },
+  "flasks|slip": {
+   "fires_in_>=95%": true,
+   "breaks_no_reaction_script(<=30%)": true,
+   "recoverable_by_retry(>=80%)": true
+  },
+  "flasks|nudge": {
+   "fires_in_>=95%": true,
+   "breaks_no_reaction_script(<=30%)": true,
+   "recoverable_by_retry(>=80%)": true
+  }
+ },
+ "crashes": []
+}

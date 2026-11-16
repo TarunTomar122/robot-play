@@ -44,8 +44,8 @@ def test_log_is_json_serialisable():
     json.loads(ep.to_json())
 
 
-def test_decoy_parameters_do_not_change_the_outcome():
-    """lift_height and yaw_offset are decoys: the stack succeeds with any of them."""
+def test_extra_settings_do_not_break_the_oracle():
+    """Adding lift_height or a hand turn on top of the oracle's settings must not stop it from stacking (the audit in results/settings_audit.md covers single settings)."""
     for kw in ({"lift_height": 0.3}, {"yaw_offset_deg": 20.0}):
         ep = Episode("stack", 6, quirk=False)
         assert ep.call("pick", {"object": "cube_green", **kw})["ok"]
