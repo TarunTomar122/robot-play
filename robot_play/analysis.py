@@ -45,7 +45,7 @@ def coverage(*dirs: str | Path) -> list[dict]:
             if not cfg:
                 continue
             out.append({"file": f.name, "dir": str(d), "model": cfg["model"], "task": cfg["task"], "condition": cfg["condition"], "quirk": cfg["quirk"],
-                        "toolset": cfg.get("toolset", "skills"), "run_seed": cfg["run_seed"], "planned": len(cfg["plan"]), "done": len(rows),
+                        "toolset": cfg.get("toolset", "skills"), "code": cfg.get("code"), "run_seed": cfg["run_seed"], "planned": len(cfg["plan"]), "done": len(rows),
                         "aborted": len(aborts), "aborted_usd": float(sum(a["usd"] for a in aborts)), "complete": len(rows) >= len(cfg["plan"])})
     return out
 
@@ -89,8 +89,25 @@ def bootstrap(clusters: list[np.ndarray], stat, n_boot: int = 10_000, seed: int 
         idx = np.concatenate([g[rng.integers(0, len(g), len(g))] for g in groups])
         vals[b] = stat(np.concatenate([clusters[i] for i in idx]))
     lo, hi = np.percentile(vals, [100 * alpha / 2, 100 * (1 - alpha / 2)])
-    f = float(np.sqrt(k / (k - 1)))                  # small-sample correction fixed in PROTOCOL.md section 1: percentile intervals from few clusters are too narrow
-    return est, float(est - f * (est - lo)), float(est + f * (hi - est))
+    if stat is np.mean:                                # small-sample rule fixed in PROTOCOL.md section 1: never narrower than a stratified t interval (a percentile bootstrap from few clusters is too narrow)
+        ss, df, n = _pooled_ss(clusters, strata)
+        if df >= 1:
+            from scipy.stats import t as _t
+            half = float(_t.ppf(1 - alpha / 2, df) * np.sqrt(ss / df / n))
+            lo, hi = min(lo, est - half), max(hi, est + half)
+    return est, float(lo), float(hi)
+
+
+def _pooled_ss(clusters, strata=None) -> tuple[float, int, int]:
+    """Within-stratum sum of squares of the cluster means, its degrees of freedom (clusters minus strata) and the number of clusters."""
+    means = np.array([float(np.mean(c)) for c in clusters])
+    labels = list(strata) if strata is not None else [0] * len(means)
+    ss, groups = 0.0, 0
+    for g in dict.fromkeys(labels):
+        m = means[[i for i, x in enumerate(labels) if x == g]]
+        ss += float(((m - m.mean()) ** 2).sum())
+        groups += 1
+    return ss, len(means) - groups, len(means)
 
 
 def _run_means(rows, metric: str) -> dict:
@@ -150,12 +167,13 @@ def _agresti_caffo(s1: int, n1: int, s2: int, n2: int, z: float, deff1: float = 
     return p1 - p2, p1 - p2 - z * se, p1 - p2 + z * se
 
 
-def intraclass(rows, model: str, m: int = 4) -> float:
-    """One-way ANOVA intraclass correlation of a model's held-out outcomes within a run (clusters of m layouts sharing one memory), computed inside each
-    (task, memory condition) stratum and pooled by summing sums of squares. Returns 0.0 when it cannot be estimated (no variation, or no clusters)."""
+def intraclass(rows, model: str, m: int = 4, condition: str = "notebook") -> float:
+    """One-way ANOVA intraclass correlation of a model's held-out clean outcomes within a run (clusters of m layouts that share one notebook), computed inside each
+    task and pooled by summing sums of squares. Only the notebook runs are used, because only there do the layouts of a run share a memory. Returns 0.0 when it cannot
+    be estimated (no variation, or no clusters)."""
     strata: dict = {}
-    for r in select(rows, model=model, phase="eval", quirk=True):
-        strata.setdefault((r["task"], r["condition"]), {}).setdefault(r["run_seed"], []).append(r["success"])
+    for r in select(rows, model=model, condition=condition, phase="eval", quirk=True):
+        strata.setdefault(r["task"], {}).setdefault(r["run_seed"], []).append(r["success"])
     ssb = ssw = dfb = dfw = 0.0
     for clusters in strata.values():
         ys = [np.array(v, dtype=float) for v in clusters.values() if len(v) == m]
@@ -173,10 +191,13 @@ def intraclass(rows, model: str, m: int = 4) -> float:
     return max(0.0, (msb - msw) / (msb + (m - 1) * msw)) if (msb + (m - 1) * msw) > 0 else 0.0
 
 
-def q3_deff(rows, cheap: str, m: int = 4) -> float:
-    """Design effect of the cheap arm, fixed in PROTOCOL.md section 1: 1 + (m - 1) x the intraclass correlation of that model's own held-out outcomes, never below 2
-    (an intraclass correlation of at least one third is assumed even where the data show none, because at ceiling there is nothing to estimate it from)."""
-    return max(2.0, 1.0 + (m - 1) * intraclass(rows, cheap, m))
+def q3_deff(rows, cheap: str, m: int = 4, condition: str = "notebook") -> float:
+    """Design effect of the cheap arm, fixed in PROTOCOL.md section 1. With a notebook the four layouts of a run share it: 1 + (m - 1) x the intraclass correlation of that
+    model's own notebook held-out outcomes, never below 2 (an intraclass correlation of at least one third is assumed even where the data show none, because at
+    ceiling there is nothing to estimate it from). With no memory nothing is shared and the design effect is 1 (the exploratory no-memory row)."""
+    if condition != "notebook":
+        return 1.0
+    return max(2.0, 1.0 + (m - 1) * intraclass(rows, cheap, m, condition))
 
 
 def q3_gap(rows, frontier: str, cheap: str, cheap_condition: str = "notebook", margin: float = 0.10, n_boot: int = 10_000, alpha: float = ALPHA_Q3) -> dict:
@@ -197,7 +218,7 @@ def q3_gap(rows, frontier: str, cheap: str, cheap_condition: str = "notebook", m
     est, blo, bhi = bootstrap(clusters, np.mean, n_boot, alpha=alpha, strata=[k[0] for k in by_cluster])
     n = len(keys)
     s_fr, s_ch = sum(fr[k] for k in keys), sum(ch[k][1] for k in keys)
-    deff = q3_deff(rows, cheap)
+    deff = q3_deff(rows, cheap, condition=cheap_condition)
     _, alo, ahi = _agresti_caffo(s_fr, n, s_ch, n, Z[alpha], 1.0, deff)
     lo = min(x for x in (blo, alo) if x == x)
     hi = max(x for x in (bhi, ahi) if x == x)
@@ -252,10 +273,14 @@ def did(rows, model: str, a: str, b: str, metric: str = "success", phase: str = 
     boots = np.array([draw(dq, tq).mean() - draw(dc, tc).mean() for _ in range(n_boot)])
     est = float(dq.mean() - dc.mean())
     lo, hi = np.percentile(boots, [100 * alpha / 2, 100 * (1 - alpha / 2)])
-    n_small = min(len(dq), len(dc))
-    f = float(np.sqrt(n_small / (n_small - 1))) if n_small > 1 else 1.0
+    ssq, dfq, nq = _pooled_ss([np.array([v]) for v in dq], list(tq))
+    ssc, dfc, nc = _pooled_ss([np.array([v]) for v in dc], list(tc))
+    if dfq >= 1 and dfc >= 1:                             # a difference of two stratified means: variances add, degrees of freedom the smaller of the two
+        from scipy.stats import t as _t
+        half = float(_t.ppf(1 - alpha / 2, min(dfq, dfc)) * np.sqrt(ssq / dfq / nq + ssc / dfc / nc))
+        lo, hi = min(lo, est - half), max(hi, est + half)
     return {"n_catch_pairs": len(dq), "n_control_pairs": len(dc), "gain_catch": float(dq.mean()), "gain_control": float(dc.mean()),
-            "did": est, "lo": float(est - f * (est - lo)), "hi": float(est + f * (hi - est))}
+            "did": est, "lo": float(lo), "hi": float(hi)}
 
 
 def tool_interaction(skills_rows, pose_rows, model: str, n_boot: int = 10_000) -> dict:

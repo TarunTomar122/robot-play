@@ -201,15 +201,16 @@ def test_q3_interval_at_ceiling_uses_the_fixed_design_effect():
     assert near["hi"] > 0.10 and near["within_margin"] is False                      # a perfect frontier against 95% is not shown to be within 10 points
 
 
-def test_small_sample_correction_widens_the_interval_by_the_documented_factor():
-    clusters = [np.array([float(i % 2)] * 4) for i in range(5)]
-    est, lo, hi = bootstrap(clusters, np.mean, 4000)
-    raw = np.percentile([np.mean(np.concatenate([clusters[i] for i in np.random.default_rng(0).integers(0, 5, 5)])) for _ in range(10)], 50)
-    assert lo < est < hi and (hi - est) > 0 and (est - lo) > 0 and raw == raw
-    f = np.sqrt(5 / 4)
-    # the stratified call with one stratum equals the plain call: same factor
-    est2, lo2, hi2 = bootstrap(clusters, np.mean, 4000, strata=["a"] * 5)
-    assert abs((hi2 - est2) / (hi - est) - 1) < 0.15 and f > 1
+def test_interval_is_never_narrower_than_the_stratified_t_interval():
+    from scipy.stats import t
+    rng = np.random.default_rng(3)
+    clusters = [np.array([float(v)]) for v in rng.binomial(1, 0.5, 15)]
+    strata = ["a"] * 5 + ["b"] * 5 + ["c"] * 5
+    est, lo, hi = bootstrap(clusters, np.mean, 3000, alpha=0.025, strata=strata)
+    means = np.array([c[0] for c in clusters])
+    ss = sum(((means[i:i + 5] - means[i:i + 5].mean()) ** 2).sum() for i in (0, 5, 10))
+    half = t.ppf(1 - 0.0125, 12) * np.sqrt(ss / 12 / 15)               # 15 clusters, 3 strata: 12 degrees of freedom
+    assert lo <= est - half + 1e-9 and hi >= est + half - 1e-9
 
 
 def test_tool_interaction_compares_notebook_gains_on_the_same_runs():

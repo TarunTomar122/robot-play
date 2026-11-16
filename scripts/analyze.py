@@ -134,6 +134,23 @@ def main():
     cvr = [(m, tools, NAMES[cond], scene, x[0], x[1], f"{x[3]}/{x[2]}", x[4]) for (m, tools, cond, scene), x in sorted(cv.items())]
     L += ["Coverage. Only runs that finished their whole plan enter the confirmatory comparisons below. An abandoned attempt (provider failure, cut-off reply, failed notebook rewrite, budget stop) is redone on resume and its cost is kept:", "",
           table(["model", "tools", "memory", "scene", "runs started", "runs complete", "episodes finished/planned", "abandoned attempts"], cvr) if cvr else "No runs yet.", ""]
+    hashes = sorted({c.get("code") or "unknown" for c in cov})
+    L += [(f"Code: every analysed run file carries the same code hash, `{hashes[0]}`." if len(hashes) == 1 else
+           f"**Code: the run files carry {len(hashes)} different code hashes ({', '.join(hashes)}). This is a deviation from the protocol: say which cells ran on which code before reading any comparison across them.**"), ""]
+    try:                                                 # planned run files that were never created (a cell that never started shows up here, not only in a smaller table)
+        from robot_play.runner import build_specs
+        cheap_m, front_m = ["claude-haiku-5-5", "gpt-6-luna"], ["claude-fable-5-2", "gpt-6-astra"]
+        planned = [("main", cheap_m, range(10), "runs/main"), ("control", cheap_m, range(10), "runs/control"), ("frontier", front_m, [0], "runs/frontier"),
+                   ("frontier_exp", ["claude-fable-5-2"], range(5), "runs/frontier_exp"), ("pose", cheap_m, range(3), "runs/pose")]
+        missing = {}
+        for cell, ms, seeds, d in planned:
+            specs = build_specs(cell, ms, list(seeds), d)
+            n_missing = sum(1 for sp in specs if not sp.path.exists())
+            if n_missing:
+                missing[cell] = f"{n_missing} of {len(specs)} planned run files were never created"
+        L += ["Planned cells that did not start: " + ("; ".join(f"{k}: {v}" for k, v in missing.items()) if missing else "none (every planned run file exists)."), ""]
+    except Exception:                                    # noqa: BLE001
+        pass
     ab_total = sum(c["aborted_usd"] for c in cov)
     try:
         tot = SpendMeter(a.meter).totals()
