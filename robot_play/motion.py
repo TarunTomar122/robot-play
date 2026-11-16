@@ -236,22 +236,27 @@ class Mover:
 
     # ------------------------------------------------------------ execution
     def follow(self, path: list[np.ndarray], speed: str = "normal"):
-        """Run the planned joint path with min-jerk timing on the position actuators."""
+        """Run a joint-space polyline with ONE min-jerk profile over its whole arc length (no stop-and-go at waypoints)."""
         w = self.w
         vmean = SPEEDS[speed]
         self.touched = set()
-        for qa, qb in zip(path[:-1], path[1:]):
-            length = float(np.max(np.abs(qb - qa)))
-            T = max(0.35, length / vmean)
+        pts = [np.asarray(q, float) for q in path]
+        seg = np.array([float(np.max(np.abs(b - a))) for a, b in zip(pts[:-1], pts[1:])])
+        L = float(seg.sum())
+        if L > 1e-9:
+            cum = np.concatenate([[0.0], np.cumsum(seg)])
+            T = max(0.35, L / vmean)
             n = int(T / w.model.opt.timestep)
             for k in range(1, n + 1):
-                s = k / n
-                s = 10 * s ** 3 - 15 * s ** 4 + 6 * s ** 5
-                w.data.ctrl[:7] = qa + (qb - qa) * s
+                u = k / n
+                u = 10 * u ** 3 - 15 * u ** 4 + 6 * u ** 5
+                d = u * L
+                i = min(int(np.searchsorted(cum, d, side="right")) - 1, len(seg) - 1)
+                f = 0.0 if seg[i] < 1e-12 else (d - cum[i]) / seg[i]
+                w.data.ctrl[:7] = pts[i] + (pts[i + 1] - pts[i]) * f
                 w.step(1)
                 if k % 25 == 0:
                     for name in w.robot_contacts(ignore={self.held} if self.held else set()):
-                        if name != "floor" or True:
-                            self.touched.add(name)
+                        self.touched.add(name)
         w.data.ctrl[:7] = path[-1]
         w.step(int(0.15 / w.model.opt.timestep))

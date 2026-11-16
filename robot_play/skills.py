@@ -6,7 +6,7 @@ import numpy as np
 from .motion import Collision, IKFailure, Mover, ik_best_yaw
 from .world import PandaWorld
 
-GRIP = {"light": 130.0, "normal": 60.0, "firm": 0.0}
+GRIP = {"light": 100.0, "normal": 60.0, "firm": 0.0}
 CLEARANCE = 0.12          # hover height above the highest thing in the way
 
 
@@ -59,6 +59,13 @@ class Skills:
             qs.append(q)
         mv.follow(qs, speed)
 
+    def _retreat(self, p, yaw, z_hover, ignore):
+        """After a failed grasp, lift straight back up so the next call starts from a clear hover pose."""
+        try:
+            self._descend([p[0], p[1], z_hover], yaw, "normal", {ignore})
+        except (IKFailure, Collision):
+            pass
+
     def _fail(self, reason: str, **extra):
         return {"ok": False, "error": reason, **extra}
 
@@ -68,7 +75,7 @@ class Skills:
         objs = []
         for o in w.scene.objects:
             p = w.obj_pos(o.name)
-            sz = [2 * o.size[0], 2 * o.size[1], 2 * o.size[2]] if o.shape == "box" else [2 * o.size[0], 2 * o.size[0], 2 * o.size[1]]
+            sz = [2 * o.size[0], 2 * o.size[1], 2 * o.size[2]] if o.shape == "box" else [2 * max(o.size[0], o.base[0] if o.base else 0), 2 * max(o.size[0], o.base[0] if o.base else 0), 2 * o.size[1]]
             objs.append({"name": o.name, "shape": o.shape, "size_xyz_m": _r(sz), "position_m": _r(p),
                          "tilt_deg": round(w.obj_tilt_deg(o.name), 1), "held": o.name == self.mv.held})
         zones = [{"name": k, "center_xy_m": _r(v["xy"]), "outer_size_xyz_m": _r(v["size"])} for k, v in self.targets.items()]
@@ -102,7 +109,7 @@ class Skills:
             return self._fail(str(e))
         return {"ok": True, "tcp_m": _r(self.w.tcp()), "touched": sorted(self.mv.touched)}
 
-    def pick(self, object: str, grasp_height: float = 0.5, speed: str = "normal", grip_level: str = "normal",
+    def pick(self, object: str, grasp_height: float = 0.6, speed: str = "normal", grip_level: str = "normal",
              yaw_offset_deg: float = 0.0, lift_height: float = 0.15) -> dict:
         w, mv = self.w, self.mv
         o = self._obj(object)
@@ -130,23 +137,41 @@ class Skills:
         z_grasp = max(0.012, base + grasp_height * h)
         z_hover = max(self._top(object), 0.0) + CLEARANCE + 0.05
         z_before = float(p[2])
-        try:
-            self._tcp_to([p[0], p[1], z_hover], yaw, speed)
-            self._descend([p[0], p[1], z_grasp], yaw, speed, ignore={object})
-        except (IKFailure, Collision) as e:
-            return self._fail(str(e))
+        # a square block can be gripped across either pair of faces: try the other if the first is blocked
+        yaws = [yaw] + ([yaw + np.pi / 2] if o.shape == "box" and abs(o.size[0] - o.size[1]) < 1e-6 else [])
+        err = None
+        for yaw in yaws:
+            try:
+                self._tcp_to([p[0], p[1], z_hover], yaw, speed)
+                self._descend([p[0], p[1], z_grasp], yaw, speed, ignore={object})
+                err = None
+                break
+            except (IKFailure, Collision) as e:
+                err = e
+                try:
+                    self._descend([p[0], p[1], z_hover], yaw, "normal", {object})
+                except (IKFailure, Collision):
+                    pass
+        if err is not None:
+            return self._fail(str(err))
+        stop_err = float(np.linalg.norm(w.tcp() - np.array([p[0], p[1], z_grasp])))
+        if stop_err > 0.012:
+            r = self._fail(f"hand stopped {stop_err * 100:.1f} cm short of the requested grasp point",
+                           tcp_m=_r(w.tcp()), touched=sorted(mv.touched))
+            self._retreat(p, yaw, z_hover, object)
+            return r
         w.set_gripper(True)
         w.data.ctrl[7] = GRIP[grip_level]
         w.settle(0.5)
         width = w.gripper_width()
         if width < 0.004:
             self.open_gripper()
+            self._retreat(p, yaw, z_hover, object)
             return self._fail("fingers closed on nothing", gripper_width_m=round(width, 3))
         mv.attach(object)
         z_up = float(w.tcp()[2] + lift_height)
         try:
-            q = ik_best_yaw(w, np.array([w.tcp()[0], w.tcp()[1], z_up]), yaw, w.q)
-            mv.follow(mv.plan(w.q, q), speed)
+            self._descend([w.tcp()[0], w.tcp()[1], z_up], yaw, speed, set(mv.held_ignore) | {object})
         except (IKFailure, Collision) as e:
             return self._fail(str(e), gripper_width_m=round(width, 3), holding=mv.held)
         w.settle(0.3)
@@ -165,7 +190,13 @@ class Skills:
     def _support(self, target: str):
         if target in self.targets:
             t = self.targets[target]
-            return np.array(t["xy"], float), float(t["top_z"]), set(t.get("ignore", [target]))
+            xy = np.array(t["xy"], float)
+            for dx, dy in t.get("slots", []):            # zones with slots: use the first free one
+                cand = xy + [dx, dy]
+                if all(np.linalg.norm(self.w.obj_pos(o.name)[:2] - cand) > 0.045 for o in self.w.scene.objects):
+                    xy = cand
+                    break
+            return xy, float(t["top_z"]), set(t.get("ignore", [target]))
         o = self._obj(target)
         if o is not None:
             p = self.w.obj_pos(target)
@@ -183,22 +214,28 @@ class Skills:
         name = mv.held
         release_height = float(np.clip(release_height, 0.0, 0.3))
         yaw = self.yaw
-        # offset between the hand's fingertip centre and the bottom of the held object
+        # carry the object above the target, let it stop swinging, then measure where it sits in the grip
+        bottom = w.obj_pos(name)[2] - self._half_h(name)
+        z_hover = max(top_z + 0.30, w.tcp()[2] - bottom + top_z + release_height + 0.05)
+        try:
+            self._tcp_to([xy[0], xy[1], z_hover], yaw, speed)
+        except (IKFailure, Collision) as e:
+            return self._fail(str(e), holding=mv.held)
+        w.settle(0.25)
+        off = w.obj_pos(name)[:2] - w.tcp()[:2]          # aim the object, not the hand
         bottom = w.obj_pos(name)[2] - self._half_h(name)
         dz = float(w.tcp()[2] - bottom)
         z_release = top_z + release_height + dz
-        z_hover = max(z_release, top_z + 0.30) + 0.0
         try:
-            self._tcp_to([xy[0], xy[1], z_hover], yaw, speed)
-            self._descend([xy[0], xy[1], z_release], yaw, speed, ignore=ignore | {"floor"} if release_height < 0.005 else ignore)
+            self._descend([xy[0] - off[0], xy[1] - off[1], z_release], yaw, speed,
+                          ignore=ignore | {"floor"} if release_height < 0.005 else ignore)
         except (IKFailure, Collision) as e:
             return self._fail(str(e), holding=mv.held)
         self.open_gripper()
         w.settle(settle_time)
         z_up = float(w.tcp()[2] + 0.15)
-        try:
-            q = ik_best_yaw(w, np.array([w.tcp()[0], w.tcp()[1], z_up]), yaw, w.q)
-            mv.follow(mv.plan(w.q, q, {name}), "normal")
+        try:                                              # straight up, so the open fingers do not sweep the object over
+            self._descend([w.tcp()[0], w.tcp()[1], z_up], yaw, "normal", {name})
         except (IKFailure, Collision):
             pass
         w.settle(0.4)

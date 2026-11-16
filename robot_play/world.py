@@ -27,6 +27,7 @@ class ObjectSpec:
     friction: tuple = (1.0, 0.01, 0.001)
     com_z: float | None = None     # centre of mass height above the object's base (None = centre)
     yaw: float = 0.0
+    base: tuple | None = None          # (radius, height) of a wide base under a cylinder's neck
 
 
 @dataclass
@@ -44,6 +45,10 @@ class StaticSpec:
 class SceneSpec:
     objects: list[ObjectSpec] = field(default_factory=list)
     statics: list[StaticSpec] = field(default_factory=list)
+
+
+TORSION = 0.03                # torsional friction coefficient [m]; keeps a held block from pivoting in the pads
+GRIP_FORCE_SCALE = 5.0        # Menagerie's tendon gains give ~2 N firm; x5 gives ~10 N per pad
 
 
 class PandaWorld:
@@ -70,20 +75,34 @@ class PandaWorld:
                             quat=[np.cos(o.yaw / 2), 0, 0, np.sin(o.yaw / 2)])
             b.add_freejoint(name=o.name + "_free")
             g = b.add_geom(name=o.name + "_g", type=BOX if o.shape == "box" else CYL,
-                           size=list(o.size), rgba=list(o.rgba), mass=o.mass,
-                           friction=list(o.friction), condim=4)
+                           size=list(o.size), rgba=list(o.rgba), mass=o.mass * (0.2 if o.base else 1.0),
+                           friction=[o.friction[0], TORSION, o.friction[2]], condim=4)
+            if o.base:                  # wide base under a narrow neck (a flask): most of the mass sits in the base
+                br, bh = o.base
+                b.add_geom(name=o.name + "_base", type=CYL, size=[br, bh / 2, 0], pos=[0, 0, bh / 2 - z0],
+                           rgba=list(o.rgba), mass=o.mass * 0.8, friction=[o.friction[0], TORSION, o.friction[2]], condim=4)
             if o.com_z is not None:      # shift the inertial frame: heavy-bottom / off-centre objects
                 g.mass = 0                # geometry carries no mass; set it through the body inertial
                 b.mass = o.mass
                 b.ipos = [0, 0, o.com_z - z0]
-                b.inertia = [o.mass * 1e-4] * 3
+                if o.shape == "box":
+                    a, bb, c = (2 * v for v in o.size)
+                    b.inertia = [o.mass / 12 * (bb**2 + c**2), o.mass / 12 * (a**2 + c**2), o.mass / 12 * (a**2 + bb**2)]
+                else:
+                    r, h = o.size[0], 2 * o.size[1]
+                    b.inertia = [o.mass * (3 * r * r + h * h) / 12] * 2 + [o.mass * r * r / 2]
                 b.explicitinertial = True
         for g in spec.geoms:                       # object friction decides contact friction (MuJoCo takes the max)
             if g.parent.name in ("hand", "left_finger", "right_finger"):
-                g.friction = [1.0, 0.0002, 0.0001]
+                g.friction = [0.05, TORSION, 0.0001]
         for b in spec.bodies:                      # gravity-compensate the arm so position control is accurate
             if b.name.startswith(("link", "hand", "left_finger", "right_finger")):
                 b.gravcomp = 1.0
+        gk = GRIP_FORCE_SCALE                      # Menagerie's tendon gains give only ~2 N; scale to a plausible 10 N firm grip
+        act = spec.actuator("actuator8")
+        act.gainprm[0] *= gk
+        act.biasprm[1] *= gk
+        act.biasprm[2] *= gk
         self.model = spec.compile()
         self.data = mujoco.MjData(self.model)
         self.scratch = mujoco.MjData(self.model)
