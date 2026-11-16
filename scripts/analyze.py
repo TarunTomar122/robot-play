@@ -158,17 +158,24 @@ def main():
     try:                                                 # planned run files that were never created (a cell that never started shows up here, not only in a smaller table)
         from robot_play.runner import build_specs
         cheap_m, front_m = ["claude-haiku-5-5", "gpt-6-luna"], ["claude-fable-5-2", "gpt-6-astra"]
-        planned = [("main", cheap_m, range(10), "runs/main"), ("control", cheap_m, range(10), "runs/control"), ("frontier", front_m, [0], "runs/frontier"),
-                   ("frontier_exp", ["claude-fable-5-2"], range(5), "runs/frontier_exp"), ("pose", cheap_m, range(3), "runs/pose")]            # the exploratory borrowed cell is listed only if it was started
+        planned = [("main", cheap_m, range(10), "runs/main", {}), ("control", cheap_m, range(10), "runs/control", {}), ("frontier", front_m, [0], "runs/frontier", {}),
+                   ("frontier_exp", ["claude-fable-5-2"], range(5), "runs/frontier_exp", {}), ("pose", cheap_m, range(3), "runs/pose", {}),
+                   ("main", ["claude-haiku-5-5"], range(10, 20), "runs/main_ext", {"tasks": ["stack", "bins"]})]
+        import inspect
+        if "source_dir" in inspect.signature(build_specs).parameters:             # the borrowed cells live on the q5-borrowed branch until it is merged after the matrix
+            for cell, d in (("borrowed", "runs/borrowed"), ("borrowed_other", "runs/borrowed_other"), ("borrowed_1", "runs/borrowed_1"), ("borrowed_3", "runs/borrowed_3")):
+                planned.append((cell, cheap_m, range(10), d, {"source_dir": "runs/frontier_exp"}))      # planned only where the Fable notebook it reads finished
         missing = {}
-        for cell, ms, seeds, d in planned:
-            specs = build_specs(cell, ms, list(seeds), d)
+        for cell, ms, seeds, d, kw in planned:
+            if not Path(d).exists() and cell.startswith("borrowed"):
+                continue                                 # an exploratory cell that was never launched is not a gap
+            specs = build_specs(cell, ms, list(seeds), d, **kw)
             n_missing = sum(1 for sp in specs if not sp.path.exists())
             if n_missing:
-                missing[cell] = f"{n_missing} of {len(specs)} planned run files were never created"
-        L += ["Planned cells that did not start: " + ("; ".join(f"{k}: {v}" for k, v in missing.items()) if missing else "none (every planned run file exists)."), ""]
-    except Exception:                                    # noqa: BLE001
-        pass
+                missing[f"{cell} ({d})"] = f"{n_missing} of {len(specs)} planned run files were never created"
+        L += ["Planned cells that did not start (exploratory cells included; the borrowed cells are planned only where the Fable notebook they read finished): " + ("; ".join(f"{k}: {v}" for k, v in missing.items()) if missing else "none (every planned run file exists)."), ""]
+    except Exception as e:                               # noqa: BLE001
+        L += [f"**The planned-cell inventory failed ({type(e).__name__}: {e}); the list of cells that never started is missing from this report.**", ""]
     ab_total = sum(c["aborted_usd"] for c in cov)
     try:
         tot = SpendMeter(a.meter).totals()
