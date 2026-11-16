@@ -20,7 +20,10 @@ SCENARIOS = {     # name: (fresh probability per job, notebook probability per j
     "no effect, mixed rates (0.3 / 0.7 / 0.99 in both arms)": ((0.3, 0.7, 0.99), (0.3, 0.7, 0.99)),
     "no effect, every arm at 0.97": ((0.97,) * 3, (0.97,) * 3),
     "Haiku-like: one job with a large gain (0.3 to 1.0), two at 0.99": ((0.3, 0.99, 0.99), (1.0, 0.99, 0.99)),
-    "hardest case: small gap, every arm near ceiling (0.95 against 0.99)": ((0.95,) * 3, (0.99,) * 3),
+    "small gap, every arm near ceiling (0.95 against 0.99)": ((0.95,) * 3, (0.99,) * 3),
+    "Luna-like: fresh 0.96 against a notebook at the ceiling (1.0)": ((0.96,) * 3, (1.0,) * 3),
+    "tiny gap at the ceiling: 0.98 against 1.0": ((0.98,) * 3, (1.0,) * 3),
+    "one-sided: no effect in two jobs at 0.97, a gain of 0.07 in one (0.93 to 1.0)": ((0.97, 0.97, 0.93), (0.97, 0.97, 1.0)),
     "moderate gain in every job (0.5 to 0.8)": ((0.5,) * 3, (0.8,) * 3),
 }
 
@@ -68,8 +71,7 @@ def main():
                 hw.append((d["hi"] - d["lo"]) / 2)
             L.append(f"| {name} | {rho} | {100 * truth:+.1f} pp | {100 * hit / a.reps:.1f}% | {100 * np.mean(hw):.1f} pp |")
             print(L[-1], flush=True)
-    L += ["", "Reading: the interval is conservative where it matters for the headline (a large gain in one job, no effect) and does not reach the nominal level in the hardest case, a small gap with every arm near ceiling; "
-          "there the true difference is inside the interval about as often as the figure above says, which is the figure to quote, not 97.5%. The sampling-noise floor treats episodes as independent (design effect 1), so a strongly shared notebook (rho above 0) can make it too narrow; the rows with rho > 0 show how much."]
+    L += ["", "Reading: quote the lowest coverage in the table, not the nominal 97.5%. The sampling-noise floor treats episodes as independent (design effect 1), so a strongly shared notebook (rho above 0) can make it too narrow; the rows with rho > 0 show how much."]
     Path(a.out).write_text("\n".join(L) + "\n")
 
 
