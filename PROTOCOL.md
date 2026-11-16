@@ -140,7 +140,7 @@ Verified against abstracts or full text (see the README for links):
 (ii) catches validated by oracle gates, dose-response sweeps, a settings audit and no-catch controls; (iii) learning curves over 12 practice episodes with frozen-memory held-out evaluation and cluster-bootstrap intervals;
 (iv) disturbance recovery as a function of experience, with the clean-to-disturbed drop as the measure; (v) a cheap-versus-frontier comparison with a pre-stated equivalence margin and every paid call of the cheap model counted next to the frontier's; and (vi) every paid call, including failed retries and memory-writing calls, counted by an enforced spend cap.
 
-## 10. Changelog and history (everything below happened before any reported run)
+## 10. Changelog and history (up to v1.3 everything happened before any reported run; the v1.4 and v1.5 addenda at the end were written while the matrix was running, each dated to the minute and written before the cell it registers)
 
 **v1.1, 16 Nov 2026.** Built the environment and played each task by hand through the tool interface. `bottle` (top-heavy, pinch-height quirk) became `flasks` (wide base, neck grasp): with a top-down hand the palm sits 4 cm above the fingertips, so a low pinch on a tall object is impossible, and a top-heavy bottle did not flop because the finger pads resist twisting. The stack cube changed from 0.9 kg to 250 g (the firm squeeze holds about 300 g); the gripper force was scaled 5 times so `light`, `normal` and `firm` differ. Contact physics became stricter (elliptic friction cone, `impratio` 10, finger-pad twisting friction). The nudge force and direction were tuned on layouts 2,000 to 2,029. No model results were used.
 

@@ -100,7 +100,8 @@ def main():
     ap.add_argument("--pose", nargs="*", default=["runs/pose"])
     ap.add_argument("--borrowed", nargs="*", default=["runs/borrowed", "runs/borrowed_other", "runs/borrowed_1", "runs/borrowed_3"])
     ap.add_argument("--ext", nargs="*", default=["runs/main_ext"], help="exploratory room-cell extension (Haiku, stack and bins, run seeds 10-19); never enters a confirmatory number")
-    ap.add_argument("--fixhold", nargs="*", default=["runs/main_fixhold"], help="exploratory rerun of Haiku on stack with the false-holding artefact fixed (PROTOCOL.md v1.5B); never pooled with the registered rows")
+    ap.add_argument("--fixhold", nargs="*", default=["runs/main_fixhold"], help="exploratory rerun of Haiku on stack with only the false-holding symptom fixed (PROTOCOL.md v1.5B); never pooled with the registered rows")
+    ap.add_argument("--fixcollide", nargs="*", default=["runs/main_fixcollide"], help="exploratory rerun of Haiku on stack with the cause fixed too: move_to planned with the real finger opening (PROTOCOL.md v1.5C)")
     ap.add_argument("--meter", default="runs/spend")
     ap.add_argument("--out", default="results/RESULTS.md")
     ap.add_argument("--img", default="docs/img")
@@ -146,12 +147,13 @@ def main():
     L += ["Coverage. Only runs that finished their whole plan enter the confirmatory comparisons below. An abandoned attempt (provider failure, cut-off reply, failed notebook rewrite, budget stop) is redone on resume and its cost is kept:", "",
           table(["model", "tools", "memory", "scene", "runs started", "runs complete", "episodes finished/planned", "abandoned attempts"], cvr) if cvr else "No runs yet.", ""]
     by_dir = {}
-    for c in cov + ext_cov:
+    extra_cov = A.coverage(*ex(a.fixhold + a.fixcollide)) if ex(a.fixhold + a.fixcollide) else []
+    for c in cov + ext_cov + extra_cov:
         by_dir.setdefault(c["dir"], {}).setdefault(c.get("code") or "unknown", 0)
         by_dir[c["dir"]][c.get("code") or "unknown"] += 1
     hashes = sorted({h for v in by_dir.values() for h in v})
     L += [(f"Code: every analysed run file carries the same code hash, `{hashes[0]}`." if len(hashes) == 1 else
-           f"**Code: the run files carry {len(hashes)} different code hashes. This is a deviation from the protocol (results/deviations.md, deviation 2 says which cells and why): read any comparison across them with that in mind.**"), "",
+           f"**Code: the run files carry {len(hashes)} different code hashes. Each exploratory cell that was added while the matrix ran has its own hash by design (PROTOCOL.md v1.4 to v1.5C, results/deviations.md deviation 2); the registered cells main, control, frontier and frontier_exp must share one. Read any comparison across hashes with that in mind.**"), "",
           table(["folder", "code hash (run files with it)"], [(d, ", ".join(f"`{h}` ({n})" for h, n in sorted(v.items()))) for d, v in sorted(by_dir.items())]), ""]
     not_done = [c for c in cov + ext_cov if not c["complete"] and c["planned"] > 4]
     L += [f"Runs with practice or a borrowed notebook that did not finish their whole plan are left out of every comparison (complete cases only, so a missing run is a missing pair, not a zero): {len(not_done)}"
@@ -225,15 +227,31 @@ def main():
     sens = []
     for m in cheap:
         for tl, tname in ((None, "all three jobs"), (["stack"], "stack only")):
-            drop = [r for r in skills if not r["false_hold"]]
-            win = [dict(r, success=1) if (r["false_hold"] and r["phase"] == "eval") else r for r in skills]
-            for label, rs in (("as run", skills), ("episodes with a false 'holding' dropped from every arm", drop), ("those episodes counted as successes in every arm", win)):
+            hit = lambda r: r["false_hold"] or r["short_move"]
+            variants = (("as run", skills),
+                        ("episodes with a false 'holding' dropped from every arm", [r for r in skills if not r["false_hold"]]),
+                        ("episodes with a false 'holding' counted as successes in every arm", [dict(r, success=1) if (r["false_hold"] and r["phase"] == "eval") else r for r in skills]),
+                        ("episodes with a false 'holding' OR a short move_to dropped from every arm", [r for r in skills if not hit(r)]),
+                        ("extreme bound: episodes with a false 'holding' OR a short move_to counted as successes", [dict(r, success=1) if (hit(r) and r["phase"] == "eval") else r for r in skills]))
+            for label, rs in variants:
                 d = A.paired_difference(rs, m, "notebook", "none", tasks=tl)
                 if d.get("n_pairs"):
                     sens.append((m, tname, label, f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
-    L += ["Q1 sensitivity (notebook against fresh, 95% intervals so the rows are comparable; exploratory): the effect is not made by the artefact, but its size depends on it. "
-          "The third row is the worst case in which every episode that suffered the artefact would otherwise have succeeded.", "",
+    L += ["Q1 sensitivity (notebook against fresh, 95% intervals so the rows are comparable; exploratory). The false-`holding` rows bound only the episodes that contain a false `holding`; "
+          "the root cause is wider (round 5b): a `move_to` after a failed `pick` is planned for an open hand although the hand is closed, lands on the cube and still answers ok, and the false `holding` follows when the model closes the hand. "
+          "The last two rows therefore count every episode touched by either symptom, and the **extreme bound** assumes every one of them would otherwise have succeeded, which is not credible but is the limit of what the registered rows can say. "
+          "Sections 6b and 6c rerun Haiku on `stack` on simulators with the symptom and then the cause fixed.", "",
           table(["model", "jobs", "treatment of the artefact episodes", "notebook", "fresh", "difference"], sens), ""]
+    if cheap:
+        fa = []
+        for m in cheap:
+            for c in ("none", "notebook", "replay"):
+                x = [r for r in A.select(skills, model=m, task="stack", condition=c, phase="eval", quirk=True)]
+                if x:
+                    fails = [r for r in x if not r["success"]]
+                    fa.append((m, NAMES[c], len(x), len(fails), sum(1 for r in fails if r["false_hold"] or r["short_move"])))
+        L += ["Failed `stack` held-out episodes that contain a false `holding` or a short `move_to` (round 5b: 25 of 27 for Haiku with no memory on run seeds 0 to 9):", "",
+              table(["model", "memory", "held-out episodes", "failed", "failed episodes with such a call"], fa), ""]
 
     # --- Q2
     L += ["## 3. Q2: does experience make it faster and cheaper? (exploratory, 95% intervals)", ""]
@@ -445,7 +463,8 @@ def main():
             keys = None
             for c in ("none", "borrowed", "borrowed_1", "borrowed_3"):
                 kc = {(r["task"], r["run_seed"]) for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True)}
-                keys = kc if keys is None else keys & kc
+                if kc:                                   # an arm that has not produced any complete run yet does not empty the table
+                    keys = kc if keys is None else keys & kc
             for c in ("none", "borrowed_1", "borrowed_3", "borrowed"):
                 for t in TASKS:
                     y = [r for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True, task=t) if (r["task"], r["run_seed"]) in (keys or set())]
@@ -461,26 +480,31 @@ def main():
             cum[k] = list(by.values())
         L += ["What the Fable practice behind each notebook cost (mean per run, practice episodes and rewrites only): " + ", ".join(f"{k} episode{'s' if k > 1 else ''}: ${np.mean(v):.2f}" for k, v in cum.items() if v) + ".", ""]
 
-    # --- 6b: Haiku on stack with the artefact fixed (v1.5B, exploratory)
+    # --- 6b/6c: Haiku on stack on three simulators (v1.5B, v1.5C; exploratory)
     fix_rows = A.load(*ex(a.fixhold), complete_only=True) if ex(a.fixhold) else []
-    if fix_rows:
-        L += ["## 6b. Exploratory: Haiku on `stack` again with the false-`holding` artefact fixed", "",
-              "Registered before it ran (PROTOCOL.md v1.5B). Same layouts (run seeds 0 to 9) and the same disturbed evaluation, but on a simulator where `close_gripper` attaches an object only if the hand is at least as wide as the object's narrowest side minus 8 mm "
-              "(its own code hash, listed in section 1). Predictions written beforehand: notebook at or above 97%; no memory above the original 32% but below 80%; so a gain of at least +20 points. Plain 95% intervals.", ""]
+    col_rows = A.load(*ex(a.fixcollide), complete_only=True) if ex(a.fixcollide) else []
+    if fix_rows or col_rows:
+        L += ["## 6b. Exploratory: Haiku on `stack` on three simulators", "",
+              "Registered before they ran (PROTOCOL.md v1.5B and v1.5C). The same layouts (run seeds 0 to 9) and the same disturbed evaluation in all three rows. "
+              "**Registered simulator:** the matrix as run. **Symptom fixed:** `close_gripper` attaches an object only if the hand is at least as wide as the object's narrowest side minus 8 mm (v1.5B); this removes the false sentence but keeps its cause, so short `move_to` stops remain (the last column). "
+              "**Cause fixed too:** a plain `move_to` is planned with the finger opening the hand really has, so a closed hand gets an honest refusal instead of landing on the cube and answering ok (v1.5C). Each has its own code hash (section 1). "
+              "Predictions written before the last one ran: notebook at or above 95%; no memory between 30% and 75%, a gain of at least +20 points; no memory at 85% or more would shrink the headline to a small effect. Plain 95% intervals.", ""]
         orig = [r for r in skills if r["model"] == "claude-haiku-5-5" and r["task"] == "stack"]
-        fx = []
-        for label, rs in (("original simulator (registered rows)", orig), ("artefact fixed", fix_rows)):
+        fx, cmp_ = [], []
+        sims = (("registered simulator", orig), ("symptom fixed (v1.5B)", fix_rows), ("cause fixed too (v1.5C)", col_rows))
+        for label, rs in sims:
             for c in ("none", "notebook"):
                 x = A.select(rs, model="claude-haiku-5-5", task="stack", condition=c, phase="eval", quirk=True)
                 if x:
                     fx.append((label, NAMES[c], len({r["run_seed"] for r in x}), len(x), f"{sum(r['success'] for r in x)}/{len(x)} ({f(mean(x, 'success'), True)})", f"{mean(x, 'calls_to_success'):.1f}",
                                sum(1 for r in x if r["false_hold"]), sum(1 for r in x if r["short_move"])))
-        L += [table(["simulator", "memory", "runs", "held-out episodes", "solved", "calls to success", "episodes with a false 'holding'", "episodes with a short move_to"], fx), ""]
-        d = A.paired_difference(fix_rows, "claude-haiku-5-5", "notebook", "none")
-        d0 = A.paired_difference(orig, "claude-haiku-5-5", "notebook", "none")
-        dc = A.paired_difference(fix_rows, "claude-haiku-5-5", "notebook", "none", metric="calls_to_success")
-        if d.get("n_pairs"):
-            L += [f"Notebook against no memory, artefact fixed: {ci(d, pct=True)} over {d['n_pairs']} runs (calls to success: {ci(dc)}). Original simulator, the same ten run seeds: {ci(d0, pct=True)}.", ""]
+            d = A.paired_difference(rs, "claude-haiku-5-5", "notebook", "none")
+            dc = A.paired_difference(rs, "claude-haiku-5-5", "notebook", "none", metric="calls_to_success")
+            if d.get("n_pairs"):
+                cmp_.append((label, d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True), ci(dc)))
+        L += [table(["simulator", "memory", "runs", "held-out episodes", "solved", "calls to success", "episodes with a false 'holding'", "episodes with a short move_to"], fx), "",
+              "Notebook against no memory on the same ten run seeds, per simulator (a run needs both arms complete):", "",
+              table(["simulator", "pairs", "notebook", "no memory", "success difference", "calls-to-success difference"], cmp_), ""]
 
     # --- pose
     if pose:
