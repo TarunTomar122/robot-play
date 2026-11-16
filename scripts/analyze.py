@@ -100,6 +100,7 @@ def main():
     ap.add_argument("--pose", nargs="*", default=["runs/pose"])
     ap.add_argument("--borrowed", nargs="*", default=["runs/borrowed", "runs/borrowed_other", "runs/borrowed_1", "runs/borrowed_3"])
     ap.add_argument("--ext", nargs="*", default=["runs/main_ext"], help="exploratory room-cell extension (Haiku, stack and bins, run seeds 10-19); never enters a confirmatory number")
+    ap.add_argument("--fixhold", nargs="*", default=["runs/main_fixhold"], help="exploratory rerun of Haiku on stack with the false-holding artefact fixed (PROTOCOL.md v1.5B); never pooled with the registered rows")
     ap.add_argument("--meter", default="runs/spend")
     ap.add_argument("--out", default="results/RESULTS.md")
     ap.add_argument("--img", default="docs/img")
@@ -459,6 +460,27 @@ def main():
                     by[(r["task"], r["run_seed"])] = by.get((r["task"], r["run_seed"]), 0.0) + r["cost_usd"]
             cum[k] = list(by.values())
         L += ["What the Fable practice behind each notebook cost (mean per run, practice episodes and rewrites only): " + ", ".join(f"{k} episode{'s' if k > 1 else ''}: ${np.mean(v):.2f}" for k, v in cum.items() if v) + ".", ""]
+
+    # --- 6b: Haiku on stack with the artefact fixed (v1.5B, exploratory)
+    fix_rows = A.load(*ex(a.fixhold), complete_only=True) if ex(a.fixhold) else []
+    if fix_rows:
+        L += ["## 6b. Exploratory: Haiku on `stack` again with the false-`holding` artefact fixed", "",
+              "Registered before it ran (PROTOCOL.md v1.5B). Same layouts (run seeds 0 to 9) and the same disturbed evaluation, but on a simulator where `close_gripper` attaches an object only if the hand is at least as wide as the object's narrowest side minus 8 mm "
+              "(its own code hash, listed in section 1). Predictions written beforehand: notebook at or above 97%; no memory above the original 32% but below 80%; so a gain of at least +20 points. Plain 95% intervals.", ""]
+        orig = [r for r in skills if r["model"] == "claude-haiku-5-5" and r["task"] == "stack"]
+        fx = []
+        for label, rs in (("original simulator (registered rows)", orig), ("artefact fixed", fix_rows)):
+            for c in ("none", "notebook"):
+                x = A.select(rs, model="claude-haiku-5-5", task="stack", condition=c, phase="eval", quirk=True)
+                if x:
+                    fx.append((label, NAMES[c], len({r["run_seed"] for r in x}), len(x), f"{sum(r['success'] for r in x)}/{len(x)} ({f(mean(x, 'success'), True)})", f"{mean(x, 'calls_to_success'):.1f}",
+                               sum(1 for r in x if r["false_hold"]), sum(1 for r in x if r["short_move"])))
+        L += [table(["simulator", "memory", "runs", "held-out episodes", "solved", "calls to success", "episodes with a false 'holding'", "episodes with a short move_to"], fx), ""]
+        d = A.paired_difference(fix_rows, "claude-haiku-5-5", "notebook", "none")
+        d0 = A.paired_difference(orig, "claude-haiku-5-5", "notebook", "none")
+        dc = A.paired_difference(fix_rows, "claude-haiku-5-5", "notebook", "none", metric="calls_to_success")
+        if d.get("n_pairs"):
+            L += [f"Notebook against no memory, artefact fixed: {ci(d, pct=True)} over {d['n_pairs']} runs (calls to success: {ci(dc)}). Original simulator, the same ten run seeds: {ci(d0, pct=True)}.", ""]
 
     # --- pose
     if pose:
