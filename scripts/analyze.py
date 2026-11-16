@@ -29,7 +29,7 @@ FRONTIER_FLOOR = 0.5               # a frontier first try below this is not a ta
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 COLORS = {"none": "#2a78d6", "notebook": "#eb6834", "replay": "#1baf7a"}          # dataviz skill categorical slots 1-3 (validated all-pairs)
 TASKS = ["stack", "bins", "flasks"]
-NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook"}
+NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job"}
 
 
 def f(x, pct=False):
@@ -287,7 +287,7 @@ def main():
         L += [table(["job", "memory", "runs", "pairs", "with memory", "starts fresh", "difference"], extr) if extr else "No complete pairs yet.", ""]
 
     # --- Q5: a stronger model's notebook (exploratory)
-    bor = [r for r in skills if r["condition"] == "borrowed"]
+    bor = [r for r in skills if r["condition"] in ("borrowed", "borrowed_other")]
     if bor:
         fx = [r for r in skills if r["model"] == "claude-fable-5-2" and r["condition"] == "notebook"]
         fcost = {}
@@ -295,14 +295,14 @@ def main():
             fcost[(r["task"], r["run_seed"])] = fcost.get((r["task"], r["run_seed"]), 0.0) + r["cost_usd"] + r.get("retry_usd", 0.0)
         L += ["## 5. Exploratory: does a stronger model's notebook help a cheaper one?", "",
               "Each cheap model reads, frozen and with no practice of its own, the notebook that the Fable-with-notebook run of the same task and run seed ended with, and plays the same four held-out layouts (run seeds 0 to 4). Exploratory, 95% intervals, three jobs times five run seeds. "
-              "The borrowed notebook costs the frontier model's own 12 practice episodes and rewrites, which is shown separately.", ""]
+              "The borrowed notebook costs the frontier model's own 12 practice episodes and rewrites, which is shown separately. The control `reads Fable's notebook for another job` gives each job the notebook written for a different job (labelled as such), to tell the content of the notebook from the mere presence of one.", ""]
         q5 = []
         for m in cheap:
-            for other in ("none", "notebook"):
-                d = A.paired_difference(skills, m, "borrowed", other)
+            for first, other in (("borrowed", "none"), ("borrowed", "notebook"), ("borrowed", "borrowed_other"), ("borrowed_other", "none")):
+                d = A.paired_difference(skills, m, first, other)
                 if d.get("n_pairs"):
-                    q5.append((m, f"reads Fable's notebook against {NAMES[other]}", d["n_pairs"], f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
-        L += [table(["model", "comparison", "runs (task, run seed)", "borrowed", "other", "difference"], q5) if q5 else "No complete comparison yet.", ""]
+                    q5.append((m, f"{NAMES[first]} against {NAMES[other]}", d["n_pairs"], f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
+        L += [table(["model", "comparison", "runs (task, run seed)", "first", "second", "difference"], q5) if q5 else "No complete comparison yet.", ""]
         ks = sorted({(r["task"], r["run_seed"]) for r in bor})
         if ks and fcost:
             own = [r for m in cheap for r in skills if r["model"] == m and r["condition"] == "notebook" and r["phase"] in ("practice", "eval") and (r["task"], r["run_seed"]) in ks]
