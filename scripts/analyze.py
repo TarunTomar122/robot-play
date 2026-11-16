@@ -97,7 +97,7 @@ def main():
     ap.add_argument("--control", nargs="*", default=["runs/control"])
     ap.add_argument("--frontier", nargs="*", default=["runs/frontier", "runs/frontier_exp"])
     ap.add_argument("--pose", nargs="*", default=["runs/pose"])
-    ap.add_argument("--borrowed", nargs="*", default=["runs/borrowed"])
+    ap.add_argument("--borrowed", nargs="*", default=["runs/borrowed", "runs/borrowed_other"])
     ap.add_argument("--ext", nargs="*", default=["runs/main_ext"], help="exploratory room-cell extension (Haiku, stack and bins, run seeds 10-19); never enters a confirmatory number")
     ap.add_argument("--meter", default="runs/spend")
     ap.add_argument("--out", default="results/RESULTS.md")
