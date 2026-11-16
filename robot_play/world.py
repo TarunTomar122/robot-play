@@ -98,6 +98,8 @@ class PandaWorld:
         for b in spec.bodies:                      # gravity-compensate the arm so position control is accurate
             if b.name.startswith(("link", "hand", "left_finger", "right_finger")):
                 b.gravcomp = 1.0
+        spec.option.cone = mujoco.mjtCone.mjCONE_ELLIPTIC      # hard friction: soft pyramidal contacts let held objects creep
+        spec.option.impratio = 10.0
         gk = GRIP_FORCE_SCALE                      # Menagerie's tendon gains give only ~2 N; scale to a plausible 10 N firm grip
         act = spec.actuator("actuator8")
         act.gainprm[0] *= gk

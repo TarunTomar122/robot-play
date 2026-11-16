@@ -193,7 +193,7 @@ class Skills:
             xy = np.array(t["xy"], float)
             for dx, dy in t.get("slots", []):            # zones with slots: use the first free one
                 cand = xy + [dx, dy]
-                if all(np.linalg.norm(self.w.obj_pos(o.name)[:2] - cand) > 0.045 for o in self.w.scene.objects):
+                if all(np.linalg.norm(self.w.obj_pos(o.name)[:2] - cand) > 0.03 for o in self.w.scene.objects if o.name != self.mv.held):
                     xy = cand
                     break
             return xy, float(t["top_z"]), set(t.get("ignore", [target]))
@@ -231,6 +231,15 @@ class Skills:
                           ignore=ignore | {"floor"} if release_height < 0.005 else ignore)
         except (IKFailure, Collision) as e:
             return self._fail(str(e), holding=mv.held)
+        for _ in range(2):                                 # closed-loop alignment: the object can shift in the grip during the descent
+            resid = xy - w.obj_pos(name)[:2]
+            if np.linalg.norm(resid) < 0.002:
+                break
+            try:
+                self._descend([w.tcp()[0] + resid[0], w.tcp()[1] + resid[1], w.tcp()[2]], yaw, "slow", ignore)
+            except (IKFailure, Collision):
+                break
+            w.settle(0.15)
         self.open_gripper()
         w.settle(settle_time)
         z_up = float(w.tcp()[2] + 0.15)

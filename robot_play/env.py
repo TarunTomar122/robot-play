@@ -17,7 +17,7 @@ MAX_CALLS = 30
 
 def _sample_xy(rng, n, x=(0.40, 0.58), y=(-0.26, 0.26), min_sep=0.11, avoid=()):
     pts = []
-    for _ in range(2000):
+    for _ in range(20000):
         p = np.array([rng.uniform(*x), rng.uniform(*y)])
         if all(np.linalg.norm(p - q) >= min_sep for q in list(pts) + list(avoid)):
             pts.append(p)
@@ -32,6 +32,7 @@ class Task:
     instruction: str
     build: callable                       # (rng, quirk) -> (SceneSpec, targets, meta)
     check: callable                       # (env) -> (bool, dict)
+    max_calls: int = 20
 
 
 # ---------------------------------------------------------------------------------------------- stack
@@ -83,11 +84,11 @@ def _build_bins(rng, quirk: bool, wall_h: float | None = None):
         objs.append(ObjectSpec(name, "box", (.0175, .0175, .0175), tuple(cubes[i]), rgba, mass=0.05))
     statics = _bin_statics("bin_red", *bin_xy[0], (.75, .25, .25, 1), wall_h) + _bin_statics("bin_blue", *bin_xy[1], (.25, .35, .8, 1), wall_h)
     full = BIN_INNER + 2 * WALL_T
-    slots = [(sx * 0.025, sy * 0.025) for sx in (-1, 1) for sy in (-1, 1)]
+    slots = [(-0.026, 0.0), (0.026, 0.0)]      # along x: the open fingers straddle the bin in y
     targets = {"bin_red": {"xy": bin_xy[0], "top_z": 0.01, "size": (full, full, 0.01 + wall_h), "slots": slots,
-                           "ignore": ["bin_red", "bin_red_wall1", "bin_red_wall2", "bin_red_wall3", "bin_red_wall4"]},
+                           "ignore": ["bin_red"]},
                "bin_blue": {"xy": bin_xy[1], "top_z": 0.01, "size": (full, full, 0.01 + wall_h),
-                            "slots": slots, "ignore": ["bin_blue", "bin_blue_wall1", "bin_blue_wall2", "bin_blue_wall3", "bin_blue_wall4"]}}
+                            "slots": slots, "ignore": ["bin_blue"]}}
     return SceneSpec(objects=objs, statics=statics), targets, {"bin_xy": {"bin_red": bin_xy[0], "bin_blue": bin_xy[1]}, "wall_h": wall_h}
 
 
@@ -109,7 +110,7 @@ FLASK_BASE = (0.05, 0.07)          # radius 5 cm > the 4 cm half-opening of the 
 
 
 def _build_flasks(rng, quirk: bool, base_h: float | None = None):
-    pts = _sample_xy(rng, 4, x=(0.40, 0.56), y=(-0.28, 0.28), min_sep=0.15)
+    pts = _sample_xy(rng, 4, x=(0.40, 0.56), y=(-0.28, 0.28), min_sep=0.14)
     if quirk:      # flask: narrow neck above a wide base the open gripper cannot straddle
         kw = dict(size=(0.02, FLASK_HALF_H, 0), base=(FLASK_BASE[0], base_h or FLASK_BASE[1]))
     else:          # plain cylinder of the same height and mass

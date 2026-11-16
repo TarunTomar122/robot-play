@@ -34,8 +34,6 @@ def run_script(task: str, seed: int, quirk: bool, policy: str, **kw) -> dict:
             continue
         r = s.place(_dest(task, obj, env), **place_kw)
         trace.append(("place", obj, r.get("ok"), r.get("error")))
-        if not r["ok"]:
-            s.open_gripper()
     s.home()
     ok, detail = env.success()
     return {"ok": bool(ok), "detail": detail, "trace": trace, "sim_time": env.sim_time}
