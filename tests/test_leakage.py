@@ -73,6 +73,6 @@ def test_memory_prompts_built_from_a_real_episode_leak_nothing(task):
     ep.call("observe", {})
     ep.call("pick", {"object": {"stack": "cube_green", "bins": "cube_red1", "flasks": "flask_a"}[task]})
     transcript = render_transcript(ep.log, 4800)
-    for block in (Memory("replay", replay=transcript).prompt_block(), Memory("notebook", notebook="what worked: nothing yet").prompt_block()):
+    for block in (Memory("replay", replay=transcript).prompt_block(), Memory("notebook", notebook="what worked: nothing yet").prompt_block(), Memory("borrowed", notebook="what worked: nothing yet").prompt_block()):
         for word in FORBIDDEN:
             assert word not in block.lower(), f"'{word}' in a memory prompt ({task})"
