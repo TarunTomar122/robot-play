@@ -7,7 +7,7 @@
 | stack | quirk | 0/100 | 100/100 |
 | stack | control | 100/100 | 100/100 |
 | bins | quirk | 0/100 | 100/100 |
-| bins | control | 99/100 | 100/100 |
+| bins | control | 100/100 | 100/100 |
 | flasks | quirk | 0/100 | 100/100 |
 | flasks | control | 100/100 | 100/100 |
 

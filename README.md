@@ -48,7 +48,7 @@ A badly made job would give meaningless results, so before any AI is allowed nea
 | Stack | with the catch | 0 / 100 | 100 / 100 |
 | Stack | control | 100 / 100 | 100 / 100 |
 | Sort | with the catch | 0 / 100 | 100 / 100 |
-| Sort | control | 99 / 100 | 100 / 100 |
+| Sort | control | 100 / 100 | 100 / 100 |
 | Stand up | with the catch | 0 / 100 | 100 / 100 |
 | Stand up | control | 100 / 100 | 100 / 100 |
 

@@ -1,0 +1,165 @@
+"""Spend meter: a hard, cross-process budget cap that is checked BEFORE every paid call.
+
+How it works, in plain words:
+  1. Before a call, `reserve()` works out the most the call could possibly cost (estimated input tokens plus the full `max_tokens` of output)
+     and adds it to the money already spent and already reserved. If that would pass the cap, the call is refused and nothing is sent.
+  2. After the call, `settle()` replaces the reservation with the real cost from the response's token counts (cache reads and writes included).
+  3. If a call fails and we cannot be sure it was not billed (a timeout, a dropped connection), `settle_unknown()` charges the full reservation.
+     Only a failure that happens before the provider processes anything (bad request, bad key) is `release()`d for free.
+All of this happens under a file lock, so many worker processes share one budget. Every event is appended to a JSONL ledger that survives restarts.
+"""
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+import time
+import uuid
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+
+# US dollars per million tokens: (input, output). Cache reads cost 10% of input and cache writes 125% of input on Anthropic. For OpenAI,
+# cached input is assumed to cost 50% of input, which over-estimates cost if it is really cheaper (safe for a budget cap).
+# These come from third-party price lists and must be checked against measured usage (see `reconcile`).
+PRICES = {
+    "claude-haiku-5-5": (0.10, 0.50),
+    "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-fable-5-2": (8.00, 40.00),
+    "gpt-6-luna": (0.10, 0.50),
+    "gpt-6.1-sol": (2.00, 10.00),
+    "gpt-6-astra": (10.00, 50.00),
+}
+CACHE_READ = {"anthropic": 0.10, "openai": 0.50}
+CACHE_WRITE = {"anthropic": 1.25, "openai": 1.00}
+PROVIDER_OF = lambda model: "anthropic" if model.startswith("claude") else "openai"
+DEFAULT_CAPS = {"anthropic": 90.0, "openai": 45.0}
+
+
+class BudgetExceeded(Exception):
+    pass
+
+
+def estimate_tokens(text: str) -> int:
+    """Deliberately high (3 characters per token) so that the reservation over-estimates."""
+    return int(len(text) / 3) + 50
+
+
+def cost_usd(model: str, input_tokens: int = 0, output_tokens: int = 0, cache_read_tokens: int = 0, cache_write_tokens: int = 0) -> float:
+    pin, pout = PRICES[model]
+    prov = PROVIDER_OF(model)
+    return (input_tokens * pin + output_tokens * pout + cache_read_tokens * pin * CACHE_READ[prov] + cache_write_tokens * pin * CACHE_WRITE[prov]) / 1e6
+
+
+@dataclass
+class Reservation:
+    id: str
+    provider: str
+    model: str
+    amount: float
+
+
+class SpendMeter:
+    def __init__(self, root: str | Path = "runs/spend", caps: dict | None = None):
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.caps = dict(caps or DEFAULT_CAPS)
+        self.ledger = self.root / "ledger.jsonl"
+        self.state_file = self.root / "state.json"
+        self.lock_file = self.root / "lock"
+        self.lock_file.touch(exist_ok=True)
+
+    # ------------------------------------------------------------------ internals
+    @contextmanager
+    def _locked(self):
+        with open(self.lock_file, "w") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+
+    def _load(self) -> dict:
+        if self.state_file.exists():
+            return json.loads(self.state_file.read_text())
+        return {"spent": {}, "reserved": {}, "open": {}}
+
+    def _save(self, st: dict):
+        tmp = self.state_file.with_suffix(".tmp")
+        tmp.write_text(json.dumps(st))
+        os.replace(tmp, self.state_file)
+
+    def _log(self, **row):
+        row["ts"] = round(time.time(), 3)
+        with open(self.ledger, "a") as f:
+            f.write(json.dumps(row) + "\n")
+
+    # ------------------------------------------------------------------ public
+    def totals(self) -> dict:
+        with self._locked():
+            st = self._load()
+        return {p: {"spent": round(st["spent"].get(p, 0.0), 6), "reserved": round(st["reserved"].get(p, 0.0), 6), "cap": self.caps[p]} for p in self.caps}
+
+    def reserve(self, model: str, est_input_tokens: int, max_output_tokens: int, run_id: str = "") -> Reservation:
+        prov = PROVIDER_OF(model)
+        worst = cost_usd(model, input_tokens=est_input_tokens, output_tokens=max_output_tokens)
+        with self._locked():
+            st = self._load()
+            committed = st["spent"].get(prov, 0.0) + st["reserved"].get(prov, 0.0)
+            if committed + worst > self.caps[prov]:
+                self._log(kind="refused", provider=prov, model=model, run_id=run_id, worst_case=round(worst, 6), committed=round(committed, 6), cap=self.caps[prov])
+                raise BudgetExceeded(f"{prov}: committed ${committed:.4f} + worst case ${worst:.4f} would pass the ${self.caps[prov]:.2f} cap")
+            rid = uuid.uuid4().hex[:12]
+            st["reserved"][prov] = st["reserved"].get(prov, 0.0) + worst
+            st["open"][rid] = [prov, worst]
+            self._save(st)
+            self._log(kind="reserve", id=rid, provider=prov, model=model, run_id=run_id, amount=round(worst, 6))
+        return Reservation(rid, prov, model, worst)
+
+    def _close(self, res: Reservation, real: float, kind: str, **extra):
+        with self._locked():
+            st = self._load()
+            if res.id not in st["open"]:
+                raise KeyError(f"reservation {res.id} is not open")
+            prov, amount = st["open"].pop(res.id)
+            st["reserved"][prov] = max(0.0, st["reserved"].get(prov, 0.0) - amount)
+            st["spent"][prov] = st["spent"].get(prov, 0.0) + real
+            self._save(st)
+            self._log(kind=kind, id=res.id, provider=prov, model=res.model, amount=round(real, 6), **extra)
+
+    def settle(self, res: Reservation, input_tokens: int, output_tokens: int, cache_read_tokens: int = 0, cache_write_tokens: int = 0) -> float:
+        real = cost_usd(res.model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens)
+        self._close(res, real, "settle", input_tokens=input_tokens, output_tokens=output_tokens,
+                    cache_read_tokens=cache_read_tokens, cache_write_tokens=cache_write_tokens, reserved=round(res.amount, 6))
+        return real
+
+    def settle_unknown(self, res: Reservation, why: str = "") -> float:
+        """The call may have been billed but we have no usage numbers: charge the whole reservation."""
+        self._close(res, res.amount, "settle_unknown", why=why[:120])
+        return res.amount
+
+    def release(self, res: Reservation, why: str = ""):
+        """Only for failures that happen before the provider processes anything."""
+        self._close(res, 0.0, "release", why=why[:120])
+
+    def reconcile(self) -> dict:
+        """Recompute totals from the ledger alone and compare with the running state."""
+        per_model, spent, open_res = {}, {}, {}
+        if self.ledger.exists():
+            for line in self.ledger.read_text().splitlines():
+                r = json.loads(line)
+                if r["kind"] == "reserve":
+                    open_res[r["id"]] = (r["provider"], r["amount"])
+                elif r["kind"] in ("settle", "settle_unknown", "release"):
+                    open_res.pop(r["id"], None)
+                    spent[r["provider"]] = spent.get(r["provider"], 0.0) + r["amount"]
+                    m = per_model.setdefault(r["model"], {"calls": 0, "usd": 0.0, "input": 0, "output": 0, "cache_read": 0, "cache_write": 0})
+                    m["calls"] += 1
+                    m["usd"] += r["amount"]
+                    m["input"] += r.get("input_tokens", 0)
+                    m["output"] += r.get("output_tokens", 0)
+                    m["cache_read"] += r.get("cache_read_tokens", 0)
+                    m["cache_write"] += r.get("cache_write_tokens", 0)
+        st = self._load()
+        match = all(abs(spent.get(p, 0.0) - st["spent"].get(p, 0.0)) < 1e-6 for p in set(spent) | set(st["spent"]))
+        return {"per_model": per_model, "spent": spent, "open_reservations": len(open_res), "matches_state": match}
