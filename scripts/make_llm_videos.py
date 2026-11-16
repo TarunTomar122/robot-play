@@ -61,9 +61,23 @@ def pick_pairs(run_dir, model, task):
                 break
 
 
+def pick_borrowed(main_dir, borrowed_dir, model, task):
+    """Yield (fresh_failed, borrowed_succeeded) on the same layout: the no-memory model failed it, the same model reading Fable's notebook solved it."""
+    fresh = {}
+    for f in sorted(Path(main_dir).glob("*.jsonl")):
+        for r in _rows(f):
+            if r["model"] == model and r["task"] == task and r["condition"] == "none" and r["phase"] == "eval" and r["quirk"] and not r["result"]["success"]:
+                fresh[r["seed"]] = r
+    for f in sorted(Path(borrowed_dir).glob("*.jsonl")):
+        for r in _rows(f):
+            if r["model"] == model and r["task"] == task and r["condition"] == "borrowed" and r["phase"] == "eval" and r["result"]["success"] and r["seed"] in fresh:
+                yield fresh[r["seed"]], r
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pick")
+    ap.add_argument("--pick-borrowed", nargs=2, metavar=("MAIN_DIR", "BORROWED_DIR"), help="find a layout the model failed fresh and solved with Fable's notebook")
     ap.add_argument("--model")
     ap.add_argument("--task")
     ap.add_argument("--file")
@@ -76,6 +90,18 @@ def main():
         for r in _rows(a.file):
             if r["phase"] == a.phase and r["idx"] == a.idx:
                 render(r, a.tag, f"{a.phase}{a.idx}", TITLES[r["task"]])
+        return
+    if a.pick_borrowed:
+        n = 0
+        for fresh, bor in pick_borrowed(a.pick_borrowed[0], a.pick_borrowed[1], a.model, a.task):
+            base = f"layout{fresh['seed']}"
+            render(fresh, a.tag, f"{base}-no-memory", f"{TITLES[a.task]}: a new layout, no memory")
+            render(bor, a.tag, f"{base}-fable-notebook", f"{TITLES[a.task]}: the same layout, reading Fable's notebook")
+            n += 1
+            if n >= a.max_pairs:
+                break
+        if n == 0:
+            print("no layout found that the model failed fresh and solved with Fable's notebook")
         return
     n = 0
     for p0, e, f in pick_pairs(a.pick, a.model, a.task):
