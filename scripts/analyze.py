@@ -29,7 +29,7 @@ FRONTIER_FLOOR = 0.5               # a frontier first try below this is not a ta
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 COLORS = {"none": "#2a78d6", "notebook": "#eb6834", "replay": "#1baf7a"}          # dataviz skill categorical slots 1-3 (validated all-pairs)
 TASKS = ["stack", "bins", "flasks"]
-NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success"}
+NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook"}
 
 
 def f(x, pct=False):
@@ -53,6 +53,11 @@ def enough(d, need, key="n_pairs"):
 
 def table(head, rows):
     return "\n".join(["| " + " | ".join(head) + " |", "|" + "---|" * len(head)] + ["| " + " | ".join(str(c) for c in r) + " |" for r in rows])
+
+
+def mean_over(d, keys):
+    v = [d[k] for k in keys if k in d]
+    return f"${np.mean(v):.2f}" if v else "n/a"
 
 
 def mean(rows, key):
@@ -92,12 +97,13 @@ def main():
     ap.add_argument("--control", nargs="*", default=["runs/control"])
     ap.add_argument("--frontier", nargs="*", default=["runs/frontier", "runs/frontier_exp"])
     ap.add_argument("--pose", nargs="*", default=["runs/pose"])
+    ap.add_argument("--borrowed", nargs="*", default=["runs/borrowed"])
     ap.add_argument("--meter", default="runs/spend")
     ap.add_argument("--out", default="results/RESULTS.md")
     ap.add_argument("--img", default="docs/img")
     a = ap.parse_args()
     ex = lambda ds: [d for d in ds if Path(d).exists()]
-    dirs = ex(a.main + a.control + a.frontier + a.pose)
+    dirs = ex(a.main + a.control + a.frontier + a.pose + a.borrowed)
     rows = A.load(*dirs, complete_only=True)                          # confirmatory numbers use runs that finished their whole plan
     cov = A.coverage(*dirs)
     abandoned = {}
@@ -141,7 +147,7 @@ def main():
         from robot_play.runner import build_specs
         cheap_m, front_m = ["claude-haiku-5-5", "gpt-6-luna"], ["claude-fable-5-2", "gpt-6-astra"]
         planned = [("main", cheap_m, range(10), "runs/main"), ("control", cheap_m, range(10), "runs/control"), ("frontier", front_m, [0], "runs/frontier"),
-                   ("frontier_exp", ["claude-fable-5-2"], range(5), "runs/frontier_exp"), ("pose", cheap_m, range(3), "runs/pose")]
+                   ("frontier_exp", ["claude-fable-5-2"], range(5), "runs/frontier_exp"), ("pose", cheap_m, range(3), "runs/pose")]            # the exploratory borrowed cell is listed only if it was started
         missing = {}
         for cell, ms, seeds, d in planned:
             specs = build_specs(cell, ms, list(seeds), d)
@@ -260,6 +266,28 @@ def main():
         L += [f"**{scene}**", "", table(["model", "memory", "disturbed episodes", "disturbance fired", "success, all assigned", "success when it fired", "same layouts, no disturbance"], q4) if q4 else "No disturbance runs yet.", ""]
         L += ["Drop in success caused by the disturbance (clean minus disturbed, same layouts, all assigned episodes). A negative difference means the notebook agent loses less:", "",
               table(["model", "drop with notebook", "drop starting fresh", "difference (all assigned" + (", primary)" if primary else ")"), "difference (fired for both, sensitivity)", "clean wins that survived (notebook against fresh)"], rd) if rd else "No complete disturbed runs yet.", ""]
+
+    # --- Q5: a stronger model's notebook (exploratory)
+    bor = [r for r in skills if r["condition"] == "borrowed"]
+    if bor:
+        fx = [r for r in skills if r["model"] == "claude-fable-5-2" and r["condition"] == "notebook"]
+        fcost = {}
+        for r in fx:
+            fcost[(r["task"], r["run_seed"])] = fcost.get((r["task"], r["run_seed"]), 0.0) + r["cost_usd"] + r.get("retry_usd", 0.0)
+        L += ["## 5. Exploratory: does a stronger model's notebook help a cheaper one?", "",
+              "Each cheap model reads, frozen and with no practice of its own, the notebook that the Fable-with-notebook run of the same task and run seed ended with, and plays the same four held-out layouts (run seeds 0 to 4). Exploratory, 95% intervals, three jobs times five run seeds. "
+              "The borrowed notebook costs the frontier model's own 12 practice episodes and rewrites, which is shown separately.", ""]
+        q5 = []
+        for m in cheap:
+            for other in ("none", "notebook"):
+                d = A.paired_difference(skills, m, "borrowed", other)
+                if d.get("n_pairs"):
+                    q5.append((m, f"reads Fable's notebook against {NAMES[other]}", d["n_pairs"], f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
+        L += [table(["model", "comparison", "runs (task, run seed)", "borrowed", "other", "difference"], q5) if q5 else "No complete comparison yet.", ""]
+        ks = sorted({(r["task"], r["run_seed"]) for r in bor})
+        if ks and fcost:
+            own = [r for m in cheap for r in skills if r["model"] == m and r["condition"] == "notebook" and r["phase"] in ("practice", "eval") and (r["task"], r["run_seed"]) in ks]
+            L += [f"Dollars per run: Fable's practice and notebook writing {mean_over(fcost, ks)}; a cheap model's own 12 practice episodes and rewrites (the cost of its whole notebook run, per run) ${sum(r['cost_usd'] for r in own) / max(1, len({(r['model'], r['task'], r['run_seed']) for r in own})):.3f}.", ""]
 
     # --- pose
     if pose:
