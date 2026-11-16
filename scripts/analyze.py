@@ -66,7 +66,7 @@ def learning_chart(rows, models, out):
             ax = axes[i][j]
             ax.set_facecolor(SURFACE)
             for c in ("none", "notebook", "replay"):
-                cur = A.curve([r for r in rows if r["task"] == t], m, c, "success", n_boot=500)
+                cur = A.curve([r for r in rows if r["task"] == t], m, c, "success", n_boot=10_000)
                 if not cur:
                     continue
                 x = [p["idx"] + 1 for p in cur]
@@ -206,13 +206,15 @@ def main():
     # --- Q3
     L += ["## 4. Q3: can a cheap model with experience come close to a frontier model's first try?", "",
           f"Confirmatory for the notebook rows (4 gaps, 98.75% intervals). The frontier models ran at reasoning effort `low`, like every model here, so this compares models at the same low setting, not at their best. Clusters are (task, run seed) runs, because the four layouts of a run share one notebook; the interval is the wider of the cluster bootstrap and an Agresti-Caffo interval "
-          f"whose cheap-arm variance carries the design effect fixed in PROTOCOL.md (max(2, 1 + 3 x rho), rho measured on that cheap model's own held-out outcomes; the frontier arm has none), so it does not shrink to zero when every episode succeeds. Fewer than {MIN_Q3_CLUSTERS} of 15 complete clusters is inconclusive. A frontier first try below {int(100 * FRONTIER_FLOOR)}% is not treated as a target. The rows with no memory show how much of the gap the notebook closes (exploratory, 95%).", ""]
+          f"whose cheap-arm variance carries the design effect fixed in PROTOCOL.md (max(2, 1 + 3 x rho), rho measured on that cheap model's own notebook held-out outcomes; the frontier arm and the no-memory row have none). A cluster counts only when all four of its layouts are paired (a block that is only partly observed is left out and reported), so it does not shrink to zero when every episode succeeds. Fewer than {MIN_Q3_CLUSTERS} of 15 complete clusters is inconclusive. A frontier first try below {int(100 * FRONTIER_FLOOR)}% is not treated as a target. The rows with no memory show how much of the gap the notebook closes (exploratory, 95%).", ""]
     q3, q3c = [], []
     for fr in [m for m in models if m in ("claude-fable-5-2", "gpt-6-astra")]:
         for ch in cheap:
             for cc in ("notebook", "none"):
                 g = A.q3_gap(skills, fr, ch, cheap_condition=cc, alpha=A.ALPHA_Q3 if cc == "notebook" else 0.05)
                 if not g.get("n_layouts"):
+                    if g.get("n_partial_clusters"):
+                        q3.append((fr, f"{ch}, {NAMES[cc]}", f"0 whole runs ({g['n_partial_clusters']} partly paired)", "-", "-", "-", "inconclusive: no run has all four layouts paired"))
                     continue
                 if cc == "notebook" and g["n_clusters"] < MIN_Q3_CLUSTERS:
                     verdict = f"inconclusive: {g['n_clusters']} complete clusters"

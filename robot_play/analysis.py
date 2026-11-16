@@ -138,7 +138,7 @@ def paired_difference(rows, model: str, a: str, b: str, metric: str = "success",
     return {"n_pairs": len(keys), "a": float(np.mean([ma[k] for k in keys])), "b": float(np.mean([mb[k] for k in keys])), "diff": est, "lo": lo, "hi": hi, "alpha": alpha}
 
 
-def curve(rows, model: str, condition: str, metric: str = "success", quirk: bool = True, n_boot: int = 2000) -> list[dict]:
+def curve(rows, model: str, condition: str, metric: str = "success", quirk: bool = True, n_boot: int = 10_000) -> list[dict]:
     """Practice-episode curve: mean `metric` at practice index 0, 1, 2, ... with a cluster-bootstrap interval over runs."""
     rs = select(rows, model=model, condition=condition, phase="practice", quirk=quirk)
     out = []
@@ -208,9 +208,13 @@ def q3_gap(rows, frontier: str, cheap: str, cheap_condition: str = "notebook", m
     'Within the margin' needs the whole interval of the gap below +margin."""
     fr = {(r["task"], r["seed"]): r["success"] for r in select(rows, model=frontier, condition="none", quirk=True, phase="eval")}
     ch = {(r["task"], r["seed"]): (r["run_seed"], r["success"]) for r in select(rows, model=cheap, condition=cheap_condition, quirk=True, phase="eval")}
-    keys = sorted(set(fr) & set(ch))
+    matched = sorted(set(fr) & set(ch))
+    per_cluster: dict = {}
+    for k in matched:
+        per_cluster.setdefault((k[0], ch[k][0]), []).append(k)
+    keys = [k for ks in per_cluster.values() if len(ks) == 4 for k in ks]           # a confirmatory cluster needs all four of its layouts paired; a partly observed block is left out
     if not keys:
-        return {"n_layouts": 0}
+        return {"n_layouts": 0, "n_partial_clusters": len(per_cluster)}
     by_cluster: dict = {}
     for k in keys:
         by_cluster.setdefault((k[0], ch[k][0]), []).append(fr[k] - ch[k][1])
@@ -222,27 +226,27 @@ def q3_gap(rows, frontier: str, cheap: str, cheap_condition: str = "notebook", m
     _, alo, ahi = _agresti_caffo(s_fr, n, s_ch, n, Z[alpha], 1.0, deff)
     lo = min(x for x in (blo, alo) if x == x)
     hi = max(x for x in (bhi, ahi) if x == x)
-    return {"n_layouts": n, "n_clusters": len(clusters), "clusters": sorted(by_cluster), "frontier": s_fr / n, "cheap": s_ch / n, "gap": est, "lo": lo, "hi": hi,
+    return {"n_layouts": n, "n_clusters": len(clusters), "n_partial_clusters": len(per_cluster) - len(clusters), "clusters": sorted(by_cluster), "layouts": keys, "frontier": s_fr / n, "cheap": s_ch / n, "gap": est, "lo": lo, "hi": hi,
             "lo_boot": blo, "hi_boot": bhi, "lo_ac": alo, "hi_ac": ahi, "deff": deff, "within_margin": bool(hi < margin), "margin": margin, "alpha": alpha}
 
 
 def q3_cost(rows, frontier: str, cheap: str, cheap_condition: str = "notebook", abandoned: dict | None = None) -> dict:
     """Everything the Q3 comparison cost, so a cheap-model-with-practice is never compared to a frontier first try on evaluation cost alone.
     Cheap side: all 12 practice episodes with their notebook rewrites, the clean evaluation episodes, and abandoned attempts, for exactly the runs in the gap.
-    Frontier side: its first-try episodes on the same layouts plus its own abandoned attempts on those tasks.
+    Frontier side: its first-try episodes on the same layouts plus ALL of its own abandoned attempts on those tasks (the scope is the task, not the layout, because an abandoned attempt has no layout once it is redone).
     `abandoned` maps (model, toolset, task, condition, quirk, run_seed) to dollars; only skill-level runs are ever counted here."""
     g = q3_gap(rows, frontier, cheap, cheap_condition, n_boot=10)
     if not g.get("n_layouts"):
         return {}
     cl = set(g["clusters"])
-    cr = [r for r in select(rows, model=cheap, condition=cheap_condition, quirk=True) if (r["task"], r["run_seed"]) in cl and r["phase"] in ("practice", "eval")]
-    layouts = {(r["task"], r["seed"]) for r in select(rows, model=cheap, condition=cheap_condition, quirk=True, phase="eval") if (r["task"], r["run_seed"]) in cl}
+    cr = [r for r in select(rows, model=cheap, condition=cheap_condition, quirk=True) if (r["task"], r["run_seed"]) in cl and (r["phase"] == "practice" or (r["phase"] == "eval" and (r["task"], r["seed"]) in set(g["layouts"])))]
+    layouts = set(g["layouts"])                                                    # the matched layouts of the whole clusters in the gap, nothing else
     fr = [r for r in select(rows, model=frontier, condition="none", quirk=True, phase="eval") if (r["task"], r["seed"]) in layouts]
     ab = abandoned or {}
     ab_cheap = sum(v for (m, tools, t, c, q, s), v in ab.items() if m == cheap and tools == "skills" and c == cheap_condition and q and (t, s) in cl)
     tasks = {t for t, _ in cl}
     ab_front = sum(v for (m, tools, t, c, q, s), v in ab.items() if m == frontier and tools == "skills" and c == "none" and q and t in tasks)
-    ev = sum(r["cost_usd"] for r in cr if r["phase"] == "eval")
+    ev = sum(r["cost_usd"] for r in cr if r["phase"] == "eval" and (r["task"], r["seed"]) in layouts)
     return {"cheap_eval_only_usd": ev, "cheap_practice_usd": sum(r["cost_usd"] for r in cr if r["phase"] == "practice"), "cheap_abandoned_usd": ab_cheap,
             "cheap_total_usd": sum(r["cost_usd"] for r in cr) + ab_cheap, "frontier_usd": sum(r["cost_usd"] for r in fr) + ab_front, "frontier_abandoned_usd": ab_front,
             "n_frontier_episodes": len(fr), "n_cheap_eval_episodes": len(layouts)}
@@ -370,6 +374,12 @@ def conditional_recovery(rows, model: str, a: str, b: str, n_boot: int = 10_000,
     vals = np.array(vals)
     vals = vals[~np.isnan(vals)]
     lo, hi = (np.percentile(vals, [100 * alpha / 2, 100 * (1 - alpha / 2)]) if len(vals) else (float("nan"), float("nan")))
+    if len(vals):                                         # a ratio of sums has no closed-form t interval: widen the percentile interval by t(df) / z, df = clusters - tasks (PROTOCOL.md section 1)
+        from scipy.stats import norm, t as _t
+        df = len(clusters_keys) - len(groups)
+        if df >= 1:
+            f = max(1.0, float(_t.ppf(1 - alpha / 2, df) / norm.ppf(1 - alpha / 2)))
+            lo, hi = est - f * (est - lo), est + f * (hi - est)
     ta, tb = arr[:, :2].sum(0), arr[:, 2:].sum(0)
     return {"n_pairs": len(clusters_keys), "a": float(ta[0] / ta[1]) if ta[1] else float("nan"), "b": float(tb[0] / tb[1]) if tb[1] else float("nan"), "diff": est,
             "lo": float(lo), "hi": float(hi), "alpha": alpha, "n_clean_wins_a": int(ta[1]), "n_clean_wins_b": int(tb[1])}

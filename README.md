@@ -37,7 +37,7 @@ The model gets eight tools, one call per turn, so each call sees the result of t
 - **`move_to`**, **`open_gripper`**, **`close_gripper`**, **`home`** are the basic moves.
 - **`done`** ends the episode. The simulator then decides whether the job was really finished. The model's own claim is recorded separately so we can count how often it says "done" when it is not.
 
-The model has 20 tool calls per episode, so wasting calls on discovering a catch costs it. There is also a **pose-level version** with no `pick` and `place`, where the model builds them from moves and the gripper. Comparing the two tells us whether good building blocks make learning from experience easier.
+The model has 20 tool calls per episode, so wasting calls on discovering a catch costs it. There is also a **pose-level version** with no `pick` and `place`, where the model builds them from moves and the gripper, with three times the call budget. Comparing the two is an exploratory look at whether good building blocks make learning from experience easier; because the budget and the planner's feedback differ too, it cannot isolate the abstraction alone.
 
 ## How we know the jobs are fair
 

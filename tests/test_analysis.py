@@ -238,3 +238,13 @@ def test_frontier_files_count_per_finished_layout(tmp_path):
     cfg = {"model": "big", "task": "stack", "condition": "none", "quirk": True, "toolset": "skills", "run_seed": 0, "plan": plan}
     (tmp_path / "a.jsonl").write_text("\n".join(json.dumps(x) for x in [{"_config": cfg}, ep(0), ep(1)]) + "\n")       # 2 of 3 layouts finished
     assert len(load(tmp_path, complete_only=True)) == 2
+
+
+def test_q3_leaves_out_clusters_that_are_only_partly_paired():
+    rows = _q3_rows(20)
+    rows = [r for r in rows if not (r["model"] == "big" and r["task"] == "stack" and r["seed"] == 3)]       # one frontier layout of one block is missing
+    g = q3_gap(rows, "big", "small", n_boot=100)
+    assert g["n_partial_clusters"] == 1 and g["n_layouts"] == 56 and g["n_clusters"] == 14
+    from robot_play.analysis import q3_cost
+    c = q3_cost(rows, "big", "small")
+    assert c["n_frontier_episodes"] == 56 and c["n_cheap_eval_episodes"] == 56
