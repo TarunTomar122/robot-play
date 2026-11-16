@@ -261,6 +261,14 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
                     text = frontier_notebook(source_dir, source_model, t, s)
                     if text:
                         specs.append(RunSpec(m, t, "borrowed", s, True, practice=0, borrowed_notebook=text, **common))
+    elif cell in ("borrowed_1", "borrowed_3"):  # exploratory (v1.5): the same, but the notebook as the frontier model had it after only 1 (or 3) practice episodes: how short can the expensive practice be?
+        after = int(cell[-1])
+        for m in models:
+            for t in tasks:
+                for s in run_seeds:
+                    text = frontier_notebook(source_dir, source_model, t, s, after=after)
+                    if text:
+                        specs.append(RunSpec(m, t, cell, s, True, practice=0, borrowed_notebook=text, **common))
     elif cell == "borrowed_other":              # the control for "borrowed": the notebook of a DIFFERENT task (stack reads the sort notebook, sort the flask one, flasks the stack one)
         shift = {"stack": "bins", "bins": "flasks", "flasks": "stack"}
         for m in models:
@@ -274,10 +282,13 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
     return specs
 
 
-def frontier_notebook(source_dir: str, source_model: str, task: str, run_seed: int) -> str:
-    """The notebook a finished frontier-with-notebook run ended with ("" if that run is missing or unfinished)."""
+def frontier_notebook(source_dir: str, source_model: str, task: str, run_seed: int, after: int | None = None) -> str:
+    """The notebook a finished frontier-with-notebook run ended with ("" if that run is missing or unfinished). With `after`, the notebook as it stood after that many practice
+    episodes (the rows record the memory after each episode), still only for runs that finished, so every borrowed arm reads from the same set of runs."""
     spec = RunSpec(source_model, task, "notebook", run_seed, True, out_dir=source_dir)
     cfg, rows, _ = _read(spec.path)
     if not cfg or len(rows) < len(cfg["plan"]):
         return ""
+    if after is not None:
+        return (rows[after - 1].get("memory") or {}).get("notebook", "") if 1 <= after <= len(rows) and rows[after - 1].get("phase") == "practice" else ""
     return (rows[-1].get("memory") or {}).get("notebook", "")

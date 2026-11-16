@@ -57,3 +57,16 @@ def test_the_wrong_task_control_reads_another_tasks_notebook_and_says_so(tmp_pat
     block = Memory("borrowed_other", notebook="x").prompt_block()
     assert "DIFFERENT task" in block and "this same task" not in block and "written by you" not in block
     assert len({s.key for s in specs.values()} | {s.key for s in build_specs("borrowed", ["claude-haiku-5-5"], [0], "o", source_dir=str(tmp_path))}) == 6      # separate files from the matching cell
+
+
+def test_early_notebook_cells_take_the_notebook_as_it_stood_after_one_or_three_practice_episodes(tmp_path):
+    spec = RunSpec(FRONT, "stack", "notebook", 0, True, out_dir=str(tmp_path))
+    plan = spec.episodes()
+    rows = [{"phase": p["phase"], "idx": p["idx"], "memory": {"notebook": f"after {i + 1}", "replay": ""}} for i, p in enumerate(plan)]
+    spec.path.write_text(json.dumps({"_config": {"plan": plan}}) + "\n" + "".join(json.dumps(r) + "\n" for r in rows))
+    assert frontier_notebook(str(tmp_path), FRONT, "stack", 0, after=1) == "after 1" and frontier_notebook(str(tmp_path), FRONT, "stack", 0, after=3) == "after 3"
+    assert frontier_notebook(str(tmp_path), FRONT, "stack", 0, after=len(plan)) == ""                  # an evaluation row is not a practice notebook
+    specs = build_specs("borrowed_3", ["claude-haiku-5-5"], [0], "o", source_dir=str(tmp_path))
+    assert len(specs) == 1 and specs[0].condition == "borrowed_3" and specs[0].practice == 0 and specs[0].config()["borrowed_notebook"] == "after 3"
+    from robot_play.agent import Memory
+    assert "more capable assistant" in Memory("borrowed_1", notebook="x").prompt_block() and "DIFFERENT" not in Memory("borrowed_3", notebook="x").prompt_block()
