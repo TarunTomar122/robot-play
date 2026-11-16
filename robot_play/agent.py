@@ -86,6 +86,9 @@ class Memory:
         if self.condition == "notebook" and self.notebook:
             return ("\n\nYOUR NOTEBOOK, written by you after earlier attempts at this same task (object positions change between attempts, "
                     "and the notes may be incomplete or wrong):\n" + self.notebook)
+        if self.condition == "borrowed" and self.notebook:        # a frozen notebook written by a stronger model on the same task (exploratory cell, PROTOCOL.md section 10, v1.4)
+            return ("\n\nA NOTEBOOK written by a more capable assistant after it practised this same task (object positions change between attempts, "
+                    "and the notes may be incomplete or wrong):\n" + self.notebook)
         if self.condition == "replay" and self.replay:
             return ("\n\nA PREVIOUS ATTEMPT AT THIS SAME TASK THAT SUCCEEDED (object positions were different; tool calls and what came back):\n" + self.replay)
         return ""
