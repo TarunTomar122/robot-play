@@ -122,6 +122,8 @@ class PandaWorld:
         robot_root = m.body("link0").id
         self.robot_bodies = {b for b in range(m.nbody) if self._is_descendant(b, robot_root)}
         self.time = 0.0
+        self._tick = 0
+        self.hooks: list = []                      # callables run every 50 ms of simulated time
         self.reset()
 
     def _is_descendant(self, b: int, root: int) -> bool:
@@ -170,14 +172,23 @@ class PandaWorld:
         return self.data.xquat[self.obj_ids[name]].copy()
 
     def obj_tilt_deg(self, name: str) -> float:
+        """Angle from upright. A cube is upright on any of its faces, so for boxes take the best-aligned axis;
+        a cylinder or flask only counts as upright on its flat base, so it uses its own vertical axis."""
         R = self.data.xmat[self.obj_ids[name]].reshape(3, 3)
-        return float(np.degrees(np.arccos(np.clip(R[2, 2], -1, 1))))
+        shape = next(o.shape for o in self.scene.objects if o.name == name)
+        c = float(np.max(np.abs(R[2, :]))) if shape == "box" else float(R[2, 2])
+        return float(np.degrees(np.arccos(np.clip(c, -1, 1))))
 
     # ---------------------------------------------------------------- stepping
     def step(self, n: int = 1):
+        dt = self.model.opt.timestep
         for _ in range(n):
             mujoco.mj_step(self.model, self.data)
-        self.time += n * self.model.opt.timestep
+            self.time += dt
+            self._tick += 1
+            if self.hooks and self._tick % 25 == 0:       # every 50 ms of simulated time (disturbances)
+                for hook in self.hooks:
+                    hook()
 
     def settle(self, seconds: float):
         self.step(int(seconds / self.model.opt.timestep))

@@ -25,14 +25,14 @@ Null results are reported. Every number in the README comes from `results/` and 
 
 - Robot: Franka Panda (MuJoCo Menagerie, pinned). The SO-101 is future work; it is not in this pilot.
 - MuJoCo is pinned to the installed `4.0.1`; Python deps are pinned by `uv.lock`. Physics timestep 2 ms.
-- Three tasks, each with one physical quirk that is **fixed across all seeds** (the poses and distractor
+- Three tasks (the third was `bottle` in the first draft and is now `flasks`, see the changelog), each with one physical quirk that is **fixed across all seeds** (the poses and distractor
   positions are resampled each episode, the quirk is not):
 
 | Task | Goal (success predicate computed from simulator state) | Quirk (physical) | Control environment (no quirk) |
 |---|---|---|---|
-| `stack` | cubes red, green, blue stacked in that order, each within 12 mm of the stack axis and stable for 1 s | The green cube is heavy (0.9 kg) with lower friction: it slips out of the gripper when moved fast | Green cube 0.05 kg, normal friction |
-| `bins` | every cube in the bin that matches its colour, resting on the bin floor | The bins have 9 cm walls. The hand cannot descend deeper than the rim, so the object must be dropped from a height; a low release makes the planner report a collision | 1 cm walls |
-| `bottle` | the tall bottle is upright (< 10 deg tilt) inside the target ring | Its centre of mass is low (4 cm above the base, height 16 cm) with a slick body: a high pinch lets it swing out of the grip | Centre of mass at mid-height, normal friction |
+| `stack` | cubes red, green, blue stacked in that order, each within 12 mm of the stack axis, stable for 1 s | The green cube weighs 250 g (the others 50 g) and has lower friction (0.5 against 0.9). A `normal` squeeze cannot hold it; `firm` can, and `slow` keeps it from tilting on release | Green cube 50 g, friction 0.9 |
+| `bins` | every cube in the bin that matches its colour, resting on the bin floor | The bins have 12 cm walls. The planner reports `arm/hand would touch bin_*_wall*` unless the cube is released from about 12 cm up or higher | 1.5 cm walls |
+| `flasks` | both flasks upright (< 10 deg tilt) within 3 cm of their rings, standing on the floor | Each flask has a 10 cm wide, 7 cm tall base under a 4 cm wide neck. The hand opens 8 cm, so fingers land on the base and the descent stops short. Grabbing the neck (`grasp_height` about 0.9) works | Plain cylinder of the same height (5 cm wide) |
 
 - The collision model used by the planner is **identical** in quirk and control scenes: the skill layer never
   routes around a quirk for the agent.
@@ -110,7 +110,7 @@ followed by **4 held-out evaluation episodes with the memory frozen**.
 ## 8. Disturbances (Q4)
 
 Applied by physics, not by editing state: (a) *slip*: the gripper is commanded open for 0.15 s after the object
-has been lifted 3 cm; (b) *nudge*: a 0.3 s lateral force on a not-yet-grasped object. Timing is fixed relative
+has been lifted 3 cm; (b) *nudge*: a 0.3 s horizontal force of 1.1 times the object's weight, pointing within 45 degrees of the x axis (from the front or back, because a sideways shove is caught by the open fingers), applied the first time the open hand descends next to an object that is not yet grasped. Timing is fixed relative
 to events (first lift / first approach), the same for experienced and fresh agents, and the denominator is all
 episodes in which the disturbance fired. "Tool failure" and "instruction change" are text injections, so
 they are reported separately and are not part of the pilot.
@@ -135,3 +135,17 @@ parameters, so the agent must learn which parameters matter; (ii) physical quirk
 dose-response sweeps and no-quirk controls; (iii) learning curves over many episodes with frozen-memory
 held-out evaluation and cluster-bootstrap intervals; (iv) disturbance recovery as a function of experience;
 (v) a cost-matched cheap-vs-frontier comparison with a pre-stated equivalence margin.
+
+
+## 10. Changelog (all made before any paid run; none of them used model results)
+
+**v1.1, 16 Nov 2026, after building the environment and playing each task by hand through the tool interface.**
+
+- `bottle` (top-heavy, pinch-height quirk) was replaced by `flasks` (wide base, neck grasp). Reason: with a top-down hand the palm sits 4 cm above the fingertips, so a low pinch on a tall object is physically impossible, and my first top-heavy bottle did not flop even when pinched below its centre of mass because the finger pads resist twisting. The flask quirk is pure geometry and validates cleanly.
+- The stack quirk changed from 0.9 kg to 250 g. Reason: the simulated gripper's firm squeeze holds about 300 g; 0.9 kg could not be held by any setting. The gripper's force was also scaled 5 times (the stock model squeezes with about 2 N) so that `light`, `normal` and `firm` are three different forces.
+- Contact physics was made stricter (elliptic friction cone, `impratio` 10, finger-pad twisting friction) because held objects crept and pivoted in the pads. Motion uses one smooth profile per move. `place` aims the object, not the hand, and nudges the object into place before releasing.
+- `tilt` for a cube counts any face-up orientation as upright, because a cube turned over is still a valid tower piece. Flasks use their own vertical axis.
+- The nudge force and direction were tuned on seeds 2000-2029 so that the disturbance gate passes (section 7 check list below). No tuning used any model run.
+- Pending, to be decided on practice seeds before the main run and recorded here: the per-task tool call budget (currently 20).
+
+Validation evidence: `results/gate.md` (100 layouts per cell), `results/dose_response.json`, `results/disturbance.md`, `tests/` (pytest), and hand-played transcripts in `docs/TASKS.md`.

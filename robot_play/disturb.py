@@ -26,9 +26,9 @@ class Disturbance:
         self._rise0: float | None = None
 
     def attach(self, env):
-        env.skills.mv.hooks.append(lambda: self.step(env))
+        env.w.hooks.append(lambda: self.step(env))
 
-    # called every 50 ms of simulated time while the arm moves
+    # called by the world every 50 ms of simulated time, whatever the arm is doing
     def step(self, env):
         w, mv = env.w, env.skills.mv
         if self.kind == "slip":
@@ -60,7 +60,8 @@ class Disturbance:
                 p = w.obj_pos(o.name)
                 top = p[2] + (o.size[2] if o.shape == "box" else o.size[1])
                 if np.linalg.norm(tcp[:2] - p[:2]) < 0.03 and tcp[2] < top + 0.06:
-                    ang = self.rng.uniform(0, 2 * np.pi)
+                    # shoved from the front or the back (within 45 degrees of the x axis): sideways pushes would be caught by the open fingers
+                    ang = self.rng.choice([0.0, np.pi]) + self.rng.uniform(-np.pi / 4, np.pi / 4)
                     mass = float(w.model.body_mass[w.obj_ids[o.name]])
                     f = NUDGE_FORCE_G * mass * 9.81 * np.array([np.cos(ang), np.sin(ang), 0.0])
                     bid = w.obj_ids[o.name]
