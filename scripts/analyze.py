@@ -98,6 +98,7 @@ def main():
     ap.add_argument("--frontier", nargs="*", default=["runs/frontier", "runs/frontier_exp"])
     ap.add_argument("--pose", nargs="*", default=["runs/pose"])
     ap.add_argument("--borrowed", nargs="*", default=["runs/borrowed"])
+    ap.add_argument("--ext", nargs="*", default=["runs/main_ext"], help="exploratory room-cell extension (Haiku, stack and bins, run seeds 10-19); never enters a confirmatory number")
     ap.add_argument("--meter", default="runs/spend")
     ap.add_argument("--out", default="results/RESULTS.md")
     ap.add_argument("--img", default="docs/img")
@@ -106,6 +107,8 @@ def main():
     dirs = ex(a.main + a.control + a.frontier + a.pose + a.borrowed)
     rows = A.load(*dirs, complete_only=True)                          # confirmatory numbers use runs that finished their whole plan
     cov = A.coverage(*dirs)
+    ext_rows = A.load(*ex(a.ext), complete_only=True) if ex(a.ext) else []
+    ext_cov = A.coverage(*ex(a.ext)) if ex(a.ext) else []
     abandoned = {}
     for c in cov:
         k = (c["model"], c["toolset"], c["task"], c["condition"], c["quirk"], c["run_seed"])
@@ -266,6 +269,22 @@ def main():
         L += [f"**{scene}**", "", table(["model", "memory", "disturbed episodes", "disturbance fired", "success, all assigned", "success when it fired", "same layouts, no disturbance"], q4) if q4 else "No disturbance runs yet.", ""]
         L += ["Drop in success caused by the disturbance (clean minus disturbed, same layouts, all assigned episodes). A negative difference means the notebook agent loses less:", "",
               table(["model", "drop with notebook", "drop starting fresh", "difference (all assigned" + (", primary)" if primary else ")"), "difference (fired for both, sensitivity)", "clean wins that survived (notebook against fresh)"], rd) if rd else "No complete disturbed runs yet.", ""]
+
+    # --- exploratory extension: the cells with room at 20 run seeds
+    if ext_rows:
+        L += ["## 5a. Exploratory: the cells with room, Haiku on `stack` and `bins`, at 20 run seeds", "",
+              "Registered before it ran (PROTOCOL.md section 10, v1.4): the pilots showed Haiku on these two jobs was the only cheap-model cell clearly below ceiling, so the `main` cell was repeated for run seeds 10 to 19. Plain 95% intervals; none of this enters a confirmatory number, which uses run seeds 0 to 9 only. "
+              f"Runs complete: {sum(c['complete'] for c in ext_cov)} of {len(ext_cov)} started (60 planned).", ""]
+        pooled = [r for r in rows if r["model"] == "claude-haiku-5-5" and r["task"] in ("stack", "bins") and r.get("toolset") in (None, "skills")] + ext_rows
+        extr = []
+        for task in ("stack", "bins", None):
+            for cond in ("notebook", "replay"):
+                tl = [task] if task else ["stack", "bins"]
+                for label, rs in (("run seeds 10-19", ext_rows), ("run seeds 0-19, pooled", pooled)):
+                    d = A.paired_difference(rs, "claude-haiku-5-5", cond, "none", tasks=tl)
+                    if d.get("n_pairs"):
+                        extr.append((task or "both jobs", NAMES[cond], label, d["n_pairs"], f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
+        L += [table(["job", "memory", "runs", "pairs", "with memory", "starts fresh", "difference"], extr) if extr else "No complete pairs yet.", ""]
 
     # --- Q5: a stronger model's notebook (exploratory)
     bor = [r for r in skills if r["condition"] == "borrowed"]
