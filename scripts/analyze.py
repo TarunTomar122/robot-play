@@ -297,12 +297,14 @@ def main():
               "Each cheap model reads, frozen and with no practice of its own, the notebook that the Fable-with-notebook run of the same task and run seed ended with, and plays the same four held-out layouts (run seeds 0 to 4). Exploratory, 95% intervals, three jobs times five run seeds. "
               "The borrowed notebook costs the frontier model's own 12 practice episodes and rewrites, which is shown separately. The control `reads Fable's notebook for another job` gives each job the notebook written for a different job (labelled as such), to tell the content of the notebook from the mere presence of one.", ""]
         q5 = []
+        halves = (("run seeds 0-4", [r for r in skills if r["run_seed"] <= 4]), ("run seeds 5-9 (replication)", [r for r in skills if r["run_seed"] >= 5]), ("run seeds 0-9, pooled", skills))
         for m in cheap:
             for first, other in (("borrowed", "none"), ("borrowed", "notebook"), ("borrowed", "borrowed_other"), ("borrowed_other", "none")):
-                d = A.paired_difference(skills, m, first, other)
-                if d.get("n_pairs"):
-                    q5.append((m, f"{NAMES[first]} against {NAMES[other]}", d["n_pairs"], f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
-        L += [table(["model", "comparison", "runs (task, run seed)", "first", "second", "difference"], q5) if q5 else "No complete comparison yet.", ""]
+                for label, rs in halves:
+                    d = A.paired_difference(rs, m, first, other)
+                    if d.get("n_pairs"):
+                        q5.append((m, f"{NAMES[first]} against {NAMES[other]}", label, d["n_pairs"], f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
+        L += [table(["model", "comparison", "runs", "pairs (task, run seed)", "first", "second", "difference"], q5) if q5 else "No complete comparison yet.", ""]
         keys5 = {(r["task"], r["run_seed"]) for r in bor if r["condition"] == "borrowed"}
         ct = []
         for m in cheap:

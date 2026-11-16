@@ -248,3 +248,32 @@ def test_q3_leaves_out_clusters_that_are_only_partly_paired():
     from robot_play.analysis import q3_cost
     c = q3_cost(rows, "big", "small")
     assert c["n_frontier_episodes"] == 56 and c["n_cheap_eval_episodes"] == 56
+
+
+def test_sampling_noise_floor_keeps_a_degenerate_interval_open():
+    rows = []
+    for task in ("stack", "bins", "flasks"):
+        for rs in range(6):
+            for j in range(4):
+                rows.append(row("m", task, "notebook", rs, "eval", j, 1))                 # every episode with a notebook succeeds
+                rows.append(row("m", task, "none", rs, "eval", j, 0 if task == "stack" else 1))   # stack always fails without; the other two always succeed
+    d = paired_difference(rows, "m", "notebook", "none", n_boot=500, alpha=0.025)
+    assert abs(d["diff"] - 1 / 3) < 1e-9 and d["hi"] - d["lo"] > 0.10                     # a plain bootstrap or t interval would have zero width here
+    all_same = [row("m", t, c, rs, "eval", j, 1) for t in ("stack", "bins") for rs in range(5) for j in range(4) for c in ("notebook", "none")]
+    e = paired_difference(all_same, "m", "notebook", "none", n_boot=300)
+    assert e["diff"] == 0 and e["hi"] > 0.02 and e["lo"] < -0.02                          # both arms perfect: the width is the floor, a few points at 40 episodes
+
+
+def test_recovery_drop_floor_is_open_when_every_layout_behaves_the_same():
+    from robot_play.analysis import recovery_drop_difference
+    rows = []
+    for rs in range(6):
+        for task in ("stack", "bins"):
+            for j in range(4):
+                for cond, dist_ok in (("notebook", 1), ("none", 0)):
+                    clean = row("m", task, cond, rs, "eval", j, 1, seed=100 * rs + j)
+                    dist = row("m", task, cond, rs, "eval_disturbed", j, dist_ok, seed=100 * rs + j)
+                    clean["quirk"] = dist["quirk"] = False
+                    rows += [clean, dist]
+    d = recovery_drop_difference(rows, "m", "notebook", "none", n_boot=300)
+    assert d["diff"] == -1.0 and d["hi"] - d["lo"] > 0.15

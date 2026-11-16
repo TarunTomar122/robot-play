@@ -110,6 +110,19 @@ def _pooled_ss(clusters, strata=None) -> tuple[float, int, int]:
     return ss, len(means) - groups, len(means)
 
 
+def _floor_half(arms, alpha: float) -> float:
+    """Half-width of a sampling-noise floor for a difference of proportions. `arms` lists (successes, episodes) for every proportion in the difference, treated as
+    independent binomials (design effect 1: the floor is only meant to bind where a bootstrap and a t interval over run means collapse, which happens when the runs of a
+    task all behave the same, and there the data show no clustering). Each proportion gets one pseudo-success and one pseudo-failure (Agresti and Caffo), so the
+    width never collapses to zero when every episode of an arm succeeds or every one fails (PROTOCOL.md section 1)."""
+    from scipy.stats import norm
+    v = 0.0
+    for succ, n in arms:
+        p = (succ + 1) / (n + 2)
+        v += p * (1 - p) / (n + 2)
+    return float(norm.ppf(1 - alpha / 2) * np.sqrt(v))
+
+
 def _run_means(rows, metric: str) -> dict:
     """Mean of `metric` over each run's episodes, keyed by (task, run_seed)."""
     out: dict = {}
@@ -122,12 +135,15 @@ def paired_difference(rows, model: str, a: str, b: str, metric: str = "success",
                       tasks: list[str] | None = None, n_boot: int = 10_000, only_fired: bool = False, alpha: float = 0.05) -> dict:
     """Condition `a` minus condition `b` for one model on the held-out episodes, paired by (task, run seed), cluster bootstrap over those pairs.
     With only_fired the denominator is the episodes in which the disturbance actually happened."""
+    raw = {}
+
     def pick(cond):
         rs = select(rows, model=model, condition=cond, phase=phase, quirk=quirk)
         if tasks:
             rs = [r for r in rs if r["task"] in tasks]
         if only_fired:
             rs = [r for r in rs if r["fired"]]
+        raw[cond] = rs
         return _run_means(rs, metric)
     ma, mb = pick(a), pick(b)
     keys = sorted(set(ma) & set(mb))
@@ -135,6 +151,14 @@ def paired_difference(rows, model: str, a: str, b: str, metric: str = "success",
     if not diffs:
         return {"n_pairs": 0}
     est, lo, hi = bootstrap(diffs, np.mean, n_boot, alpha=alpha, strata=[k[0] for k in keys])
+    if metric == "success":                                    # never narrower than the sampling-noise floor of the episodes behind the two proportions
+        ks = set(keys)
+        arms = []
+        for cond in (a, b):
+            x = [r for r in raw[cond] if (r["task"], r["run_seed"]) in ks]
+            arms.append((sum(r["success"] for r in x), len(x)))
+        half = _floor_half(arms, alpha)
+        lo, hi = min(lo, est - half), max(hi, est + half)
     return {"n_pairs": len(keys), "a": float(np.mean([ma[k] for k in keys])), "b": float(np.mean([mb[k] for k in keys])), "diff": est, "lo": lo, "hi": hi, "alpha": alpha}
 
 
@@ -346,6 +370,10 @@ def recovery_drop_difference(rows, model: str, a: str, b: str, n_boot: int = 10_
         by_cluster.setdefault((k[0], k[1]), []).append((la[k][0], lb[k][0]))
     clusters = [np.array([x[0] - x[1] for x in v], dtype=float) for v in by_cluster.values()]
     est, lo, hi = bootstrap(clusters, np.mean, n_boot, alpha=alpha, strata=[k[0] for k in by_cluster])
+    n = len(keys)                                              # the difference of two drops is four proportions: clean and disturbed success of each condition on the same layouts
+    arms = [(sum(la[k][2] for k in keys), n), (sum(la[k][3] for k in keys), n), (sum(lb[k][2] for k in keys), n), (sum(lb[k][3] for k in keys), n)]
+    half = _floor_half(arms, alpha)
+    lo, hi = min(lo, est - half), max(hi, est + half)
     return {"n_pairs": len(clusters), "n_layouts": len(keys), "drop_a": float(np.mean([la[k][0] for k in keys])), "drop_b": float(np.mean([lb[k][0] for k in keys])),
             "diff": est, "lo": lo, "hi": hi, "alpha": alpha}
 
