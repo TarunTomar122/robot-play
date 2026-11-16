@@ -1,5 +1,7 @@
 """Chart for the exploratory Q5 cells: held-out success of a cheap model with no memory, with its own notebook, with Fable's notebook for the same job, and with Fable's notebook for another job.
-Same runs (task, run seed) in every bar: only run seeds for which the borrowed cell exists are used. Error bars: 95% cluster bootstrap over runs (a task and run seed), resampling inside each task.
+Same runs (task, run seed) in every bar of a model: only runs that have a complete no-memory, own-notebook, borrowed and wrong-task arm are used (so the wrong-task bar of sort and flasks may have fewer runs than the cluster
+bootstrap suggests: the run seed whose Fable notebook does not exist is missing from every arm). Error bars: 95%, the wider of the cluster bootstrap over runs (resampling inside each task, 10,000 resamples) and a binomial
+sampling-noise floor (so a bar at 100% still shows the uncertainty of the 36 to 40 episodes behind it). The chart shows a pooled bar and per-job bars; most of the pooled effect is one job.
   python scripts/make_q5_chart.py --out docs/img/q5_borrowed.png"""
 import argparse
 import sys
@@ -42,7 +44,10 @@ def main():
         return
     fig, axes = plt.subplots(1, len(models), figsize=(6.8 * len(models), 4.4), facecolor=SURFACE, squeeze=False, sharey=True)
     for ax, m in zip(axes[0], models):
-        keys = set(run_success(rows, m, "borrowed"))
+        keys = None
+        for cond, _, _ in COND:
+            kc = set(run_success(rows, m, cond))
+            keys = kc if keys is None else keys & kc
         w = 0.19
         for ci, (cond, label, color) in enumerate(COND):
             for gi, (task, _) in enumerate(JOBS):
@@ -50,7 +55,11 @@ def main():
                 if not by:
                     continue
                 clusters = [np.array(v, dtype=float) for v in by.values()]
-                est, lo, hi = A.bootstrap(clusters, np.mean, 5000, strata=[k[0] for k in by])
+                est, lo, hi = A.bootstrap(clusters, np.mean, 10_000, strata=[k[0] for k in by])
+                n_ep = int(sum(len(c) for c in clusters))
+                half = A._floor_half([(int(sum(c.sum() for c in clusters)), n_ep)], 0.05)
+                lo, hi = (min(lo, est - half), max(hi, est + half)) if lo == lo else (est - half, est + half)
+                lo, hi = max(0.0, lo), min(1.0, hi)
                 x = gi + (ci - 1.5) * w
                 ax.bar(x, 100 * est, w * 0.92, color=color, label=label if gi == 0 else None, zorder=2)
                 if lo == lo:
@@ -68,7 +77,7 @@ def main():
         ax.tick_params(length=0, colors=MUTED)
         ax.set_title(m, loc="left", fontsize=11, color=INK)
         n = len(keys)
-        ax.text(0.0, -0.16, f"{n} runs (task and run seed) per bar, 4 held-out layouts each", transform=ax.transAxes, fontsize=8, color=MUTED)
+        ax.text(0.0, -0.16, f"{n} runs (task and run seed) behind the pooled bar, the same runs split by job in the others; 4 held-out layouts per run", transform=ax.transAxes, fontsize=8, color=MUTED)
     axes[0][0].set_ylabel("held-out layouts solved (%)", color=INK)
     axes[0][0].legend(frameon=False, fontsize=8, loc="lower left", bbox_to_anchor=(0, 1.16), ncol=2)
     fig.suptitle("Can a cheap model use a stronger model's notes? (exploratory)", x=0.01, y=1.02, ha="left", fontsize=13, fontweight="bold", color=INK)
