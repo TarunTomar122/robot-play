@@ -303,6 +303,15 @@ def main():
                 if d.get("n_pairs"):
                     q5.append((m, f"{NAMES[first]} against {NAMES[other]}", d["n_pairs"], f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
         L += [table(["model", "comparison", "runs (task, run seed)", "first", "second", "difference"], q5) if q5 else "No complete comparison yet.", ""]
+        keys5 = {(r["task"], r["run_seed"]) for r in bor if r["condition"] == "borrowed"}
+        ct = []
+        for m in cheap:
+            for c in ("none", "notebook", "borrowed", "borrowed_other"):
+                x = [r for r in A.select(skills, model=m, condition=c, phase="eval", quirk=True) if (r["task"], r["run_seed"]) in keys5]
+                if x:
+                    ct.append((m, NAMES[c], len(x), f(mean(x, "success"), True), f"{mean(x, 'calls'):.1f}", f"{mean(x, 'calls_to_success'):.1f}", f"${mean(x, 'cost_usd'):.4f}"))
+        if ct:
+            L += ["Held-out episodes on exactly the runs the borrowed cell has (same layouts in every row):", "", table(["model", "memory", "episodes", "success", "mean calls", "calls to success (a failure is charged the budget)", "dollars per episode"], ct), ""]
         gaps = []
         for fr in [m for m in models if m in ("claude-fable-5-2", "gpt-6-astra")]:
             for ch in cheap:
