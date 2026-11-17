@@ -2,6 +2,8 @@
 
 **Can an AI that only gives orders to a robot arm get better at a job just by practising it?**
 
+Prefer to read it in small steps? There is a [progressive report](https://tarunTomar122.github.io/robot-play/) of this study: sections that open one at a time, short explanations behind the underlined terms, and charts. The numbers on it come from [results/RESULTS.md](results/RESULTS.md), which wins if the two ever differ.
+
 Picture a new worker in a workshop. On day one they do not know that one drill sticks, or that one shelf is too tall for the short ladder. They find out by trying, they write a note, and by day ten they are faster and make fewer mistakes. Nobody retrained them. They just remembered.
 
 This project asks whether a language model can do the same thing with a simulated robot arm. The model never touches the arm's motors. It calls simple tools such as `pick` and `place`, and ordinary robotics code (inverse kinematics and collision-free motion planning) does the careful movement behind them. Each job hides one small physical "catch". We watch whether the model finds the catch, writes it down, and uses it next time.
