@@ -306,6 +306,13 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
             for t in tasks:
                 for c, text in arms.items():
                     specs += [RunSpec(m, t, c, s, True, practice=0, borrowed_notebook=text, **common) for s in run_seeds]
+    elif cell == "budget":                      # exploratory (v1.14): run with a stated call budget (--max-calls 12): no memory, the reminder, and the model's own notebook after 1 and after 12 practice episodes
+        for m in models:
+            for t in tasks:
+                for s in run_seeds:
+                    specs.append(RunSpec(m, t, "none", s, True, practice=0, **common))
+                    specs.append(RunSpec(m, t, "lm_names", s, True, practice=0, borrowed_notebook=SPLIT_TEXTS["lm_names"], **common))
+                    specs += [RunSpec(m, t, "notebook", s, True, practice=k, **common) for k in (1, 12)]
     elif cell == "dose":                        # exploratory (v1.12): the model's own notebook after 1, 3, 6 (and, on run seeds 30 to 39, 12) practice episodes, held-out layouts of the usual four per run seed
         for m in models:
             for t in tasks:
