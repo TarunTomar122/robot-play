@@ -10,3 +10,9 @@ Held-out `stack` episodes of Claude Haiku 5.5 on the corrected simulator (run se
 | Fable's notebook, no practice | 40 | 26 | 27 | 21 | 2 | 1 | 11 | 4 |
 | Sonnet's notebook, no practice | 40 | 40 | 36 | 36 | 4 | 4 | 0 | 0 |
 | own notebook | 40 | 40 | 28 | 28 | 12 | 12 | 0 | 0 |
+| neutral label: inert sentence | 40 | 16 | 15 | 12 | 10 | 4 | 15 | 0 |
+| neutral label: generic sentence | 40 | 37 | 36 | 36 | 2 | 1 | 2 | 0 |
+| neutral label: naming sentence | 40 | 40 | 40 | 40 | 0 | 0 | 0 | 0 |
+| neutral label: frame only | 40 | 20 | 26 | 19 | 1 | 1 | 13 | 0 |
+| neutral label: frame + the four names | 40 | 37 | 35 | 35 | 2 | 1 | 3 | 1 |
+| neutral label: frame + the instruction | 40 | 28 | 27 | 26 | 3 | 2 | 10 | 0 |

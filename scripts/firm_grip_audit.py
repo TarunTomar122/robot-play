@@ -13,7 +13,9 @@ from pathlib import Path
 root = Path(sys.argv[1] if len(sys.argv) > 1 else "runs")
 H = "claude-haiku-5-5"
 ARMS = [("starts fresh", "rep_fixed", "none"), ("generic hint", "hint_generic", "hint_generic"), ("hint naming the fix", "hint", "hint"),
-        ("Fable's notebook, no practice", "prior", "prior"), ("Sonnet's notebook, no practice", "borrowed_sonnet", "borrowed"), ("own notebook", "rep_fixed", "notebook")]
+        ("Fable's notebook, no practice", "prior", "prior"), ("Sonnet's notebook, no practice", "borrowed_sonnet", "borrowed"), ("own notebook", "rep_fixed", "notebook"),
+        ("neutral label: inert sentence", "labelmatch", "lm_inert"), ("neutral label: generic sentence", "labelmatch", "lm_generic"), ("neutral label: naming sentence", "labelmatch", "lm_specific"),
+        ("neutral label: frame only", "wordsplit", "lm_frame"), ("neutral label: frame + the four names", "wordsplit", "lm_names"), ("neutral label: frame + the instruction", "wordsplit", "lm_instr")]
 
 
 def episodes(folder, cond):

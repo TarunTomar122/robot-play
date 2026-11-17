@@ -101,7 +101,7 @@ Runs with practice or a borrowed notebook that did not finish their whole plan a
 
 Planned cells that did not start (exploratory cells included; the borrowed cells are planned only where the Fable notebook they read finished): none (every planned run file exists).
 
-Spend meter (pessimistic pricing): {"anthropic": {"spent": 72.506062, "reserved": 0.0, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 26.958573, "reserved": 0.0, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 0. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
+Spend meter (pessimistic pricing): {"anthropic": {"spent": 72.676911, "reserved": 0.0, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 26.958573, "reserved": 0.0, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 0. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
 
 ## 2. Q1: does experience raise held-out success?
 
@@ -785,6 +785,45 @@ Paired differences (task, run seed):
 | gpt-6-luna | flasks | reads the naming sentence under the neutral label against starts fresh | 10 | 100% | 82% | +17.5 pp (95% CI +4.8 to +30.2) |
 | gpt-6-luna | flasks | reads the generic sentence under the neutral label against reads a generic tip (lists the four adjustable settings, names no fix) | 10 | 92% | 88% | +5.0 pp (95% CI -11.4 to +21.4) |
 | gpt-6-luna | flasks | reads the naming sentence under the neutral label against reads a one-sentence hint naming the fix | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+
+## 6g. Exploratory: which part of the generic sentence does the work? (the sentence taken apart)
+
+Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.10). The generic sentence is a **frame** ("Defaults do not suit every object or surface."), an **instruction** (when a call fails or is refused, change the settings one at a time instead of repeating the call) and the **names** of the four settings. Claude Haiku 5.5, `stack` only, no practice, the neutral label of section 6f, run seeds 20 to 29 (the same layouts as every other arm of this model, so each arm pairs). The three new arms keep the frame and add the names, the instruction, or neither. Run files started 30, complete 30 (planned 30). Plain 95% intervals, ten pairs per comparison, so wide.
+
+**Predictions of PROTOCOL.md v1.10, scored by the generator first** (pending until every pair exists; below 8 of the 10 planned pairs per arm inconclusive once the cell has finished). Written after the v1.9 results were known, so not blind. The registered reading: W1 and W2 met, the instruction carries the effect and the names do not; W1 missed and W2 met, neither part alone is enough; W1 met and W2 missed, either part suffices; both missed, both parts are needed and each does more than the frame; W3 missed, the frame does part of the work and the split cannot be read cleanly. No reading is claimed for differences under 20 points.
+
+| prediction | result | status |
+|---|---|---|
+| W1: Haiku `stack` with the frame and the instruction (no names) solves at least 75% | frame + instruction 70% | MISSED |
+| W2: Haiku `stack` with the frame and the four names (no instruction) solves at most 65% | frame + names 92% | MISSED |
+| W3: Haiku `stack` with the frame only solves at most 65% | frame only 50% | met |
+
+Registered reading of the outcome (the wording of PROTOCOL.md v1.10): the effect needs both parts, and each part alone does more than the frame.
+
+**What the numbers show (written after seeing them, not registered).** With the frame, the four names alone reached 92% (over fresh: +42.5 pp (95% CI +20.1 to +64.9)), the same as the full generic sentence (generic minus frame + names: +0.0 pp (95% CI -12.6 to +12.6)). The instruction alone reached 70% (over fresh: +20.0 pp (95% CI -10.2 to +50.2)). Names minus instruction: +22.5 pp (95% CI +4.7 to +40.3) (not a registered comparison). So in these runs the list of names is what carries the effect, and the instruction adds little on top of it; the registered reading's phrase for the case where both predictions are missed ("the effect needs both parts") does not describe this outcome and is not used.
+
+Validation of the included files: 30 run files, every one with code hash `0346eddace878d63` and a run seed from 20 to 29: yes.
+
+Held-out success on `stack` (and calls to success) on the 10 runs every arm has:
+
+|  | no memory | inert sentence | frame only | frame + names | frame + instruction | frame + instruction + names (the generic sentence) |
+|---|---|---|---|---|---|---|
+| Haiku | 50% (16.4 calls) | 40% (18.3 calls) | 50% (14.7 calls) | 92% (9.0 calls) | 70% (13.3 calls) | 92% (8.4 calls) |
+
+Paired differences (run seed):
+
+| comparison | pairs | first | second | difference |
+|---|---|---|---|---|
+| reads the frame sentence only (neutral label) against starts fresh | 10 | 50% | 50% | +0.0 pp (95% CI -21.4 to +21.4) |
+| reads the frame and the four names (neutral label) against starts fresh | 10 | 92% | 50% | +42.5 pp (95% CI +20.1 to +64.9) |
+| reads the frame and the instruction to vary (neutral label) against starts fresh | 10 | 70% | 50% | +20.0 pp (95% CI -10.2 to +50.2) |
+| reads the generic sentence under the neutral label against starts fresh | 10 | 92% | 50% | +42.5 pp (95% CI +21.8 to +63.2) |
+| reads the frame and the four names (neutral label) against reads the frame sentence only (neutral label) | 10 | 92% | 50% | +42.5 pp (95% CI +25.0 to +60.0) |
+| reads the frame and the instruction to vary (neutral label) against reads the frame sentence only (neutral label) | 10 | 70% | 50% | +20.0 pp (95% CI -5.0 to +45.0) |
+| reads the generic sentence under the neutral label against reads the frame and the instruction to vary (neutral label) | 10 | 92% | 70% | +22.5 pp (95% CI +2.8 to +42.2) |
+| reads the generic sentence under the neutral label against reads the frame and the four names (neutral label) | 10 | 92% | 92% | +0.0 pp (95% CI -12.6 to +12.6) |
+| reads the frame sentence only (neutral label) against reads an inert sentence under the neutral label | 10 | 50% | 40% | +10.0 pp (95% CI -18.2 to +38.2) |
+| reads the frame and the four names (neutral label) against reads the frame and the instruction to vary (neutral label) | 10 | 92% | 70% | +22.5 pp (95% CI +4.7 to +40.3) |
 
 ## 7. Skill-level against pose-level tools
 

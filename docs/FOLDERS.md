@@ -7,3 +7,4 @@
 - `results/` the generated report (`RESULTS.md`), the audits, the gate tables, the deviations and the code-version table.
 - `data/` the raw run files (one archive) and the recipe that regenerates `results/RESULTS.md` from them.
 - `council/` the judges' rubric and their reviews.
+- `docs/other-findings.md`: the five results kept out of the README (frontier ceiling, calls, Fable's notebook, recovery, pose-level tools).
