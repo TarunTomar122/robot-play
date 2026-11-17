@@ -104,8 +104,10 @@ class Skills:
         self.w.settle(0.5)
         self._refresh_held()
         if not self.mv.held:                       # an object squeezed between both fingers is part of the hand from now on: the planner carries it and does not treat it as an obstacle
+            width = self.w.gripper_width()
             for o in self.w.scene.objects:
-                if self.w.fingers_touching(o.name) == 2:
+                narrow = 2 * min(o.size[0], o.size[1]) if o.shape == "box" else 2 * o.size[0]       # its narrowest horizontal extent: a cube's side, a flask's diameter
+                if self.w.fingers_touching(o.name) == 2 and width >= narrow - 0.008:               # fingertips resting on top of the object touch it with both fingers but have nothing between them
                     self.mv.attach(o.name)
                     break
         return {"ok": True, "gripper_width_m": round(self.w.gripper_width(), 3), "holding": self.mv.held}
