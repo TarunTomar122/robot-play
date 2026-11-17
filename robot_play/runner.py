@@ -281,6 +281,13 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
                     text = prior_notebook(source_dir, t, s)
                     if text:
                         specs.append(RunSpec(m, t, "prior", s, True, practice=0, borrowed_notebook=text, **common))
+    elif cell == "labelmatch":                  # exploratory (v1.9): no practice, the same neutral label over an inert sentence, the generic sentence and the naming sentence
+        texts = {"lm_inert": lambda t: INERT_TEXT, "lm_generic": lambda t: GENERIC_HINT, "lm_specific": lambda t: HINTS[t]}
+        for m in models:
+            for t in tasks:
+                for c, fn in texts.items():
+                    for s in run_seeds:
+                        specs.append(RunSpec(m, t, c, s, True, practice=0, borrowed_notebook=fn(t), **common))
     elif cell == "borrowed_other":              # the control for "borrowed": the notebook of a DIFFERENT task (stack reads the sort notebook, sort the flask one, flasks the stack one)
         shift = {"stack": "bins", "bins": "flasks", "flasks": "stack"}
         for m in models:
@@ -299,6 +306,10 @@ HINTS = {"stack": "Pick the green cube with grip_level firm.",                  
          "flasks": "Grasp each flask near its top: grasp_height 0.9."}
 GENERIC_HINT = ("Defaults do not suit every object or surface. When a pick or place fails or is refused, read the message and change the settings "
                 "(grip_level, grasp_height, release_height, speed) one at a time instead of repeating the same call.")
+
+
+INERT_TEXT = ("Every object in this scene can be handled with the tools you have, one after another. When a call fails or is refused, read the message and look at "
+              "the scene again before you carry on, and call done only once the job really is finished.")          # v1.9: about as long as GENERIC_HINT, names no setting and gives no advice about settings
 
 
 def prior_notebook(source_dir: str, task: str, run_seed: int) -> str:
