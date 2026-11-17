@@ -300,6 +300,12 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
                 specs += [RunSpec(m, t, "none", s, True, practice=0, **common) for s in run_seeds]
                 for c, text in SPLIT2_TEXTS.items():
                     specs += [RunSpec(m, t, c, s, True, practice=0, borrowed_notebook=text, **common) for s in run_seeds]
+    elif cell == "dose":                        # exploratory (v1.12): the model's own notebook after 1, 3, 6 (and, on run seeds 30 to 39, 12) practice episodes, held-out layouts of the usual four per run seed
+        for m in models:
+            for t in tasks:
+                for s in run_seeds:
+                    for k in (1, 3, 6) + ((12,) if s >= 30 else ()):
+                        specs.append(RunSpec(m, t, "notebook", s, True, practice=k, **common))
     elif cell == "borrowed_other":              # the control for "borrowed": the notebook of a DIFFERENT task (stack reads the sort notebook, sort the flask one, flasks the stack one)
         shift = {"stack": "bins", "bins": "flasks", "flasks": "stack"}
         for m in models:

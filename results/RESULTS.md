@@ -101,7 +101,7 @@ Runs with practice or a borrowed notebook that did not finish their whole plan a
 
 Planned cells that did not start (exploratory cells included; the borrowed cells are planned only where the Fable notebook they read finished): none (every planned run file exists).
 
-Spend meter (pessimistic pricing): {"anthropic": {"spent": 72.676911, "reserved": 0.0, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 26.958573, "reserved": 0.0, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 0. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
+Spend meter (pessimistic pricing): {"anthropic": {"spent": 73.139779, "reserved": 0.0, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 26.958573, "reserved": 0.0, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 0. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
 
 ## 2. Q1: does experience raise held-out success?
 
@@ -790,7 +790,7 @@ Paired differences (task, run seed):
 
 Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.10). The generic sentence is a **frame** ("Defaults do not suit every object or surface."), an **instruction** (when a call fails or is refused, change the settings one at a time instead of repeating the call) and the **names** of the four settings. Claude Haiku 5.5, `stack` only, no practice, the neutral label of section 6f, run seeds 20 to 29 (the same layouts as every other arm of this model, so each arm pairs). The three new arms keep the frame and add the names, the instruction, or neither. Run files started 30, complete 30 (planned 30). Plain 95% intervals, ten pairs per comparison, so wide.
 
-**Predictions of PROTOCOL.md v1.10, scored by the generator first** (pending until every pair exists; below 8 of the 10 planned pairs per arm inconclusive once the cell has finished). Written after the v1.9 results were known, so not blind. The registered reading: W1 and W2 met, the instruction carries the effect and the names do not; W1 missed and W2 met, neither part alone is enough; W1 met and W2 missed, either part suffices; both missed, both parts are needed and each does more than the frame; W3 missed, the frame does part of the work and the split cannot be read cleanly. No reading is claimed for differences under 20 points.
+**Predictions of PROTOCOL.md v1.10, scored by the generator first** (pending until every pair exists; below 8 of the 10 planned pairs per arm inconclusive once the cell has finished). Written after the v1.9 results were known, so not blind. The registered reading: W1 and W2 met, the instruction carries the effect and the names do not; W1 missed and W2 met, neither part alone is enough; W1 met and W2 missed, either part suffices; both missed, both parts are needed and each does more than the frame; W3 missed, the frame does part of the work and the split cannot be read cleanly. No reading is claimed for differences under 20 points (as registered; the post-hoc paragraph below states which of its statements rest on an interval and which on a point estimate).
 
 | prediction | result | status |
 |---|---|---|
@@ -802,7 +802,7 @@ Registered reading of the outcome (the wording of PROTOCOL.md v1.10): the effect
 
 **What the numbers show (written after seeing them, not registered).** With the frame, the four names alone reached 92% (over fresh: +42.5 pp (95% CI +20.1 to +64.9)), the same as the full generic sentence (generic minus frame + names: +0.0 pp (95% CI -12.6 to +12.6)). The instruction alone reached 70% (over fresh: +20.0 pp (95% CI -10.2 to +50.2)). Names minus instruction: +22.5 pp (95% CI +4.7 to +40.3) (not a registered comparison). So in these runs the list of names is what carries the effect, and the instruction adds little on top of it; the registered reading's phrase for the case where both predictions are missed ("the effect needs both parts") does not describe this outcome and is not used.
 
-Validation of the included files: 30 run files, every one with code hash `0346eddace878d63` and a run seed from 20 to 29: yes.
+Validation of the included files: 30 run files with code hash `0346eddace878d63`, plus the anchor files of the replication (`8fdcf6b2491b68a3`) and the label-matched cell (`58b19ca1be3740fe`), all with a run seed from 20 to 29: yes.
 
 Held-out success on `stack` (and calls to success) on the 10 runs every arm has:
 
@@ -824,6 +824,52 @@ Paired differences (run seed):
 | reads the generic sentence under the neutral label against reads the frame and the four names (neutral label) | 10 | 92% | 92% | +0.0 pp (95% CI -12.6 to +12.6) |
 | reads the frame sentence only (neutral label) against reads an inert sentence under the neutral label | 10 | 50% | 40% | +10.0 pp (95% CI -18.2 to +38.2) |
 | reads the frame and the four names (neutral label) against reads the frame and the instruction to vary (neutral label) | 10 | 92% | 70% | +22.5 pp (95% CI +4.7 to +40.3) |
+| reads the frame sentence only (neutral label) against reads the generic sentence under the neutral label | 10 | 50% | 92% | -42.5 pp (95% CI -60.0 to -25.0) |
+
+## 6h. Exploratory: the split repeated on fresh layouts (run seeds 30 to 39), with nested wordings
+
+Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.11). Claude Haiku 5.5, `stack` only, no practice, the neutral label, layouts no earlier arm has played. `lm_inert`, `lm_frame`, `lm_names`, `lm_instr` and `lm_generic` repeat the texts of sections 6f and 6g unchanged; `lm_instr_n` is the generic sentence minus the names exactly (it keeps the word "settings") and `lm_names2` is the generic sentence with the instruction to change replaced by a bare "read the message" (it keeps the names). Run files started 80, complete 80 (planned 80). Plain 95% intervals, ten pairs per comparison.
+
+**Predictions of PROTOCOL.md v1.11, scored by the generator first** (pending until every pair of every arm exists; below 8 of 10 pairs inconclusive once the cell has finished). Written after the v1.10 results were known, so not blind. The registered reading: R0 missed, no reading; R0, R1, R2 and R5 met, the v1.10 pattern replicates; with R3 and R4 also met the names beat the instruction under both wordings; R3 met and R4 missed, the instruction wording matters; R3 missed, the v1.10 gap is not reliable; R1 missed, the names result does not replicate. No multiplicity correction; all intervals are descriptive.
+
+| prediction | result | status |
+|---|---|---|
+| R0: Haiku `stack` with no memory solves at most 75% on these layouts (they have room) | no memory 48% | met |
+| R1: `lm_names` (frame and the four names) solves at least 80% | 98% | met |
+| R2: `lm_frame` (frame only) solves at most 65% | 65% | met |
+| R3: `lm_instr` (frame and 'change how you call it') solves at most 80% | 65% | met |
+| R4: `lm_names2` minus `lm_instr_n` is at least +10 points | +10.0 | met |
+| R5: `lm_generic` solves at least 80% | 98% | met |
+
+Registered reading of the outcome: the v1.10 pattern replicates on fresh layouts (the frame and the names reproduce the generic sentence, the frame alone does little), and the names beat the instruction under both wordings (R3 and R4 met).
+
+Validation of the included files: 80 run files, every one with code hash `c44187af32043997` and a run seed from 30 to 39: yes.
+
+Held-out success on `stack` (and calls to success) on the 10 runs every arm has:
+
+|  | no memory | the inert sentence | the frame only | the frame and the four names | the frame and 'change how you call it' | the frame and 'change the settings one at a time' (no names) | the frame, 'read the message' and the four names | the generic sentence |
+|---|---|---|---|---|---|---|---|---|
+| Haiku | 48% (17.3 calls) | 42% (18.4 calls) | 65% (14.3 calls) | 98% (8.1 calls) | 65% (14.0 calls) | 78% (11.8 calls) | 88% (10.3 calls) | 98% (8.0 calls) |
+
+Paired differences (run seed):
+
+| comparison | pairs | first | second | difference |
+|---|---|---|---|---|
+| reads the inert sentence against starts fresh | 10 | 42% | 48% | -5.0 pp (95% CI -32.7 to +22.7) |
+| reads the frame only against starts fresh | 10 | 65% | 48% | +17.5 pp (95% CI -6.4 to +41.4) |
+| reads the frame and the four names against starts fresh | 10 | 98% | 48% | +50.0 pp (95% CI +31.1 to +68.9) |
+| reads the frame and 'change how you call it' against starts fresh | 10 | 65% | 48% | +17.5 pp (95% CI -3.4 to +38.4) |
+| reads the frame and 'change the settings one at a time' (no names) against starts fresh | 10 | 78% | 48% | +30.0 pp (95% CI +2.3 to +57.7) |
+| reads the frame, 'read the message' and the four names against starts fresh | 10 | 88% | 48% | +40.0 pp (95% CI +21.6 to +58.4) |
+| reads the generic sentence against starts fresh | 10 | 98% | 48% | +50.0 pp (95% CI +29.3 to +70.7) |
+| reads the frame and the four names against reads the frame and 'change how you call it' | 10 | 98% | 65% | +32.5 pp (95% CI +16.6 to +48.4) |
+| reads the frame, 'read the message' and the four names against reads the frame and 'change the settings one at a time' (no names) | 10 | 88% | 78% | +10.0 pp (95% CI -12.6 to +32.6) |
+| reads the generic sentence against reads the frame, 'read the message' and the four names | 10 | 98% | 88% | +10.0 pp (95% CI -5.1 to +25.1) |
+| reads the generic sentence against reads the frame and 'change the settings one at a time' (no names) | 10 | 98% | 78% | +20.0 pp (95% CI +1.5 to +38.5) |
+| reads the frame and the four names against reads the frame only | 10 | 98% | 65% | +32.5 pp (95% CI +15.5 to +49.5) |
+| reads the frame and 'change how you call it' against reads the frame only | 10 | 65% | 65% | +0.0 pp (95% CI -20.7 to +20.7) |
+| reads the frame and 'change the settings one at a time' (no names) against reads the frame only | 10 | 78% | 65% | +12.5 pp (95% CI -8.6 to +33.6) |
+| **primary: reads the frame and the four names against reads the frame and 'change how you call it', pooled over run seeds 20 to 39 (this cell and section 6g)** | 20 | 95% | 68% | +27.5 pp (95% CI +16.1 to +38.9) |
 
 ## 7. Skill-level against pose-level tools
 
@@ -873,7 +919,7 @@ Over all held-out catch-scene episodes of the registered conditions (no memory, 
 
 **Deviation 1 (analysis rule, before any result was analysed).** At 21:10 on 16 Nov the matrix started with the pre-registered small-sample rule "multiply the half-widths by sqrt(k/(k-1))". Council round 4 (a simulation by the Fable judge) showed that this factor is 1.017 at 30 clusters and leaves the Q1 and Q4 intervals near 95.5% coverage for a nominal 97.5%. At about 21:19, before any matrix result had been analysed (only run counts had been looked at), the rule was replaced by a stricter one: every interval is the wider of the percentile bootstrap and a stratified t interval (PROTOCOL.md section 1). The Q3 intraclass correlation was also restricted to notebook runs to match the protocol text. No run, prompt or tool was affected.
 
-**Deviation 2 (borrowed-notebook cell, exploratory).** While that cell was running from a separate checkout, an edit to that checkout (adding the code for its wrong-task control) changed the code hash of runs that started after the edit. The cell was stopped, the edit set aside, and the four run files that carried the new hash (each had at most a few finished episodes) were deleted and rerun. The killed workers of that first start also kept running for a minute and appended rows to files after the restart, so six more files (two with a missing header, four with duplicate rows) were deleted and rerun as well, and the borrowed cell was verified to have exactly 30 run files with 4 unique episodes each and one code hash. The few cents these discarded attempts cost remain in the spend ledger but not in any run file. Every borrowed run file therefore carries one code hash. The `borrowed_other` control cell is run from the edited checkout after the first cell has finished, with its own hash.
+**Deviation 2 (borrowed-notebook cell, exploratory).** While that cell was running from a separate checkout, an edit to that checkout (adding the code for its wrong-task control) changed the code hash of runs that started after the edit. The cell was stopped, the edit set aside, and the four run files that carried the new hash (each had at most a few finished episodes) were deleted and rerun. The killed workers of that first start also kept running for a minute and appended rows to files after the restart, so six more files (two with a missing header, four with duplicate rows) were deleted and rerun as well, and the borrowed cell was verified to have exactly 30 run files with 4 unique episodes each and one code hash. The few cents these discarded attempts cost remain in the spend ledger but not in any run file. Every borrowed run file therefore carried one code hash **when this was written; the addendum below corrects that**: the cell later finished with two hashes (run seeds 0 to 4 and 5 to 9). The `borrowed_other` control cell is run from the edited checkout after the first cell has finished, with its own hash.
 
 **Deviation 3 (one layout the environment cannot place, found at 22:10).** The pose sampler cannot place the flasks for evaluation layout seed 20801 (run seed 8, second held-out layout), in both the catch and the control scene; a scan of every practice and evaluation seed of run seeds 0 to 19 in all three jobs found no other such layout. Every flasks run with run seed 8 therefore ends with a crash at that episode ("could not sample poses") and is never complete: the Fable notebook run for run seed 8 (so the borrowed and wrong-task cells have 14 of 15 notebooks for run seeds 5 to 9), and in the main and control cells the flasks runs of run seed 8 for both cheap models. They are listed as incomplete in the coverage table and excluded by the complete-runs rule, leaving 29 of 30 (task, run seed) pairs for flasks-affected comparisons, above the registered minimum of 24. The sampler was not changed because that would change the code hash in the middle of the matrix; run_night.sh will end with NIGHT_INCOMPLETE because of these crashes, which is expected.
 

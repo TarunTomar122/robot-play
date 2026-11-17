@@ -31,6 +31,7 @@ COLORS = {"none": "#2a78d6", "notebook": "#eb6834", "replay": "#1baf7a"}        
 TASKS = ["stack", "bins", "flasks"]
 LM_HASH = "58b19ca1be3740fe"        # code hash of tag code-labelmatch (PROTOCOL.md v1.9)
 WS_HASH = "0346eddace878d63"        # code hash of tag code-wordsplit (PROTOCOL.md v1.10)
+WS2_HASH = "c44187af32043997"       # code hash of tag code-wordsplit2 (PROTOCOL.md v1.11)
 NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job",
          "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes",
          "hint": "reads a one-sentence hint naming the fix", "hint_generic": "reads a generic tip (lists the four adjustable settings, names no fix)", "prior": "reads Fable's notebook written with no practice"}
@@ -69,9 +70,9 @@ def void_if(bad, pr):
     return [(a_, b_, "void (a file failed validation)") for a_, b_, _ in pr] if bad else pr
 
 
-def bad_cov(cov, hashes):
-    """Files that fail the registered validation: a code hash that is not one of `hashes`, or a run seed that is missing or outside 20 to 29 (no default is assumed)."""
-    return [c for c in cov if c.get("code") not in hashes or not isinstance(c.get("run_seed"), int) or not 20 <= c["run_seed"] <= 29]
+def bad_cov(cov, hashes, lo=20, hi=29):
+    """Files that fail the registered validation: a code hash that is not one of `hashes`, or a run seed that is missing or outside lo to hi (no default is assumed)."""
+    return [c for c in cov if c.get("code") not in hashes or not isinstance(c.get("run_seed"), int) or not lo <= c["run_seed"] <= hi]
 
 
 def mean(rows, key):
@@ -120,6 +121,7 @@ def main():
     ap.add_argument("--prior-notebooks", default="runs/prior_notebooks")
     ap.add_argument("--labelmatch", nargs="*", default=["runs/labelmatch"], help="exploratory label-matched text control (PROTOCOL.md v1.9): one neutral label over an inert, a generic and a naming sentence, run seeds 20-29, no practice")
     ap.add_argument("--wordsplit", nargs="*", default=["runs/wordsplit"], help="exploratory split of the generic sentence (PROTOCOL.md v1.10): frame only, frame + names, frame + instruction under the neutral label; Haiku, stack, run seeds 20-29, no practice")
+    ap.add_argument("--wordsplit2", nargs="*", default=["runs/wordsplit2"], help="exploratory repeat of the split on fresh layouts (PROTOCOL.md v1.11): Haiku, stack, run seeds 30-39, eight arms")
     ap.add_argument("--writer", nargs="*", default=["runs/writer_sonnet"], help="exploratory second writer (PROTOCOL.md v1.8): Claude Sonnet 5.5 with its own notebook, run seeds 20-29 (stack) and 20-24 (bins, flasks)")
     ap.add_argument("--borrowed-sonnet", nargs="*", default=["runs/borrowed_sonnet"], help="cheap models reading the Sonnet notebooks with no practice (PROTOCOL.md v1.8)")
     ap.add_argument("--meter", default="runs/spend")
@@ -914,7 +916,7 @@ def main():
         L += [f"Held-out success on `stack` (and calls to success) on the {len(ks)} runs every arm has:", "",
               table(["", "no memory", "inert sentence", "frame only", "frame + names", "frame + instruction", "frame + instruction + names (the generic sentence)"], [("Haiku", *row)]), ""]
         cmp_rows, vd = [], {}
-        for x, y in (("lm_frame", "none"), ("lm_names", "none"), ("lm_instr", "none"), ("lm_generic", "none"), ("lm_names", "lm_frame"), ("lm_instr", "lm_frame"), ("lm_generic", "lm_instr"), ("lm_generic", "lm_names"), ("lm_frame", "lm_inert"), ("lm_names", "lm_instr")):
+        for x, y in (("lm_frame", "none"), ("lm_names", "none"), ("lm_instr", "none"), ("lm_generic", "none"), ("lm_names", "lm_frame"), ("lm_instr", "lm_frame"), ("lm_generic", "lm_instr"), ("lm_generic", "lm_names"), ("lm_frame", "lm_inert"), ("lm_names", "lm_instr"), ("lm_frame", "lm_generic")):
             d = A.paired_difference(allw, hm, x, y, tasks=["stack"])
             if d.get("n_pairs"):
                 cmp_rows.append((f"{NAMES[x]} against {NAMES[y]}", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
@@ -923,7 +925,7 @@ def main():
         final = (ROOT / "logs/wordsplit_done.txt").exists() or all(vd.get((c, "none"), {}).get("n_pairs", 0) >= 10 for c in ("lm_frame", "lm_names", "lm_instr"))     # every planned pair exists
 
         def arm_state(c, fn):
-            n = vd.get((c, "none"), {}).get("n_pairs", 0)
+            n = min(vd.get((x, "none"), {}).get("n_pairs", 0) for x in ("lm_frame", "lm_names", "lm_instr"))      # scored only when every arm has its pairs
             if n >= 10:
                 return fn()
             if not final:
@@ -933,7 +935,7 @@ def main():
         pr = [("W1: Haiku `stack` with the frame and the instruction (no names) solves at least 75%", f"frame + instruction {f(ri['a'], True)}" if ri else "no data", arm_state("lm_instr", lambda: "met" if ri["a"] >= 0.75 else "MISSED")),
               ("W2: Haiku `stack` with the frame and the four names (no instruction) solves at most 65%", f"frame + names {f(rn['a'], True)}" if rn else "no data", arm_state("lm_names", lambda: "met" if rn["a"] <= 0.65 else "MISSED")),
               ("W3: Haiku `stack` with the frame only solves at most 65%", f"frame only {f(rf['a'], True)}" if rf else "no data", arm_state("lm_frame", lambda: "met" if rf["a"] <= 0.65 else "MISSED"))]
-        bad_files = bad_cov(wcov2, {WS_HASH})
+        bad_files = bad_cov(wcov2, {WS_HASH}) + bad_cov(rcov, {"8fdcf6b2491b68a3"}) + bad_cov(lcov, {LM_HASH})          # the anchors (no-memory replication, inert and generic arms) must validate too
         pr = void_if(bad_files, pr)
         if final and not bad_files and all(st in ("met", "MISSED") or st.startswith(("met ", "MISSED ")) for _, _, st in pr):
             w1, w2, w3 = (st.startswith("met") for _, _, st in pr)
@@ -951,9 +953,91 @@ def main():
         else:
             reading = "Registered reading: scored when the cell has finished."
         L[pred_at_6g:pred_at_6g] = ["**Predictions of PROTOCOL.md v1.10, scored by the generator first** (pending until every pair exists; below 8 of the 10 planned pairs per arm inconclusive once the cell has finished). Written after the v1.9 results were known, so not blind. "
-                                    "The registered reading: W1 and W2 met, the instruction carries the effect and the names do not; W1 missed and W2 met, neither part alone is enough; W1 met and W2 missed, either part suffices; both missed, both parts are needed and each does more than the frame; W3 missed, the frame does part of the work and the split cannot be read cleanly. No reading is claimed for differences under 20 points.", "",
+                                    "The registered reading: W1 and W2 met, the instruction carries the effect and the names do not; W1 missed and W2 met, neither part alone is enough; W1 met and W2 missed, either part suffices; both missed, both parts are needed and each does more than the frame; W3 missed, the frame does part of the work and the split cannot be read cleanly. No reading is claimed for differences under 20 points (as registered; the post-hoc paragraph below states which of its statements rest on an interval and which on a point estimate).", "",
                                     table(["prediction", "result", "status"], pr), "", reading, "",
-                                    f"Validation of the included files: {len(wcov2)} run files, every one with code hash `{WS_HASH}` and a run seed from 20 to 29: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
+                                    f"Validation of the included files: {len(wcov2)} run files with code hash `{WS_HASH}`, plus the anchor files of the replication (`8fdcf6b2491b68a3`) and the label-matched cell (`{LM_HASH}`), all with a run seed from 20 to 29: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
+
+    # --- 6h: the split repeated on fresh layouts, with nested wordings (v1.11; exploratory)
+    ws2_rows = [r for r in (A.load(*ex(a.wordsplit2), complete_only=True) if ex(a.wordsplit2) else []) if 30 <= r["run_seed"] <= 39]
+    if ws2_rows:
+        w2cov = A.coverage(*ex(a.wordsplit2))
+        W2N = {"none": "starts fresh", "lm_inert": "reads the inert sentence", "lm_frame": "reads the frame only", "lm_names": "reads the frame and the four names", "lm_instr": "reads the frame and 'change how you call it'",
+               "lm_instr_n": "reads the frame and 'change the settings one at a time' (no names)", "lm_names2": "reads the frame, 'read the message' and the four names", "lm_generic": "reads the generic sentence"}
+        NAMES.update({k: v + " (neutral label)" for k, v in W2N.items() if k != "none"})
+        L += ["## 6h. Exploratory: the split repeated on fresh layouts (run seeds 30 to 39), with nested wordings", "",
+              "Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.11). Claude Haiku 5.5, `stack` only, no practice, the neutral label, layouts no earlier arm has played. "
+              "`lm_inert`, `lm_frame`, `lm_names`, `lm_instr` and `lm_generic` repeat the texts of sections 6f and 6g unchanged; `lm_instr_n` is the generic sentence minus the names exactly (it keeps the word \"settings\") and `lm_names2` is the generic sentence with the instruction to change replaced by a bare \"read the message\" (it keeps the names). "
+              f"Run files started {len(w2cov)}, complete {sum(int(c['complete']) for c in w2cov)} (planned 80). Plain 95% intervals, ten pairs per comparison.", ""]
+        pred_at_6h = len(L)
+        hm = "claude-haiku-5-5"
+        order = ("none", "lm_inert", "lm_frame", "lm_names", "lm_instr", "lm_instr_n", "lm_names2", "lm_generic")
+        ks = None
+        for c in order:
+            kc = {r["run_seed"] for r in A.select(ws2_rows, model=hm, condition=c, phase="eval", quirk=True)}
+            ks = kc if ks is None else ks & kc
+        ks = ks or set()
+        cells = []
+        for c in order:
+            x = [r for r in A.select(ws2_rows, model=hm, condition=c, phase="eval", quirk=True) if r["run_seed"] in ks]
+            cells.append(f"{f(mean(x, 'success'), True)} ({mean(x, 'calls_to_success'):.1f} calls)" if x else "-")
+        L += [f"Held-out success on `stack` (and calls to success) on the {len(ks)} runs every arm has:", "",
+              table(["", *[W2N[c].replace("reads ", "").replace("starts fresh", "no memory") for c in order]], [("Haiku", *cells)]), ""]
+        cmp_rows, vd2 = [], {}
+        pairs = [(c, "none") for c in order[1:]] + [("lm_names", "lm_instr"), ("lm_names2", "lm_instr_n"), ("lm_generic", "lm_names2"), ("lm_generic", "lm_instr_n"), ("lm_names", "lm_frame"), ("lm_instr", "lm_frame"), ("lm_instr_n", "lm_frame")]
+        for x, y in pairs:
+            d = A.paired_difference(ws2_rows, hm, x, y, tasks=["stack"])
+            if d.get("n_pairs"):
+                cmp_rows.append((f"{W2N[x]} against {W2N[y]}", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
+                vd2[(x, y)] = d
+        pooled = A.paired_difference(ws_rows + ws2_rows, hm, "lm_names", "lm_instr", tasks=["stack"])
+        if pooled.get("n_pairs"):
+            cmp_rows.append((f"**primary: {W2N['lm_names']} against {W2N['lm_instr']}, pooled over run seeds 20 to 39 (this cell and section 6g)**", pooled["n_pairs"], f(pooled["a"], True), f(pooled["b"], True), ci(pooled, pct=True)))
+        L += ["Paired differences (run seed):", "", table(["comparison", "pairs", "first", "second", "difference"], cmp_rows), ""]
+        final2 = (ROOT / "logs/wordsplit2_done.txt").exists() or all(vd2.get((c, "none"), {}).get("n_pairs", 0) >= 10 for c in order[1:])
+
+        def score(cells_, fn):
+            n = min([vd2.get(c_, {}).get("n_pairs", 0) for c_ in cells_] or [0])
+            if n >= 10:
+                return fn()
+            if not final2:
+                return "pending"
+            return "inconclusive (below the registered floor)" if n < 8 else fn() + " (scored with fewer than the planned pairs, above the floor)"
+        g = lambda c: vd2.get((c, "none"))
+        r0, r1, r2, r3, r5 = (g("none") and None, g("lm_names"), g("lm_frame"), g("lm_instr"), g("lm_generic"))
+        nn = [r for r in A.select(ws2_rows, model=hm, condition="none", phase="eval", quirk=True) if r["task"] == "stack"]
+        n0 = min([vd2.get((c, "none"), {}).get("n_pairs", 0) for c in order[1:]] or [0])
+        none_rate = mean(nn, "success") if nn else float("nan")
+        r4 = vd2.get(("lm_names2", "lm_instr_n"))
+        allc = [(c, "none") for c in order[1:]]
+        pr = [("R0: Haiku `stack` with no memory solves at most 75% on these layouts (they have room)", f"no memory {f(none_rate, True)}" if nn else "no data", score(allc, lambda: "met" if none_rate <= 0.75 else "MISSED")),
+              ("R1: `lm_names` (frame and the four names) solves at least 80%", f"{f(r1['a'], True)}" if r1 else "no data", score(allc, lambda: "met" if r1["a"] >= 0.80 else "MISSED")),
+              ("R2: `lm_frame` (frame only) solves at most 65%", f"{f(r2['a'], True)}" if r2 else "no data", score(allc, lambda: "met" if r2["a"] <= 0.65 else "MISSED")),
+              ("R3: `lm_instr` (frame and 'change how you call it') solves at most 80%", f"{f(r3['a'], True)}" if r3 else "no data", score(allc, lambda: "met" if r3["a"] <= 0.80 else "MISSED")),
+              ("R4: `lm_names2` minus `lm_instr_n` is at least +10 points", f"{r4['diff'] * 100:+.1f}" if r4 else "no data", score([("lm_names2", "lm_instr_n")] + allc, lambda: "met" if r4["diff"] >= 0.10 else "MISSED")),
+              ("R5: `lm_generic` solves at least 80%", f"{f(r5['a'], True)}" if r5 else "no data", score(allc, lambda: "met" if r5["a"] >= 0.80 else "MISSED"))]
+        bad_files = bad_cov(w2cov, {WS2_HASH}, 30, 39)
+        pr = void_if(bad_files, pr)
+        st = [x[2] for x in pr]
+        if final2 and not bad_files and all(x.startswith(("met", "MISSED")) for x in st):
+            m = [x.startswith("met") for x in st]
+            if not m[0]:
+                reading = "R0 missed: these layouts left no room, so nothing below is read."
+            elif not m[1]:
+                reading = "R1 missed: the v1.10 names result does not replicate on fresh layouts."
+            elif m[1] and m[2] and m[5]:
+                reading = ("the v1.10 pattern replicates on fresh layouts (the frame and the names reproduce the generic sentence, the frame alone does little)"
+                           + (", and the names beat the instruction under both wordings (R3 and R4 met)." if (m[3] and m[4]) else
+                              ", but the instruction wording matters: with the word 'settings' added the instruction closes the gap (R3 met, R4 missed), so the v1.10 contrast is partly a wording effect." if (m[3] and not m[4]) else
+                              ", but the instruction reaches the names' level on these layouts (R3 missed), so the v1.10 gap is not reliable."))
+            else:
+                reading = "mixed: the registered reading does not cover this combination (R1 met, but R2 or R5 missed); see the table."
+            reading = "Registered reading of the outcome: " + reading
+        else:
+            reading = "Registered reading: scored when the cell has finished."
+        L[pred_at_6h:pred_at_6h] = ["**Predictions of PROTOCOL.md v1.11, scored by the generator first** (pending until every pair of every arm exists; below 8 of 10 pairs inconclusive once the cell has finished). Written after the v1.10 results were known, so not blind. "
+                                    "The registered reading: R0 missed, no reading; R0, R1, R2 and R5 met, the v1.10 pattern replicates; with R3 and R4 also met the names beat the instruction under both wordings; R3 met and R4 missed, the instruction wording matters; R3 missed, the v1.10 gap is not reliable; R1 missed, the names result does not replicate. No multiplicity correction; all intervals are descriptive.", "",
+                                    table(["prediction", "result", "status"], pr), "", reading, "",
+                                    f"Validation of the included files: {len(w2cov)} run files, every one with code hash `{WS2_HASH}` and a run seed from 30 to 39: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
 
     # --- pose
     if pose:

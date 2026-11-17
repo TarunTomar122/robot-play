@@ -45,3 +45,11 @@ def test_v1_11_cell_has_a_no_memory_arm_and_seven_texts_per_seed_and_the_nested_
     assert not any(n in nested_instr for n in NAMES) and all(n in nested_names for n in NAMES) and "change" not in nested_names and "read the message" in nested_names
     for c in ("lm_instr_n", "lm_names2"):
         assert Memory(c, notebook=SPLIT2_TEXTS[c]).prompt_block().startswith("\n\nNOTES FOR THIS TASK")
+
+
+def test_v1_12_dose_cell_plans_own_notebooks_after_1_3_6_and_on_fresh_seeds_12_practice_episodes():
+    specs = build_specs("dose", ["claude-haiku-5-5"], [20, 30], "runs/x", tasks=["stack"])
+    got = sorted((s.run_seed, s.practice) for s in specs)
+    assert got == [(20, 1), (20, 3), (20, 6), (30, 1), (30, 3), (30, 6), (30, 12)]
+    assert all(s.condition == "notebook" and s.borrowed_notebook == "" for s in specs)
+    assert len({s.key for s in specs}) == len(specs)

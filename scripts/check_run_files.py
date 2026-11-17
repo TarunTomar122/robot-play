@@ -9,36 +9,70 @@ A run file is a header line (`_config`: the plan and the code hash) followed by 
   - a header whose plan seeds do not follow the registered rule (practice 10000 + 100 * run seed + i; held-out 20000 + 100 * (run seed + j // 4) + j % 4, which is 20000 + 100 * run seed + j for the usual four held-out episodes and spreads the frontier cell's 20 layouts over five run seeds' layouts);
   - an episode row whose model, task, condition, run seed, quirk flag, phase, index or seed differs from the header or its plan, or whose run name differs from the file name;
   - repeated or out-of-order episodes (two processes writing one file, for example workers that outlived a stopped runner);
-  - with --expect, a code hash that is not one of the given hashes.
+  - with --expect, a code hash that is not one of the given hashes;
+  - a memory text (header `borrowed_notebook`) that differs from the registered text of that condition (hint, generic, inert and split arms);
+  - with --reported, a missing folder, a different number of files or of unfinished files than the documented one (EXPECTED below), a code hash that is not the one
+    results/code_versions.md lists for that folder, or no run file at all.
 `--reported` stands for every run folder the results use (the pilot and smoke folders, which use layouts 50000+ and run seed 99, are left out).
 Folders named `spend` (the spend ledger) and files that are not run files are not run folders and are skipped. Exit code 1 if any file is not clean."""
 import collections
 import json
+import re
 import sys
 from pathlib import Path
 
+HEX16 = re.compile(r"^[0-9a-f]{16}$")
 args = sys.argv[1:]
 expect = set()
 if "--expect" in args:
     i = args.index("--expect")
     j = i + 1
-    while j < len(args) and not Path(args[j]).exists():
+    while j < len(args) and HEX16.match(args[j]):
         expect.add(args[j])
         j += 1
     args = args[:i] + args[j:]
-REPORTED = ["main", "main_ext", "control", "frontier", "frontier_exp", "pose", "borrowed", "borrowed_1", "borrowed_3", "borrowed_other", "borrowed_sonnet",
-            "main_fixhold", "main_fixcollide", "rep_fixed", "hint", "hint_generic", "prior", "writer_sonnet", "labelmatch", "wordsplit"]
-if "--reported" in args:
+# folder: (run files, files whose plan was not finished, code hashes). The unfinished files are the documented exclusions (the flasks run-seed-8 layout the original sampler cannot build, deviation 3).
+EXPECTED = {
+    "main": (180, 6, {"4d59e8f26cd2a9b6"}), "main_ext": (60, 0, {"4d59e8f26cd2a9b6"}), "control": (120, 4, {"4d59e8f26cd2a9b6"}), "frontier": (6, 0, {"4d59e8f26cd2a9b6"}),
+    "frontier_exp": (30, 1, {"4d59e8f26cd2a9b6"}), "pose": (36, 0, {"4d59e8f26cd2a9b6"}), "borrowed": (58, 0, {"1cd309b2c89e94d7", "bdda918f09675319"}),
+    "borrowed_1": (58, 0, {"90bd12fc77ec6f43"}), "borrowed_3": (58, 0, {"90bd12fc77ec6f43"}), "borrowed_other": (58, 2, {"bdda918f09675319"}), "borrowed_sonnet": (40, 0, {"088c639d7139a3af"}),
+    "main_fixhold": (20, 0, {"c694b1a45aaf30c5"}), "main_fixcollide": (20, 0, {"aef351c5c3033d54"}), "rep_fixed": (120, 0, {"8fdcf6b2491b68a3"}),
+    "hint": (60, 0, {"088c639d7139a3af"}), "hint_generic": (60, 0, {"088c639d7139a3af"}), "prior": (60, 0, {"088c639d7139a3af"}), "writer_sonnet": (20, 0, {"088c639d7139a3af"}),
+    "labelmatch": (180, 0, {"58b19ca1be3740fe"}), "wordsplit": (30, 0, {"0346eddace878d63"}), "wordsplit2": (80, 0, {"c44187af32043997"}), "dose": (70, 0, {"33db266fef842900"}),
+}
+
+
+def registered_text(cond, task):
+    """The memory text a run file of this condition must carry, or None when the condition has no fixed text."""
+    try:
+        from robot_play import runner
+    except Exception:
+        return None
+    fixed = {"hint_generic": runner.GENERIC_HINT, "lm_inert": runner.INERT_TEXT, "lm_generic": runner.GENERIC_HINT, "lm_frame": runner.SPLIT_TEXTS["lm_frame"],
+             "lm_names": runner.SPLIT_TEXTS["lm_names"], "lm_instr": runner.SPLIT_TEXTS["lm_instr"], "lm_instr_n": runner.SPLIT2_TEXTS["lm_instr_n"], "lm_names2": runner.SPLIT2_TEXTS["lm_names2"]}
+    if cond in ("hint", "lm_specific"):
+        return runner.HINTS.get(task)
+    return fixed.get(cond)
+
+
+reported = "--reported" in args
+if reported:
     i = args.index("--reported")
-    args = args[:i] + [f"runs/{x}" for x in REPORTED if Path(f"runs/{x}").is_dir()] + args[i + 1:]
+    args = args[:i] + [f"runs/{x}" for x in EXPECTED] + args[i + 1:]
 bad = 0
 nfiles = 0
 for d in args or ["runs"]:
-    if not Path(d).is_dir() or Path(d).name == "spend":
-        print(f"{d}: skipped (not a run folder)")
+    if Path(d).name == "spend":
+        print(f"{d}: skipped (the spend ledger is not a run folder)")
+        continue
+    if not Path(d).is_dir():
+        bad += 1
+        print(f"NOT CLEAN {d}: no such folder")
         continue
     codes = collections.Counter()
     aborted = 0
+    unfinished = 0
+    files_here = 0
     for f in sorted(Path(d).glob("*.jsonl")):
         lines = [x for x in f.read_text().splitlines() if x.strip()]
         if not lines or not lines[0].startswith('{"_config"'):
@@ -46,6 +80,7 @@ for d in args or ["runs"]:
             print(f"NOT CLEAN {f}: {'empty file' if not lines else 'first line is not a header'}")
             continue
         nfiles += 1
+        files_here += 1
         cfg = json.loads(lines[0])["_config"]
         codes[cfg.get("code")] += 1
         problems = []
@@ -60,6 +95,10 @@ for d in args or ["runs"]:
         rows = [json.loads(x) for x in lines[1:]]
         aborted += sum(1 for r in rows if "_aborted" in r or r.get("aborted"))
         eps = [r for r in rows if "result" in r]
+        unfinished += len(eps) < len(cfg["plan"])
+        want_text = registered_text(cfg.get("condition"), cfg.get("task"))
+        if want_text is not None and cfg.get("borrowed_notebook") != want_text:
+            problems.append(f"the memory text of condition {cfg.get('condition')} differs from the registered text")
         keys = [(r.get("phase"), r.get("idx")) for r in eps]
         plan = [(p["phase"], p["idx"]) for p in cfg["plan"]]
         if len(set(keys)) != len(keys) or keys != plan[:len(keys)]:
@@ -78,6 +117,14 @@ for d in args or ["runs"]:
         if problems:
             bad += 1
             print(f"NOT CLEAN {f}: " + "; ".join(problems))
+    if reported and Path(d).name in EXPECTED:
+        n_exp, unf_exp, hashes_exp = EXPECTED[Path(d).name]
+        if (files_here, unfinished) != (n_exp, unf_exp) or not set(codes) <= hashes_exp:
+            bad += 1
+            print(f"NOT CLEAN {d}: {files_here} files ({unfinished} unfinished) and hashes {sorted(codes)}, documented: {n_exp} files ({unf_exp} unfinished) and hashes {sorted(hashes_exp)}")
     print(f"{d}: code hashes {dict(codes)}" + (f", {aborted} abort record(s) (kept, harmless when the arm has no memory or the run resumed)" if aborted else ""))
+if nfiles == 0:
+    bad += 1
+    print("NOT CLEAN: no run file was found")
 print(f"{nfiles} run files checked; " + ("all clean" if not bad else f"{bad} problem(s)"))
 raise SystemExit(1 if bad else 0)

@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from robot_play.scripted import run_script  # noqa: E402
 
 WALLS = [0.04, 0.07, 0.10, 0.12, 0.15, 0.18, 0.21]
-RELEASES = [0.02, 0.04, 0.05, 0.06, 0.07, 0.08, 0.10, 0.14, 0.18, 0.22]
+RELEASES = [0.02, 0.04, 0.05, 0.06, 0.07, 0.08, 0.10, 0.14, 0.18, 0.22, 0.26, 0.30]
 SEEDS = list(range(100, 120))
 
 
@@ -30,4 +30,4 @@ if __name__ == "__main__":
     print("|---|" + "---|" * len(RELEASES))
     for h in WALLS:
         print(f"| {h:.2f} | " + " | ".join(str(sum(1 for hh, rr, ok in res if hh == h and rr == r and ok)) for r in RELEASES) + " |")
-    print("\nThe catch's wall is 0.12 m. For it the threshold is sharp (about 6 cm); 0.14 m, the value the hint and the audit use, is a margin of 8 cm over it. Higher release heights up to the 0.30 m limit never failed in this scan, so a model that always lets go from high up solves the job, and the job cannot tell a stored rule from a stored constant.")
+    print("\nThe catch's wall is 0.12 m. For it the threshold is sharp (about 6 cm); 0.14 m, the value the hint and the audit use, is a margin of 8 cm over it. Every release height above a wall's threshold, up to the 0.30 m limit of the tool, solved every layout in this scan, so a model that always lets go from high up solves the job, and the job cannot tell a stored rule from a stored constant.")
