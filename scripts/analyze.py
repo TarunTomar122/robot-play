@@ -32,6 +32,7 @@ TASKS = ["stack", "bins", "flasks"]
 LM_HASH = "58b19ca1be3740fe"        # code hash of tag code-labelmatch (PROTOCOL.md v1.9)
 WS_HASH = "0346eddace878d63"        # code hash of tag code-wordsplit (PROTOCOL.md v1.10)
 WS2_HASH = "c44187af32043997"       # code hash of tag code-wordsplit2 (PROTOCOL.md v1.11)
+DOSE_HASH = "33db266fef842900"      # code hash of tag code-dose (PROTOCOL.md v1.12)
 NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job",
          "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes",
          "hint": "reads a one-sentence hint naming the fix", "hint_generic": "reads a generic tip (lists the four adjustable settings, names no fix)", "prior": "reads Fable's notebook written with no practice"}
@@ -122,6 +123,7 @@ def main():
     ap.add_argument("--labelmatch", nargs="*", default=["runs/labelmatch"], help="exploratory label-matched text control (PROTOCOL.md v1.9): one neutral label over an inert, a generic and a naming sentence, run seeds 20-29, no practice")
     ap.add_argument("--wordsplit", nargs="*", default=["runs/wordsplit"], help="exploratory split of the generic sentence (PROTOCOL.md v1.10): frame only, frame + names, frame + instruction under the neutral label; Haiku, stack, run seeds 20-29, no practice")
     ap.add_argument("--wordsplit2", nargs="*", default=["runs/wordsplit2"], help="exploratory repeat of the split on fresh layouts (PROTOCOL.md v1.11): Haiku, stack, run seeds 30-39, eight arms")
+    ap.add_argument("--dose", nargs="*", default=["runs/dose"], help="exploratory practice-dose cell (PROTOCOL.md v1.12): Haiku, stack, own notebook after 1, 3, 6 (and 12 on run seeds 30-39) practice episodes")
     ap.add_argument("--writer", nargs="*", default=["runs/writer_sonnet"], help="exploratory second writer (PROTOCOL.md v1.8): Claude Sonnet 5.5 with its own notebook, run seeds 20-29 (stack) and 20-24 (bins, flasks)")
     ap.add_argument("--borrowed-sonnet", nargs="*", default=["runs/borrowed_sonnet"], help="cheap models reading the Sonnet notebooks with no practice (PROTOCOL.md v1.8)")
     ap.add_argument("--meter", default="runs/spend")
@@ -1038,6 +1040,86 @@ def main():
                                     "The registered reading: R0 missed, no reading; R0, R1, R2 and R5 met, the v1.10 pattern replicates; with R3 and R4 also met the names beat the instruction under both wordings; R3 met and R4 missed, the instruction wording matters; R3 missed, the v1.10 gap is not reliable; R1 missed, the names result does not replicate. No multiplicity correction; all intervals are descriptive.", "",
                                     table(["prediction", "result", "status"], pr), "", reading, "",
                                     f"Validation of the included files: {len(w2cov)} run files, every one with code hash `{WS2_HASH}` and a run seed from 30 to 39: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
+
+    # --- 6i: how much practice does the model's own notebook need? (v1.12; exploratory)
+    ds_rows = [r for r in (A.load(*ex(a.dose), complete_only=True) if ex(a.dose) else []) if 20 <= r["run_seed"] <= 39]
+    if ds_rows and ws2_rows:
+        import re as _re
+        dcov = A.coverage(*ex(a.dose))
+        kof = lambda r: int(_re.search(r"__p(\d+)__s", r["run"]).group(1))
+        hm = "claude-haiku-5-5"
+        rel = lambda rows, cond: [dict(r, condition=cond) for r in rows]
+        rows_d = (rel([r for r in ds_rows if kof(r) == 1], "nb1") + rel([r for r in ds_rows if kof(r) == 3], "nb3") + rel([r for r in ds_rows if kof(r) == 6], "nb6")
+                  + rel([r for r in ds_rows if kof(r) == 12], "nb12") + rel([r for r in rep_rows if r["condition"] == "notebook" and r["task"] == "stack" and kof(r) == 12], "nb12")
+                  + rel([r for r in rep_rows + ws2_rows if r["condition"] == "none" and r["task"] == "stack"], "nb0")
+                  + rel([r for r in ws_rows + ws2_rows if r["condition"] == "lm_names"], "names"))
+        DN = {"nb0": "no memory", "nb1": "1 practice episode", "nb3": "3 practice episodes", "nb6": "6 practice episodes", "nb12": "12 practice episodes", "names": "the zero-practice reminder (frame + the four names)"}
+        NAMES.update({k: "with " + v if k.startswith("nb") else "reads " + v for k, v in DN.items()})
+        L += ["## 6i. Exploratory: how much practice does the model's own notebook need?", "",
+              "Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.12). Claude Haiku 5.5, `stack` only, the notebook condition (the model rewrites its own notes after each practice episode, memory frozen for the four held-out episodes) after 1, 3 or 6 practice episodes on run seeds 20 to 39 and after 12 on run seeds 30 to 39; no memory and 12 episodes on run seeds 20 to 29 come from section 6c, the reminder from sections 6g and 6h. Every arm plays the same held-out layouts per run seed, so every comparison pairs. "
+              f"Run files started {len(dcov)}, complete {sum(int(c['complete']) for c in dcov)} (planned 70). Plain 95% intervals, no multiplicity correction.", ""]
+        pred_at_6i = len(L)
+
+        def cell(rows, cond, seeds):
+            x = [r for r in A.select(rows, model=hm, condition=cond, phase="eval", quirk=True) if r["task"] == "stack" and r["run_seed"] in seeds]
+            return (f"{f(mean(x, 'success'), True)} ({mean(x, 'calls_to_success'):.1f} calls)", len({r["run_seed"] for r in x})) if x else ("-", 0)
+
+        def per_run_cost(rows, cond, seeds):
+            runs = {}
+            for r in A.select(rows, model=hm, condition=cond, quirk=True):
+                if cond in ("nb0", "names") and r["phase"] != "eval":
+                    continue                      # no memory and the reminder need no practice: only their held-out episodes are charged
+                if r["task"] == "stack" and r["run_seed"] in seeds:
+                    runs[r["run"]] = runs.get(r["run"], 0.0) + (r.get("cost_usd") or 0.0)
+            return f"${np.mean(list(runs.values())):.3f}" if runs else "-"
+        seeds_all, seeds_fresh = set(range(20, 40)), set(range(30, 40))
+        order = ("nb0", "nb1", "nb3", "nb6", "nb12", "names")
+        t1 = [(DN[c], *cell(rows_d, c, seeds_fresh), per_run_cost(rows_d, c, seeds_fresh)) for c in order]
+        L += ["Run seeds 30 to 39 (10 runs, every dose exists):", "", table(["what the model has", "held-out success (calls to success)", "runs", "episode cost per run as recorded (practice, notebook writing and held-out; none and the reminder: held-out only)"], t1), ""]
+        t2 = [(DN[c], *cell(rows_d, c, seeds_all), per_run_cost(rows_d, c, seeds_all)) for c in ("nb0", "nb1", "nb3", "nb6", "nb12", "names")]
+        L += ["Run seeds 20 to 39 pooled (20 runs; the 12-episode notebooks are those of the replication on run seeds 20 to 29 and of this cell on 30 to 39):", "", table(["what the model has", "held-out success (calls to success)", "runs", "episode cost per run as recorded (practice, notebook writing and held-out; none and the reminder: held-out only)"], t2), ""]
+        cmp_rows, vd3 = [], {}
+        for x, y in (("nb1", "nb0"), ("nb3", "nb0"), ("nb6", "nb0"), ("nb12", "nb0"), ("nb3", "nb1"), ("nb6", "nb1"), ("nb6", "nb3"), ("nb12", "nb6"), ("names", "nb1"), ("names", "nb6"), ("names", "nb12")):
+            d = A.paired_difference(rows_d, hm, x, y, tasks=["stack"])
+            if d.get("n_pairs"):
+                cmp_rows.append((f"{DN[x]} against {DN[y]}", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
+                vd3[(x, y)] = d
+        L += ["Paired differences (run seed; the number of pairs says which run seeds each comparison could use):", "", table(["comparison", "pairs", "first", "second", "difference"], cmp_rows), ""]
+        final3 = (ROOT / "logs/dose_done.txt").exists() or sum(int(c["complete"]) for c in dcov) == 70
+
+        def sc(keys, fn, need):
+            n = min([vd3.get(k, {}).get("n_pairs", 0) for k in keys] or [0])
+            if n >= need:
+                return fn()
+            if not final3:
+                return "pending"
+            return "inconclusive (below the registered floor)" if n < 0.8 * need else fn() + " (scored with fewer than the planned pairs, above the floor)"
+        d1 = vd3.get(("nb12", "nb0"))
+        d1r = [r for r in A.select(rows_d, model=hm, condition="nb12", phase="eval", quirk=True) if r["task"] == "stack" and r["run_seed"] in seeds_fresh]
+        d1v = mean(d1r, "success") if d1r else float("nan")
+        k1 = [r for r in A.select(rows_d, model=hm, condition="nb1", phase="eval", quirk=True) if r["task"] == "stack"]
+        d2v = mean(k1, "success") if k1 else float("nan")
+        d3, d4 = vd3.get(("nb6", "nb1")), vd3.get(("nb3", "nb0"))
+        pr = [("D1: Haiku with 12 practice episodes solves at least 90% on run seeds 30 to 39", f"12 episodes {d1v * 100:.1f}%" if d1r else "no data", sc([("nb12", "nb0")], lambda: "met" if d1v >= 0.90 else "MISSED", 10) if d1r else "pending"),
+              ("D2: with 1 practice episode it solves at most 80% (pooled over 20 runs)", f"1 episode {d2v * 100:.1f}%" if k1 else "no data", sc([("nb1", "nb0")], lambda: "met" if d2v <= 0.80 else "MISSED", 20)),
+              ("D3: with 6 practice episodes it solves at least 10 points more than with 1 (pooled, paired)", f"{d3['diff'] * 100:+.1f}" if d3 else "no data", sc([("nb6", "nb1")], lambda: "met" if d3["diff"] >= 0.10 else "MISSED", 20)),
+              ("D4: with 3 practice episodes it solves at least 20 points more than no memory (pooled, paired)", f"{d4['diff'] * 100:+.1f}" if d4 else "no data", sc([("nb3", "nb0")], lambda: "met" if d4["diff"] >= 0.20 else "MISSED", 20))]
+        bad_files = [c for c in dcov if c.get("code") != DOSE_HASH or not isinstance(c.get("run_seed"), int) or not (30 if "__p12__" in str(c.get("file", "")) else 20) <= c["run_seed"] <= 39]
+        pr = void_if(bad_files, pr)
+        st = [x[2] for x in pr]
+        if final3 and not bad_files and all(x.startswith(("met", "MISSED")) for x in st):
+            m = [x.startswith("met") for x in st]
+            reading = ("D1 missed: the replication of the 12-episode notebook failed and nothing else is read." if not m[0] else
+                       "a single practice episode already gives a notebook near the reminder's level (D2 missed)." if not m[1] else
+                       "success rises with practice (D2 and D3 met); the dose at which it first reaches 90% is the answer and is read from the tables above." if m[2] else
+                       "practice beyond one episode adds little on these layouts and the early episodes carry the effect (D2 met, D3 missed).")
+            reading = "Registered reading of the outcome: " + reading + (" Three practice episodes pay for themselves against no memory (D4 met)." if m[3] else " Three practice episodes do not clear +20 points against no memory (D4 missed).")
+        else:
+            reading = "Registered reading: scored when the cell has finished."
+        L[pred_at_6i:pred_at_6i] = ["**Predictions of PROTOCOL.md v1.12, scored by the generator first** (pending until every pair exists; below 80% of the planned runs inconclusive once the cell has finished). Written after the v1.11 results were known, so not blind. "
+                                    "The registered reading: D1 missed, nothing else is read; D2 missed, one practice episode already gives a notebook near the reminder's level; D2 and D3 met, success rises with practice and the dose at which it first reaches 90% is the answer; D2 met and D3 missed, the early episodes carry the effect.", "",
+                                    table(["prediction", "result", "status"], pr), "", reading, "",
+                                    f"Validation of the included files: {len(dcov)} run files, every one with code hash `{DOSE_HASH}` and a run seed from 20 to 39 (30 to 39 for the 12-episode dose): {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
 
     # --- pose
     if pose:

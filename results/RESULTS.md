@@ -101,7 +101,7 @@ Runs with practice or a borrowed notebook that did not finish their whole plan a
 
 Planned cells that did not start (exploratory cells included; the borrowed cells are planned only where the Fable notebook they read finished): none (every planned run file exists).
 
-Spend meter (pessimistic pricing): {"anthropic": {"spent": 73.139779, "reserved": 0.0, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 26.958573, "reserved": 0.0, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 0. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
+Spend meter (pessimistic pricing): {"anthropic": {"spent": 74.120261, "reserved": 0.0, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 26.958573, "reserved": 0.0, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 0. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
 
 ## 2. Q1: does experience raise held-out success?
 
@@ -870,6 +870,61 @@ Paired differences (run seed):
 | reads the frame and 'change how you call it' against reads the frame only | 10 | 65% | 65% | +0.0 pp (95% CI -20.7 to +20.7) |
 | reads the frame and 'change the settings one at a time' (no names) against reads the frame only | 10 | 78% | 65% | +12.5 pp (95% CI -8.6 to +33.6) |
 | **primary: reads the frame and the four names against reads the frame and 'change how you call it', pooled over run seeds 20 to 39 (this cell and section 6g)** | 20 | 95% | 68% | +27.5 pp (95% CI +16.1 to +38.9) |
+
+## 6i. Exploratory: how much practice does the model's own notebook need?
+
+Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.12). Claude Haiku 5.5, `stack` only, the notebook condition (the model rewrites its own notes after each practice episode, memory frozen for the four held-out episodes) after 1, 3 or 6 practice episodes on run seeds 20 to 39 and after 12 on run seeds 30 to 39; no memory and 12 episodes on run seeds 20 to 29 come from section 6c, the reminder from sections 6g and 6h. Every arm plays the same held-out layouts per run seed, so every comparison pairs. Run files started 70, complete 70 (planned 70). Plain 95% intervals, no multiplicity correction.
+
+**Predictions of PROTOCOL.md v1.12, scored by the generator first** (pending until every pair exists; below 80% of the planned runs inconclusive once the cell has finished). Written after the v1.11 results were known, so not blind. The registered reading: D1 missed, nothing else is read; D2 missed, one practice episode already gives a notebook near the reminder's level; D2 and D3 met, success rises with practice and the dose at which it first reaches 90% is the answer; D2 met and D3 missed, the early episodes carry the effect.
+
+| prediction | result | status |
+|---|---|---|
+| D1: Haiku with 12 practice episodes solves at least 90% on run seeds 30 to 39 | 12 episodes 100.0% | met |
+| D2: with 1 practice episode it solves at most 80% (pooled over 20 runs) | 1 episode 85.0% | MISSED |
+| D3: with 6 practice episodes it solves at least 10 points more than with 1 (pooled, paired) | +5.0 | MISSED |
+| D4: with 3 practice episodes it solves at least 20 points more than no memory (pooled, paired) | +45.0 | met |
+
+Registered reading of the outcome: a single practice episode already gives a notebook near the reminder's level (D2 missed). Three practice episodes pay for themselves against no memory (D4 met).
+
+Validation of the included files: 70 run files, every one with code hash `33db266fef842900` and a run seed from 20 to 39 (30 to 39 for the 12-episode dose): yes.
+
+Run seeds 30 to 39 (10 runs, every dose exists):
+
+| what the model has | held-out success (calls to success) | runs | episode cost per run as recorded (practice, notebook writing and held-out; none and the reminder: held-out only) |
+|---|---|---|---|
+| no memory | 48% (17.3 calls) | 10 | $0.008 |
+| 1 practice episode | 90% (12.3 calls) | 10 | $0.009 |
+| 3 practice episodes | 90% (9.4 calls) | 10 | $0.011 |
+| 6 practice episodes | 90% (10.7 calls) | 10 | $0.018 |
+| 12 practice episodes | 100% (7.5 calls) | 10 | $0.024 |
+| the zero-practice reminder (frame + the four names) | 98% (8.1 calls) | 10 | $0.003 |
+
+Run seeds 20 to 39 pooled (20 runs; the 12-episode notebooks are those of the replication on run seeds 20 to 29 and of this cell on 30 to 39):
+
+| what the model has | held-out success (calls to success) | runs | episode cost per run as recorded (practice, notebook writing and held-out; none and the reminder: held-out only) |
+|---|---|---|---|
+| no memory | 49% (16.8 calls) | 20 | $0.008 |
+| 1 practice episode | 85% (12.3 calls) | 20 | $0.009 |
+| 3 practice episodes | 94% (8.8 calls) | 20 | $0.010 |
+| 6 practice episodes | 90% (10.1 calls) | 20 | $0.017 |
+| 12 practice episodes | 100% (7.5 calls) | 20 | $0.027 |
+| the zero-practice reminder (frame + the four names) | 95% (8.6 calls) | 20 | $0.003 |
+
+Paired differences (run seed; the number of pairs says which run seeds each comparison could use):
+
+| comparison | pairs | first | second | difference |
+|---|---|---|---|---|
+| 1 practice episode against no memory | 20 | 85% | 49% | +36.2 pp (95% CI +20.4 to +52.1) |
+| 3 practice episodes against no memory | 20 | 94% | 49% | +45.0 pp (95% CI +30.5 to +59.5) |
+| 6 practice episodes against no memory | 20 | 90% | 49% | +41.2 pp (95% CI +20.7 to +61.8) |
+| 12 practice episodes against no memory | 20 | 100% | 49% | +51.2 pp (95% CI +39.0 to +63.5) |
+| 3 practice episodes against 1 practice episode | 20 | 94% | 85% | +8.8 pp (95% CI -7.0 to +24.5) |
+| 6 practice episodes against 1 practice episode | 20 | 90% | 85% | +5.0 pp (95% CI -11.4 to +21.4) |
+| 6 practice episodes against 3 practice episodes | 20 | 90% | 94% | -3.8 pp (95% CI -22.5 to +15.0) |
+| 12 practice episodes against 6 practice episodes | 20 | 100% | 90% | +10.0 pp (95% CI -4.4 to +25.0) |
+| the zero-practice reminder (frame + the four names) against 1 practice episode | 20 | 95% | 85% | +10.0 pp (95% CI -1.6 to +21.6) |
+| the zero-practice reminder (frame + the four names) against 6 practice episodes | 20 | 95% | 90% | +5.0 pp (95% CI -9.0 to +19.0) |
+| the zero-practice reminder (frame + the four names) against 12 practice episodes | 20 | 95% | 100% | -5.0 pp (95% CI -10.7 to +0.7) |
 
 ## 7. Skill-level against pose-level tools
 
