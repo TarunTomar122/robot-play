@@ -71,7 +71,7 @@ def _build_stack(rng, quirk: bool, mass: float | None = None, mu: float | None =
 FRAGILE_N = 3.5            # each finger may press at most this hard on the fragile cube [N]: 'normal' presses with about 2.6 N, 'firm' with about 4.9 N
 
 
-def _build_mixed(rng, quirk: bool):
+def _build_mixed(rng, quirk: bool, silent: bool = False):
     """Stack with two odd cubes. In every layout one of cube_green and cube_blue is heavy and slippery (it needs a firm grip) and the other is fragile (it takes
     at most FRAGILE_N per finger, so a firm grip makes the hand let go). Which is which is drawn from the seed and is never shown. The control scene has two ordinary cubes."""
     pts = _sample_xy(rng, 3, min_sep=0.14)
@@ -82,8 +82,8 @@ def _build_mixed(rng, quirk: bool):
     frag = {"cube_green": None if (heavy_is_green or not quirk) else FRAGILE_N, "cube_blue": None if (not heavy_is_green or not quirk) else FRAGILE_N}
     objs = [
         ObjectSpec("cube_red", "box", (.02, .02, .02), tuple(pts[0]), (.9, .15, .15, 1), mass=0.05),
-        ObjectSpec("cube_green", "box", (.02, .02, .02), tuple(pts[1]), (.15, .75, .2, 1), crush_n=frag["cube_green"], **kinds["cube_green"]),
-        ObjectSpec("cube_blue", "box", (.02, .02, .02), tuple(pts[2]), (.15, .25, .9, 1), crush_n=frag["cube_blue"], **kinds["cube_blue"]),
+        ObjectSpec("cube_green", "box", (.02, .02, .02), tuple(pts[1]), (.15, .75, .2, 1), crush_n=frag["cube_green"], crush_silent=silent, **kinds["cube_green"]),
+        ObjectSpec("cube_blue", "box", (.02, .02, .02), tuple(pts[2]), (.15, .25, .9, 1), crush_n=frag["cube_blue"], crush_silent=silent, **kinds["cube_blue"]),
     ]
     meta = {"heavy": ("cube_green" if heavy_is_green else "cube_blue") if quirk else None, "fragile": (("cube_blue" if heavy_is_green else "cube_green") if quirk else None)}
     return SceneSpec(objects=objs), {}, meta
@@ -98,8 +98,12 @@ def _check_stack(env):
     ok_g = np.linalg.norm(g[:2] - r[:2]) < 0.012 and abs(g[2] - (r[2] + 0.04)) < 0.008
     ok_b = np.linalg.norm(b[:2] - r[:2]) < 0.012 and abs(b[2] - (r[2] + 0.08)) < 0.008
     tilts = max(tr["tilt"].values())
-    ok = bool(ok_g and ok_b and tilts < 15 and stable)
-    return ok, {"green_on_red": bool(ok_g), "blue_on_green": bool(ok_b), "max_tilt_deg": round(tilts, 1), "stable_1s": bool(stable)}
+    cracked = sorted(getattr(w, "cracked", ()))
+    ok = bool(ok_g and ok_b and tilts < 15 and stable and not cracked)
+    detail = {"green_on_red": bool(ok_g), "blue_on_green": bool(ok_b), "max_tilt_deg": round(tilts, 1), "stable_1s": bool(stable)}
+    if cracked:                                                  # v1.16: hidden damage, named only in the verdict
+        detail["cracked"] = cracked
+    return ok, detail
 
 
 # ---------------------------------------------------------------------------------------------- bins
@@ -186,6 +190,8 @@ TASKS = {
                   "then cube_blue on top of cube_green. Call done() when the tower is finished.", _build_stack, _check_stack),
     "mixed": Task("mixed", "Stack the three cubes into one tower. cube_red is the bottom and stays where it is, cube_green goes on top of it, "
                   "then cube_blue on top of cube_green. Call done() when the tower is finished.", _build_mixed, _check_stack),
+    "mixed_silent": Task("mixed_silent", "Stack the three cubes into one tower. cube_red is the bottom and stays where it is, cube_green goes on top of it, "
+                         "then cube_blue on top of cube_green. Call done() when the tower is finished.", lambda rng, quirk: _build_mixed(rng, quirk, silent=True), _check_stack),
     "bins": Task("bins", "Sort the cubes: put both red cubes (cube_red1, cube_red2) into bin_red and both blue cubes (cube_blue1, cube_blue2) "
                  "into bin_blue, so that every cube ends up resting inside the bin of its colour. Call done() when finished.", _build_bins, _check_bins),
     "flasks": Task("flasks", "Move flask_a upright onto ring_a and flask_b upright onto ring_b, centred in each ring and standing on the floor. "

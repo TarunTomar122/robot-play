@@ -29,6 +29,7 @@ class ObjectSpec:
     yaw: float = 0.0
     base: tuple | None = None          # (radius, height) of a wide base under a cylinder's neck
     crush_n: float | None = None       # the most each finger may press on it [N]; a harder squeeze makes the hand let go (a fragile object)
+    crush_silent: bool = False         # v1.16: the hand does NOT let go and nothing is reported: the object is cracked (hidden damage) and only the final verdict shows it
 
 
 @dataclass
@@ -60,6 +61,7 @@ class PandaWorld:
 
     def __init__(self, scene: SceneSpec):
         self.scene = scene
+        self.cracked: set = set()              # objects squeezed past their silent limit (v1.16)
         spec = mujoco.MjSpec.from_file(str(model_dir("franka_emika_panda") / "scene.xml"))
         spec.geom("floor").friction = [1.0, 0.005, 0.0001]
         wb = spec.worldbody

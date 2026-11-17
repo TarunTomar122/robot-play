@@ -77,6 +77,14 @@ class Skills:
         f = self.w.finger_normal_force(name)
         return (f, o.crush_n) if f > o.crush_n else None
 
+    def _crack_silently(self, name: str, viol) -> bool:
+        """v1.16: an object with `crush_silent` squeezed past its limit is cracked without a message and the pick carries on; returns True if that happened (the caller must not refuse)."""
+        o = self._obj(name)
+        if viol and o is not None and getattr(o, "crush_silent", False):
+            self.w.cracked.add(name)
+            return True
+        return False
+
     def _squeeze_error(self, name: str, viol):
         return self._fail(f"squeeze limit exceeded on {name}: the fingers pressed with {viol[0]:.1f} N, it takes at most {viol[1]:.1f} N; the hand let go",
                           gripper_width_m=round(self.w.gripper_width(), 3))
@@ -118,7 +126,7 @@ class Skills:
         for o in self.w.scene.objects:               # a fragile object squeezed harder than it takes: the hand lets go
             if getattr(o, "crush_n", None) is not None and self.w.fingers_touching(o.name) == 2:
                 viol = self._squeeze_violation(o.name)
-                if viol:
+                if viol and not self._crack_silently(o.name, viol):
                     self.open_gripper()
                     return self._squeeze_error(o.name, viol)
         if not self.mv.held:                       # an object squeezed between both fingers is part of the hand from now on: the planner carries it and does not treat it as an obstacle
@@ -210,7 +218,7 @@ class Skills:
             self._retreat(p, yaw, z_hover, object)
             return self._fail("fingers closed on nothing", gripper_width_m=round(width, 3))
         viol = self._squeeze_violation(object)
-        if viol:
+        if viol and not self._crack_silently(object, viol):
             self.open_gripper()
             self._retreat(p, yaw, z_hover, object)
             return self._squeeze_error(object, viol)

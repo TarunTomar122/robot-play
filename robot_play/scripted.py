@@ -124,16 +124,19 @@ MIXED_POLICIES = {
 }
 
 
-def run_mixed(seed: int, quirk: bool, policy: str, max_calls: int | None = None, **env_kw) -> dict:
+def run_mixed(seed: int, quirk: bool, policy: str, max_calls: int | None = None, task: str = "mixed", **env_kw) -> dict:
     """Scripted players for the `mixed` job. A fixed policy in MIXED_POLICIES uses one pick setting for both cubes. `oracle` knows which cube is heavy and which is fragile.
     `procedure` knows nothing: it picks with a normal grip and, when the pick fails, reads the error (a squeeze-limit message means the grip was too hard, any other failure
     means it was too soft) and tries the other grip once."""
-    ep = Episode("mixed", seed, quirk=quirk, max_calls=max_calls, env_kw=env_kw)
+    ep = Episode(task, seed, quirk=quirk, max_calls=max_calls, env_kw=env_kw)
     mv, meta = ep.env.skills.mv, ep.env.meta
     trace = []
+    sticky_firm = False                                          # `sticky`: once a firm grip has worked, it is used for every later pick (what a model that kept the fix would do)
     for obj in ORDER["stack"]:
         if policy in MIXED_POLICIES:
             attempts = MIXED_POLICIES[policy]
+        elif policy == "sticky":
+            attempts = [{"grip_level": "firm", "speed": "slow"}] if sticky_firm else [{"speed": "slow"}, {"grip_level": "firm", "speed": "slow"}]
         elif policy == "oracle":
             attempts = [{"grip_level": "firm", "speed": "slow"} if obj == meta.get("heavy") else {"speed": "slow"}]
         else:
@@ -152,6 +155,8 @@ def run_mixed(seed: int, quirk: bool, policy: str, max_calls: int | None = None,
             trace.append(("pick", obj, r.get("ok"), r.get("error")))
             last = r
             if r.get("ok"):
+                if policy == "sticky" and kw.get("grip_level") == "firm":
+                    sticky_firm = True
                 r2 = ep.call("place", {"target": _dest("stack", obj), "speed": "slow"})
                 trace.append(("place", obj, r2.get("ok"), r2.get("error")))
                 break

@@ -322,6 +322,13 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
                 specs.append(RunSpec(m, "mixed", "notebook", s, True, practice=12, **common))
                 specs.append(RunSpec(m, "mixed", "none", s, False, practice=0, **common))                                     # the control scene: two ordinary cubes
                 specs.append(RunSpec(m, "mixed", "lm_proc", s, False, practice=0, borrowed_notebook=MIXED_TEXTS["lm_proc"], **common))
+    elif cell == "silent":                      # exploratory (v1.16): the two-sided job with SILENT damage: a firm grip cracks the fragile cube with no message, only the final verdict names it
+        for m in models:
+            for s in run_seeds:
+                specs.append(RunSpec(m, "mixed_silent", "none", s, True, practice=0, **common))
+                for c in ("lm_names", "lm_firm", "lm_proc"):
+                    specs.append(RunSpec(m, "mixed_silent", c, s, True, practice=0, borrowed_notebook=SILENT_TEXTS[c], **common))
+                specs.append(RunSpec(m, "mixed_silent", "notebook", s, True, practice=12, **common))
     elif cell == "dose":                        # exploratory (v1.12): the model's own notebook after 1, 3, 6 (and, on run seeds 30 to 39, 12) practice episodes, held-out layouts of the usual four per run seed
         for m in models:
             for t in tasks:
@@ -382,6 +389,17 @@ MIXED_TEXTS = {
     "lm_proc": ("Each cube needs its own grip. Pick every cube first with the default grip_level. If the pick fails (holding stays None and the cube does not rise), pick it again "
                 "with grip_level firm. If a pick comes back with a squeeze-limit message, the grip was too hard for that cube: use the default grip_level for it. Which cube needs "
                 "which changes from layout to layout, so read the result of every pick."),
+}
+
+
+# v1.16: the same three texts for the silent job. The answer key differs only where the world differs: there is no squeeze-limit message, so it says that a firm grip can crack a
+# fragile cube with no message and that only the final verdict shows it.
+SILENT_TEXTS = {
+    "lm_names": SPLIT_TEXTS["lm_names"],
+    "lm_firm": MIXED_TEXTS["lm_firm"],
+    "lm_proc": ("Each cube needs its own grip. Pick every cube first with the default grip_level. Only if the pick fails (holding stays None and the cube does not rise), pick that "
+                "cube again with grip_level firm, and go back to the default grip_level for the next cube: a firm grip can crack a fragile cube with no message, and only the final "
+                "verdict shows it. Which cube needs which changes from layout to layout."),
 }
 
 
