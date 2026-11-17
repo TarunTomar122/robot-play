@@ -65,6 +65,7 @@ class RunSpec:
     eval_seed_list: list | None = None       # explicit evaluation seeds (frontier first try); default is the shared four per run seed
     toolset: str = "skills"                  # "pose" removes pick and place (skill-level versus pose-level comparison)
     disturb_eval: bool = False               # after the clean evaluation episodes, repeat the same layouts with a disturbance
+    borrowed_notebook: str = ""              # condition "borrowed": a frozen notebook written by a stronger model; never rewritten, no practice
     max_calls: int | None = None
     out_dir: str = "runs/main"
     meter_root: str = "runs/spend"
@@ -83,7 +84,7 @@ class RunSpec:
         return {"protocol": PROTOCOL_VERSION, "model": self.model, "task": self.task, "condition": self.condition, "run_seed": self.run_seed,
                 "quirk": self.quirk, "practice": self.practice, "disturb_eval": self.disturb_eval,
                 "toolset": self.toolset, "max_calls": self.max_calls or TASKS[self.task].max_calls * CALL_BUDGET_FACTOR[self.toolset], "plan": self.episodes(), "setup": fingerprint(TASKS[self.task].instruction),
-                "code": code_hash()}
+                "code": code_hash(), **({"borrowed_notebook": self.borrowed_notebook} if self.borrowed_notebook else {})}
 
     def episodes(self) -> list[dict]:
         """The full ordered plan of episodes for this run."""
@@ -145,6 +146,8 @@ def run_one(spec: RunSpec, provider=None) -> dict:
     # rewrite the file with the header, the abandoned-attempt lines and only the complete lines, so a torn tail cannot confuse later readers
     spec.path.write_text(json.dumps({"_config": cfg}) + "\n" + "".join(json.dumps({"_aborted": a}) + "\n" for a in aborts) + "".join(json.dumps(r) + "\n" for r in done))
     memory = Memory(spec.condition)
+    if spec.borrowed_notebook:
+        memory.notebook = spec.borrowed_notebook
     if done:
         memory.notebook, memory.replay = done[-1]["memory"]["notebook"], done[-1]["memory"]["replay"]
     if len(done) >= len(plan):
@@ -211,7 +214,7 @@ def run_all(specs: list[RunSpec], workers: int = 8, log=print) -> list[dict]:
 
 # ----------------------------------------------------------------------------------------------- the matrix (PROTOCOL.md section 5)
 def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str, meter_root: str = "runs/spend", tasks: list[str] | None = None,
-                max_calls: int | None = None) -> list[RunSpec]:
+                max_calls: int | None = None, source_dir: str = "runs/frontier_exp", source_model: str = "claude-fable-5-2") -> list[RunSpec]:
     tasks = tasks or TASK_LIST
     specs: list[RunSpec] = []
     common = dict(out_dir=out_dir, meter_root=meter_root, max_calls=max_calls)
@@ -251,6 +254,41 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
             for t in tasks:
                 for s in run_seeds:
                     specs.append(RunSpec(m, t, "notebook", s, True, **common))
+    elif cell == "borrowed":                    # exploratory (v1.4): a cheap model reads the finished notebook of the frontier model for the same task and run seed, with no practice of its own
+        for m in models:
+            for t in tasks:
+                for s in run_seeds:
+                    text = frontier_notebook(source_dir, source_model, t, s)
+                    if text:
+                        specs.append(RunSpec(m, t, "borrowed", s, True, practice=0, borrowed_notebook=text, **common))
+    elif cell in ("borrowed_1", "borrowed_3"):  # exploratory (v1.5): the same, but the notebook as the frontier model had it after only 1 (or 3) practice episodes: how short can the expensive practice be?
+        after = int(cell[-1])
+        for m in models:
+            for t in tasks:
+                for s in run_seeds:
+                    text = frontier_notebook(source_dir, source_model, t, s, after=after)
+                    if text:
+                        specs.append(RunSpec(m, t, cell, s, True, practice=0, borrowed_notebook=text, **common))
+    elif cell == "borrowed_other":              # the control for "borrowed": the notebook of a DIFFERENT task (stack reads the sort notebook, sort the flask one, flasks the stack one)
+        shift = {"stack": "bins", "bins": "flasks", "flasks": "stack"}
+        for m in models:
+            for t in tasks:
+                for s in run_seeds:
+                    text = frontier_notebook(source_dir, source_model, shift[t], s)
+                    if text:
+                        specs.append(RunSpec(m, t, "borrowed_other", s, True, practice=0, borrowed_notebook=text, **common))
     else:
         raise ValueError(cell)
     return specs
+
+
+def frontier_notebook(source_dir: str, source_model: str, task: str, run_seed: int, after: int | None = None) -> str:
+    """The notebook a finished frontier-with-notebook run ended with ("" if that run is missing or unfinished). With `after`, the notebook as it stood after that many practice
+    episodes (the rows record the memory after each episode), still only for runs that finished, so every borrowed arm reads from the same set of runs."""
+    spec = RunSpec(source_model, task, "notebook", run_seed, True, out_dir=source_dir)
+    cfg, rows, _ = _read(spec.path)
+    if not cfg or len(rows) < len(cfg["plan"]):
+        return ""
+    if after is not None:
+        return (rows[after - 1].get("memory") or {}).get("notebook", "") if 1 <= after <= len(rows) and rows[after - 1].get("phase") == "practice" else ""
+    return (rows[-1].get("memory") or {}).get("notebook", "")
