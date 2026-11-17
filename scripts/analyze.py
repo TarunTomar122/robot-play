@@ -249,7 +249,7 @@ def main():
                     sens.append((m, tname, label, f(d.get("a"), True), f(d.get("b"), True), ci(d, pct=True)))
     L += ["Q1 sensitivity (notebook against fresh, 95% intervals so the rows are comparable; exploratory). The false-`holding` rows bound only the episodes that contain a false `holding`; "
           "the root cause is wider (round 5b): a `move_to` after a failed `pick` is planned for an open hand although the hand is closed, lands on the cube and still answers ok, and the false `holding` follows when the model closes the hand. "
-          "The last two rows therefore count every episode touched by either symptom, and the **extreme bound** assumes every one of them would otherwise have succeeded, which is not credible but is the limit of what the registered rows can say. "
+          "The last two rows therefore count every episode touched by either symptom, and the **extreme bound** assumes every one of them would otherwise have succeeded, which is not credible but is the limit of what the registered rows can say; **the cause-fixed rerun of section 6b contradicts it** (no memory reached 42%, not about 95%). "
           "Sections 6b and 6c rerun Haiku on `stack` on simulators with the symptom and then the cause fixed.", "",
           table(["model", "jobs", "treatment of the artefact episodes", "notebook", "fresh", "difference"], sens), ""]
     if cheap:
@@ -517,6 +517,12 @@ def main():
             dc = A.paired_difference(rs, "claude-haiku-5-5", "notebook", "none", metric="calls_to_success")
             if d.get("n_pairs"):
                 cmp_.append((label, d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True), ci(dc)))
+        dist_rows = []
+        for label, rs in sims:
+            for c in ("none", "notebook"):
+                x = A.select(rs, model="claude-haiku-5-5", task="stack", condition=c, phase="eval_disturbed", quirk=True)
+                if x:
+                    dist_rows.append((label, NAMES[c], len(x), f"{sum(r['success'] for r in x)}/{len(x)} ({f(mean(x, 'success'), True)})"))
         gaps = {}
         for label, rs in sims:
             ma = A._run_means(A.select(rs, model="claude-haiku-5-5", task="stack", condition="notebook", phase="eval", quirk=True), "success")
@@ -532,7 +538,9 @@ def main():
               "Notebook against no memory on the same ten run seeds, per simulator (a run needs both arms complete):", "",
               table(["simulator", "pairs", "notebook", "no memory", "success difference", "calls-to-success difference"], cmp_), "",
               "How much smaller is the notebook gain on a simulator with the defect removed? Difference of the gains, paired by run seed (a run-level bootstrap of the ten per-seed differences, exploratory and not pre-registered). The observed gain is smaller; with ten run seeds and one model the size of that change is uncertain, and an interval that includes zero means the data do not exclude no change at all:", "",
-              table(["difference of gains", "run seeds", "estimate"], gap_rows), ""]
+              table(["difference of gains", "run seeds", "estimate"], gap_rows), "",
+              "The disturbed held-out episodes (a slip or a shove mid-task) on the same three simulators, Haiku on `stack`:", "",
+              table(["simulator", "memory", "disturbed episodes", "solved"], dist_rows), ""]
 
     # --- 6c: the registered Q1 comparison replicated on the corrected simulator (v1.6; exploratory)
     rep_rows = A.load(*ex(a.rep), complete_only=True) if ex(a.rep) else []
@@ -564,30 +572,42 @@ def main():
         # the predictions of v1.6, scored mechanically, and only once every required cell and pair exists
         expected_pairs = {"all three jobs": 30, "stack": 10, "bins": 10, "flasks": 10}
         missing = [f"{m} {t}: {verdict.get((m, t), {}).get('n_pairs', 0)} of {n} pairs" for m in cheap for t, n in expected_pairs.items() if verdict.get((m, t), {}).get("n_pairs", 0) < n]
+        floor = {"all three jobs": 24, "stack": 8, "bins": 8, "flasks": 8}                       # registered in PROTOCOL.md v1.6B: the Q1 floor (24 of 30 pooled pairs) and 8 of 10 per job
+        final = (ROOT / "logs/rep_fixed_done.txt").exists()
+
+        def S(cells, fn):
+            """pending until every pair exists; once the cell has finished, scored if each cell has at least its floor, else inconclusive"""
+            got = [verdict.get(c, {}).get("n_pairs", 0) for c in cells]
+            if all(g >= expected_pairs[c[1]] for g, c in zip(got, cells)):
+                return fn()
+            if not final:
+                return "pending"
+            return "inconclusive (below the registered floor)" if any(g < floor[c[1]] for g, c in zip(got, cells)) else fn() + " (scored with fewer than the planned pairs, above the floor)"
         bad_files = [c["file"] for c in rcov if c.get("code") != "8fdcf6b2491b68a3" or not 20 <= c["run_seed"] <= 29]
         L += [f"Validation of the included files: {len(rcov)} run files, every one with code hash `8fdcf6b2491b68a3` and a run seed from 20 to 29: {'yes' if not bad_files else 'NO, ' + ', '.join(bad_files[:5])}. "
-              + (f"**Incomplete: {len(missing)} of {len(cheap) * len(expected_pairs)} model and job cells are missing pairs ({'; '.join(missing[:6])}{' ...' if len(missing) > 6 else ''}). Every prediction below is pending until all 120 runs are complete.**" if missing else "All 120 planned runs are complete."), ""]
+              + (f"**Incomplete: {len(missing)} of {len(cheap) * len(expected_pairs)} model and job cells are missing pairs ({'; '.join(missing[:6])}{' ...' if len(missing) > 6 else ''}). Every prediction below is pending until all 120 runs are complete; once the cell has finished it is scored if every cell has at least the registered floor (24 of 30 pooled pairs, 8 of 10 per job) and called inconclusive below it.**" if missing else "All 120 planned runs are complete."), ""]
         pr = []
         hs, hall = verdict.get(("claude-haiku-5-5", "stack")), verdict.get(("claude-haiku-5-5", "all three jobs"))
         ls_ = verdict.get(("gpt-6-luna", "all three jobs"))
         if hs:
             pr.append(("1. Haiku `stack`: notebook at or above 90%, no memory 30% to 75%, gain at least +20 points",
-                       f"notebook {f(hs['a'], True)}, no memory {f(hs['b'], True)}, gain {hs['diff'] * 100:+.1f}", "pending" if missing else ("met" if hs["a"] >= 0.90 and 0.30 <= hs["b"] <= 0.75 and hs["diff"] >= 0.20 else "MISSED")))
+                       f"notebook {f(hs['a'], True)}, no memory {f(hs['b'], True)}, gain {hs['diff'] * 100:+.1f}", S([("claude-haiku-5-5", "stack")], lambda: "met" if hs["a"] >= 0.90 and 0.30 <= hs["b"] <= 0.75 and hs["diff"] >= 0.20 else "MISSED")))
         if hall:
             pr.append(("2. Haiku pooled: gain at least +10 points with the 95% interval above zero", f"gain {hall['diff'] * 100:+.1f}, interval {hall['lo'] * 100:+.1f} to {hall['hi'] * 100:+.1f}",
-                       "pending" if missing else ("met" if hall["diff"] >= 0.10 and hall["lo"] > 0 else "MISSED")))
+                       S([("claude-haiku-5-5", "all three jobs")], lambda: "met" if hall["diff"] >= 0.10 and hall["lo"] > 0 else "MISSED")))
         if ls_:
             pr.append(("3. Luna pooled: a small positive gain below +15 points (interval may include zero)", f"gain {ls_['diff'] * 100:+.1f}, interval {ls_['lo'] * 100:+.1f} to {ls_['hi'] * 100:+.1f}",
-                       "pending" if missing else ("met" if 0 < ls_["diff"] < 0.15 else "MISSED")))
+                       S([("gpt-6-luna", "all three jobs")], lambda: "met" if 0 < ls_["diff"] < 0.15 else "MISSED")))
         worst = [(k, v) for k, v in verdict.items() if k[1] != "all three jobs" and v["diff"] < -0.05]
-        pr.append(("4. No job where the notebook arm is more than 5 points below no memory", "none" if not worst else "; ".join(f"{k[0]} {k[1]} {v['diff'] * 100:+.1f}" for k, v in worst), "pending" if missing else ("met" if not worst else "MISSED")))
+        pr.append(("4. No job where the notebook arm is more than 5 points below no memory", "none" if not worst else "; ".join(f"{k[0]} {k[1]} {v['diff'] * 100:+.1f}" for k, v in worst), S([(m, t) for m in cheap for t in ("stack", "bins", "flasks")], lambda: "met" if not worst else "MISSED")))
         against = []
         if hs and hs["b"] >= 0.85:
             against.append("Haiku `stack` no memory at 85% or more")
         if hall and hall["diff"] < 0.05:
             against.append("pooled Haiku gain below +5 points")
-        L += ["Predictions of PROTOCOL.md v1.6, scored by the generator:", "", table(["prediction", "result", "status"], pr), "",
-              ("Pending: the pre-stated conditions against the claim (Haiku `stack` no memory at 85% or more, or a pooled Haiku gain below +5 points) are judged only when all runs are complete." if missing else
+        L += ["Note on the two corrected simulators: the three-simulator comparison of section 6b used the code with hash `aef351c5c3033d54` (tag `code-fixcollide`); this replication uses `8fdcf6b2491b68a3` (tag `code-fixed`), which adds only the layout sampler restart on top of it (a change that touches one flasks layout, not used here), so for the played layouts the two behave alike.", "",
+              "Predictions of PROTOCOL.md v1.6, scored by the generator:", "", table(["prediction", "result", "status"], pr), "",
+              ("Pending or inconclusive: the pre-stated conditions against the claim (Haiku `stack` no memory at 85% or more, or a pooled Haiku gain below +5 points) are judged under the same rule as the predictions (all pairs, or the registered floor once the cell has finished)." if S([("claude-haiku-5-5", "stack"), ("claude-haiku-5-5", "all three jobs")], lambda: "") in ("pending",) or S([("claude-haiku-5-5", "stack"), ("claude-haiku-5-5", "all three jobs")], lambda: "").startswith("inconclusive") else
                ("**The registered headline did not replicate on the corrected simulator** (" + "; ".join(against) + ")." if against else "The pre-stated condition against the claim (Haiku `stack` no memory at 85% or more, or a pooled Haiku gain below +5 points) did not occur.")),
               "The four predictions were written after the registered and three-simulator results were known, so they are predictions about a replication, not independent forecasts; the condition against the claim leaves a middle zone (a pooled Haiku gain between +5 and +10 points) in which the replication is neither confirmed nor refuted, and the report says so if it lands there.", ""]
         dr = []
@@ -623,10 +643,16 @@ def main():
     # --- honesty about claims
     fc = []
     for m in cheap:
-        x = A.select(skills, model=m, phase="eval", quirk=True)
-        if x:
-            fc.append((m, len(x), f(mean(x, "claimed_done"), True), f(sum(r["false_claim"] for r in x) / len(x), True)))
-    L += ["## 8. Saying 'done' when the job is not done", "", table(["model", "held-out episodes", "said done", "said done but the simulator disagreed"], fc), ""]
+        for c in ("none", "notebook", "replay"):
+            for ph, ph_name in (("eval", "clean"), ("eval_disturbed", "disturbed")):
+                x = A.select(skills, model=m, condition=c, phase=ph, quirk=True)
+                if x:
+                    fc.append((m, NAMES[c], ph_name, len(x), f(mean(x, "claimed_done"), True), f"{sum(r['false_claim'] for r in x)} ({f(sum(r['false_claim'] for r in x) / len(x), True)})"))
+    allx = {m: [r for r in skills if r["model"] == m and r["phase"] in ("eval", "eval_disturbed") and r["quirk"] and r["condition"] in ("none", "notebook", "replay")] for m in cheap}
+    L += ["## 8. Saying 'done' when the job is not done", "",
+          "Held-out catch-scene episodes, clean and disturbed separately (the disturbed ones are only played by the no-memory, notebook and replay arms that have a disturbed evaluation):", "",
+          table(["model", "memory", "evaluation", "episodes", "said done", "said done but the simulator disagreed"], fc), "",
+          "Over all held-out catch-scene episodes of the registered conditions (no memory, notebook, replay): " + "; ".join(f"{m}: {sum(r['false_claim'] for r in x)} of {len(x)} ({f(sum(r['false_claim'] for r in x) / len(x), True)})" for m, x in allx.items() if x) + ".", ""]
 
     dev = ROOT / "results/deviations.md"
     L += ["## 9. Deviations from the protocol", "", dev.read_text() if dev.exists() else "None recorded.", ""]
