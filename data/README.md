@@ -1,6 +1,6 @@
 # Raw run files
 
-`robot-play-runs.tar.xz` (8.7 MB) holds every run file behind every number in `results/RESULTS.md`: one `.jsonl` file per run (a header line with the plan and the code hash, then one line per finished episode with the full tool-call log, the memory, the usage and the verdict), grouped in the folders named in [results/code_versions.md](../results/code_versions.md), plus the spend ledger (`runs/spend/ledger.jsonl`) and the zero-practice notebooks (`runs/prior_notebooks`). Pilot and smoke-test folders that no table uses are left out (`runs/pilot20`, `pilot20b`, `pilot21`, `pilot21_pose`, `memsmoke`). The only edit is that local file-system paths inside a few zero-cost crash messages (the three-minute model-directory outage of 17 Nov, deviation 5) were replaced by `<local>`.
+`robot-play-runs.tar.xz` (9.6 MB) holds every run file behind every number in `results/RESULTS.md`: one `.jsonl` file per run (a header line with the plan and the code hash, then one line per finished episode with the full tool-call log, the memory, the usage and the verdict), grouped in the folders named in [results/code_versions.md](../results/code_versions.md), plus the spend ledger (`runs/spend/ledger.jsonl`) and the zero-practice notebooks (`runs/prior_notebooks`). Pilot and smoke-test folders that no table uses are left out (`runs/pilot20`, `pilot20b`, `pilot21`, `pilot21_pose`, `memsmoke`). The only edit is that local file-system paths inside a few zero-cost crash messages (the three-minute model-directory outage of 17 Nov, deviation 5) were replaced by `<local>`.
 
 Regenerate the report from the files, with no network and no money:
 
@@ -11,4 +11,4 @@ cd /tmp/rp && /path/to/robot-play/.venv/bin/python /path/to/robot-play/scripts/a
 /path/to/robot-play/.venv/bin/python /path/to/robot-play/scripts/check_run_files.py --reported
 ```
 
-The regenerated `RESULTS.md` is identical to `results/RESULTS.md` (checked on 17 Nov, 04:01, from a clean checkout without the local logs: `diff` is empty). SHA-256 of the archive: `a6d98de8596da3337a762da1f179f58d756bc3e1057a8d1599c8225969dbb91e`.
+The regenerated `RESULTS.md` is identical to `results/RESULTS.md` (checked on 17 Nov, 04:50, from a clean checkout without the local logs: `diff` is empty; the checker reports 1,714 run files clean). SHA-256 of the archive: `f418e79314cab6ea621fb0ca28c75cfc5b7df5ae06aad99421b8caaf5a456606`.

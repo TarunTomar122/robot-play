@@ -16,6 +16,7 @@ A run file is a header line (`_config`: the plan and the code hash) followed by 
 `--reported` stands for every run folder the results use (the pilot and smoke folders, which use layouts 50000+ and run seed 99, are left out).
 Folders named `spend` (the spend ledger) and files that are not run files are not run folders and are skipped. Exit code 1 if any file is not clean."""
 import collections
+import hashlib
 import json
 import re
 import sys
@@ -38,13 +39,40 @@ EXPECTED = {
     "borrowed_1": (58, 0, {"90bd12fc77ec6f43"}), "borrowed_3": (58, 0, {"90bd12fc77ec6f43"}), "borrowed_other": (58, 2, {"bdda918f09675319"}), "borrowed_sonnet": (40, 0, {"088c639d7139a3af"}),
     "main_fixhold": (20, 0, {"c694b1a45aaf30c5"}), "main_fixcollide": (20, 0, {"aef351c5c3033d54"}), "rep_fixed": (120, 0, {"8fdcf6b2491b68a3"}),
     "hint": (60, 0, {"088c639d7139a3af"}), "hint_generic": (60, 0, {"088c639d7139a3af"}), "prior": (60, 0, {"088c639d7139a3af"}), "writer_sonnet": (20, 0, {"088c639d7139a3af"}),
-    "labelmatch": (180, 0, {"58b19ca1be3740fe"}), "wordsplit": (30, 0, {"0346eddace878d63"}), "wordsplit2": (80, 0, {"c44187af32043997"}), "dose": (70, 0, {"33db266fef842900"}), "second": (50, 0, {"216aab61b6c8b09e"}),
+    "labelmatch": (180, 0, {"58b19ca1be3740fe"}), "wordsplit": (30, 0, {"0346eddace878d63"}), "wordsplit2": (80, 0, {"c44187af32043997"}), "dose": (70, 0, {"33db266fef842900"}), "second": (50, 0, {"216aab61b6c8b09e"}), "budget": (240, 0, {"a047eaf9c4a9c258"}),
 }
 # folder: (lowest, highest) run seed its files may carry (the registered seed plan of each cell; the dose folder holds seeds 20 to 39, its 12-episode runs only 30 to 39)
 RUN_SEEDS = {
     "main": (0, 9), "main_ext": (10, 19), "control": (0, 9), "frontier": (0, 0), "frontier_exp": (0, 9), "pose": (0, 2), "borrowed": (0, 9), "borrowed_1": (0, 9), "borrowed_3": (0, 9),
     "borrowed_other": (0, 9), "borrowed_sonnet": (20, 29), "main_fixhold": (0, 9), "main_fixcollide": (0, 9), "rep_fixed": (20, 29), "hint": (20, 29), "hint_generic": (20, 29),
-    "prior": (20, 29), "writer_sonnet": (20, 29), "labelmatch": (20, 29), "wordsplit": (20, 29), "wordsplit2": (30, 39), "dose": (20, 39), "second": (30, 39),
+    "prior": (20, 29), "writer_sonnet": (20, 29), "labelmatch": (20, 29), "wordsplit": (20, 29), "wordsplit2": (30, 39), "dose": (20, 39), "second": (30, 39), "budget": (30, 39),
+}
+# folder: first 16 hex digits of the SHA-256 of the sorted run-file names joined by newlines (an identity manifest: a substituted, renamed or missing file changes it even when the count stays the same)
+MANIFEST = {
+    "main": "826c89847cb52211",
+    "main_ext": "12b5c61f6f8eecb6",
+    "control": "c348fe2456cbb2f1",
+    "frontier": "c5e9dbc0c26b8b28",
+    "frontier_exp": "a72feba808e9d11e",
+    "pose": "a785ca61ad033feb",
+    "borrowed": "07009686df1108f0",
+    "borrowed_1": "5658cfac4abda733",
+    "borrowed_3": "d752151062d66782",
+    "borrowed_other": "d28298789e37ab52",
+    "borrowed_sonnet": "04bdbf38ebb08c91",
+    "main_fixhold": "153d82ec5cb087c1",
+    "main_fixcollide": "153d82ec5cb087c1",
+    "rep_fixed": "6e2e532477026242",
+    "hint": "a10aeb1a2f39cc05",
+    "hint_generic": "76457dd627b726f8",
+    "prior": "64672d10bb0539e4",
+    "writer_sonnet": "932ee9673418aa1e",
+    "labelmatch": "4589fcd15621d1de",
+    "wordsplit": "72e49eb3a093cab2",
+    "wordsplit2": "3fd2207a2e3cbe36",
+    "dose": "990117792c716c71",
+    "second": "966d4b5015069afe",
+    "budget": "136b994d8cac360b",
 }
 IMPORT_ERROR = None
 try:
@@ -140,6 +168,10 @@ for d in args or ["runs"]:
             print(f"NOT CLEAN {f}: " + "; ".join(problems))
     if reported and Path(d).name in EXPECTED:
         n_exp, unf_exp, hashes_exp = EXPECTED[Path(d).name]
+        names_sha = hashlib.sha256("\n".join(sorted(x.name for x in Path(d).glob("*.jsonl"))).encode()).hexdigest()[:16]
+        if MANIFEST.get(Path(d).name) != names_sha:
+            bad += 1
+            print(f"NOT CLEAN {d}: the run-file names hash to {names_sha}, the documented manifest says {MANIFEST.get(Path(d).name)}")
         if (files_here, unfinished) != (n_exp, unf_exp) or not set(codes) <= hashes_exp:
             bad += 1
             print(f"NOT CLEAN {d}: {files_here} files ({unfinished} unfinished) and hashes {sorted(codes)}, documented: {n_exp} files ({unf_exp} unfinished) and hashes {sorted(hashes_exp)}")

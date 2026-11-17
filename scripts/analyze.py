@@ -34,6 +34,7 @@ WS_HASH = "0346eddace878d63"        # code hash of tag code-wordsplit (PROTOCOL.
 WS2_HASH = "c44187af32043997"       # code hash of tag code-wordsplit2 (PROTOCOL.md v1.11)
 DOSE_HASH = "33db266fef842900"      # code hash of tag code-dose (PROTOCOL.md v1.12)
 SEC_HASH = "216aab61b6c8b09e"       # code hash of tag code-second (PROTOCOL.md v1.13)
+BUD_HASH = "a047eaf9c4a9c258"       # code hash of tag code-budget (PROTOCOL.md v1.14)
 NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job",
          "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes",
          "hint": "reads a one-sentence hint naming the fix", "hint_generic": "reads a generic tip (lists the four adjustable settings, names no fix)", "prior": "reads Fable's notebook written with no practice"}
@@ -138,6 +139,7 @@ def main():
     ap.add_argument("--wordsplit2", nargs="*", default=["runs/wordsplit2"], help="exploratory repeat of the split on fresh layouts (PROTOCOL.md v1.11): Haiku, stack, run seeds 30-39, eight arms")
     ap.add_argument("--dose", nargs="*", default=["runs/dose"], help="exploratory practice-dose cell (PROTOCOL.md v1.12): Haiku, stack, own notebook after 1, 3, 6 (and 12 on run seeds 30-39) practice episodes")
     ap.add_argument("--second", nargs="*", default=["runs/second"], help="exploratory second model (PROTOCOL.md v1.13): Claude Sonnet 5.5 on stack, run seeds 30-39, room check then four split arms")
+    ap.add_argument("--budget", nargs="*", default=["runs/budget"], help="exploratory stated-budget cell (PROTOCOL.md v1.14): Haiku and Luna, three jobs, run seeds 30-39, 12 calls stated to the model")
     ap.add_argument("--writer", nargs="*", default=["runs/writer_sonnet"], help="exploratory second writer (PROTOCOL.md v1.8): Claude Sonnet 5.5 with its own notebook, run seeds 20-29 (stack) and 20-24 (bins, flasks)")
     ap.add_argument("--borrowed-sonnet", nargs="*", default=["runs/borrowed_sonnet"], help="cheap models reading the Sonnet notebooks with no practice (PROTOCOL.md v1.8)")
     ap.add_argument("--meter", default="runs/spend")
@@ -941,7 +943,7 @@ def main():
         final = (ROOT / "logs/wordsplit_done.txt").exists() or all(vd.get((c, "none"), {}).get("n_pairs", 0) >= 10 for c in ("lm_frame", "lm_names", "lm_instr"))     # every planned pair exists
 
         def arm_state(c, fn):
-            n = min(vd.get((x, "none"), {}).get("n_pairs", 0) for x in ("lm_frame", "lm_names", "lm_instr"))      # scored only when every arm has its pairs
+            n = min(len(ks), *[vd.get((x, "none"), {}).get("n_pairs", 0) for x in ("lm_frame", "lm_names", "lm_instr")])      # scored only when every arm has its pairs, on the same run seeds
             if n >= 10:
                 return fn()
             if not final:
@@ -1012,7 +1014,7 @@ def main():
         final2 = (ROOT / "logs/wordsplit2_done.txt").exists() or all(vd2.get((c, "none"), {}).get("n_pairs", 0) >= 10 for c in order[1:])
 
         def score(cells_, fn):
-            n = min([vd2.get(c_, {}).get("n_pairs", 0) for c_ in cells_] or [0])
+            n = min([len(ks)] + [vd2.get(c_, {}).get("n_pairs", 0) for c_ in cells_])          # every arm must have the same run seeds
             if n >= 10:
                 return fn()
             if not final2:
@@ -1103,9 +1105,11 @@ def main():
         L += ["Paired differences (run seed; the number of pairs says which run seeds each comparison could use):", "", table(["comparison", "pairs", "first", "second", "difference"], cmp_rows), ""]
         final3 = (ROOT / "logs/dose_done.txt").exists() or sum(int(c["complete"]) for c in dcov) == 70
 
+        all_ready = all(vd3.get(k, {}).get("n_pairs", 0) >= 20 for k in (("nb1", "nb0"), ("nb3", "nb0"), ("nb6", "nb0"), ("nb6", "nb1"), ("nb12", "nb0"))) and len({r["run_seed"] for r in A.select(rows_d, model=hm, condition="nb12", phase="eval", quirk=True) if r["run_seed"] in seeds_fresh}) >= 10     # every dose must be complete before any prediction is scored
+
         def sc(keys, fn, need, n_over=None):
             n = n_over if n_over is not None else min([vd3.get(k, {}).get("n_pairs", 0) for k in keys] or [0])
-            if n >= need:
+            if n >= need and (all_ready or final3):
                 return fn()
             if not final3:
                 return "pending"
@@ -1159,6 +1163,84 @@ def main():
         if solved_first or failed_first:
             L += ["**By the outcome of the single practice episode (descriptive, not registered; runs on the corrected simulator with one practice episode, run seeds 20 to 39 as pooled above):** "
                   f"after a solved practice episode the held-out layouts were solved {sum(a_ for a_, _ in solved_first)} of {sum(b_ for _, b_ in solved_first)} times ({len(solved_first)} runs); after a failed practice episode {sum(a_ for a_, _ in failed_first)} of {sum(b_ for _, b_ in failed_first)} ({len(failed_first)} runs).", ""]
+
+    # --- 6k: the same arms under a stated call budget (v1.14; exploratory)
+    bud_rows = [r for r in (A.load(*ex(a.budget), complete_only=True) if ex(a.budget) else []) if 30 <= r["run_seed"] <= 39]
+    if bud_rows:
+        import re as _re
+        bcov3 = A.coverage(*ex(a.budget))
+        kofb = lambda r: int(_re.search(r"__p(\d+)__s", r["run"]).group(1))
+        relb = lambda rows, cond: [dict(r, condition=cond) for r in rows]
+        rows_b = (relb([r for r in bud_rows if r["condition"] == "none"], "b_none") + relb([r for r in bud_rows if r["condition"] == "lm_names"], "b_names")
+                  + relb([r for r in bud_rows if r["condition"] == "notebook" and kofb(r) == 1], "b_nb1") + relb([r for r in bud_rows if r["condition"] == "notebook" and kofb(r) == 12], "b_nb12"))
+        BN = {"b_none": "no memory", "b_names": "the frame and the four names", "b_nb1": "own notebook, 1 practice episode", "b_nb12": "own notebook, 12 practice episodes"}
+        NAMES.update(BN)
+        mods = [m for m in ("claude-haiku-5-5", "gpt-6-luna") if any(r["model"] == m for r in rows_b)]
+        jobs = ("stack", "bins", "flasks")
+        L += ["## 6k. Exploratory: the same arms with the call budget stated to the model (12 calls)", "",
+              "Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.14, branch `budget`, tag `code-budget`). The system prompt says \"at most 12 tool calls in total\" (the practice episodes run under the same budget), so an episode that has not called `done` in time is a failure. Haiku 5.5 and Luna, all three jobs, run seeds 30 to 39, four held-out episodes per run. "
+              f"Run files started {len(bcov3)}, complete {sum(int(c['complete']) for c in bcov3)} (planned 240). Plain 95% intervals, paired by (job, run seed), no multiplicity correction. The shortest possible `bins` episode takes 9 calls, `stack` and `flasks` 5.", ""]
+        pred_at_6k = len(L)
+        trows = []
+        for m in mods:
+            for t in jobs:
+                for c in ("b_none", "b_names", "b_nb1", "b_nb12"):
+                    x = [r for r in A.select(rows_b, model=m, condition=c, phase="eval", quirk=True) if r["task"] == t]
+                    if x:
+                        suc = [r for r in x if r["success"]]
+                        trows.append((m, t, BN[c], len(x), f"{len(suc)} ({len(suc) / len(x) * 100:.0f}%)", f"{np.mean([r['calls'] for r in suc]):.1f}" if suc else "-", f"{sum(1 for r in suc if r['calls'] <= 10)}", f"{sum(1 for r in x if r['phase'] == 'eval' and not r.get('claimed_done'))}"))
+        L += ["Held-out episodes solved within the stated 12 calls (calls used by the successes; solved within 10; episodes that never called `done`):", "",
+              table(["model", "job", "what the model has", "episodes", "solved within 12", "calls of the successes", "within 10", "never called `done`"], trows), ""]
+        cmp_b, vb = [], {}
+        for m in mods:
+            for t in jobs:
+                for x_, y_ in (("b_nb12", "b_names"), ("b_names", "b_none"), ("b_nb1", "b_none"), ("b_nb12", "b_none"), ("b_nb12", "b_nb1")):
+                    d = A.paired_difference(rows_b, m, x_, y_, tasks=[t])
+                    if d.get("n_pairs"):
+                        cmp_b.append((m, t, f"{BN[x_]} against {BN[y_]}", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
+                        vb[(m, t, x_, y_)] = d
+        L += ["Paired differences (run seed, per model and job):", "", table(["model", "job", "comparison", "pairs", "first", "second", "difference"], cmp_b), ""]
+        finalb = (ROOT / "logs/budget_done.txt").exists() or (len(bcov3) == 240 and all(c["complete"] for c in bcov3))
+
+        def scb(keys, fn):
+            n = min([vb.get(k, {}).get("n_pairs", 0) for k in keys] or [0])
+            if n >= 10:
+                return fn()
+            if not finalb:
+                return "pending"
+            return "inconclusive (below the registered floor)" if n < 8 else fn() + " (scored with fewer than the planned pairs, above the floor)"
+        H, Lu = "claude-haiku-5-5", "gpt-6-luna"
+        kb = lambda m, t: (m, t, "b_nb12", "b_names")
+        pr = []
+        d_b1 = vb.get(kb(H, "stack"))
+        pr.append(("B1: Haiku `stack`, own notebook (12) minus the names list is at most +10 points", f"{d_b1['diff'] * 100:+.1f}" if d_b1 else "no data", scb([kb(H, "stack")], lambda: "met" if at_most(d_b1["diff"], 0.10) else "MISSED")))
+        for tag, job in (("B2", "flasks"), ("B3", "bins")):
+            dh, dl = vb.get(kb(H, job)), vb.get(kb(Lu, job))
+            res = " / ".join(f"{nm} {d['diff'] * 100:+.1f}" if d else f"{nm} no data" for nm, d in (("Haiku", dh), ("Luna", dl)))
+            pr.append((f"{tag}: `{job}`, notebook (12) minus the names list is at least +30 points for Haiku and for Luna", res,
+                       scb([kb(H, job), kb(Lu, job)], lambda: "met" if (at_least(dh["diff"], 0.30) and at_least(dl["diff"], 0.30)) else ("MISSED (Haiku only)" if at_least(dl["diff"], 0.30) else "MISSED (Luna only)" if at_least(dh["diff"], 0.30) else "MISSED (both)"))))
+        bad_files = bad_cov(bcov3, {BUD_HASH}, 30, 39)
+        pr = void_if(bad_files, pr)
+        st = [x[2] for x in pr]
+        if finalb and not bad_files and all(x.startswith(("met", "MISSED")) for x in st):
+            m_ = [x.startswith("met") for x in st]
+            if all(m_):
+                reading = "B1, B2 and B3 met: under a stated budget a list of settings is enough where the catch is a choice among named values, and not where the model has to find a number (a grasp height, a release height), so the notebook's value is the stored value."
+            else:
+                parts = []
+                if not m_[0]:
+                    parts.append("B1 missed: the list does not match the notebook even on `stack` at this budget")
+                for nm, ok, st_ in (("B2 (`flasks`)", m_[1], st[1]), ("B3 (`bins`)", m_[2], st[2])):
+                    if not ok:
+                        parts.append(f"{nm} missed ({st_.split('(')[-1].rstrip(')')}): the notebook's efficiency advantage is not confirmed for that job and model")
+                reading = "; ".join(parts) + "."
+            reading = "Registered reading of the outcome: " + reading
+        else:
+            reading = "Registered reading: scored when the cell has finished."
+        L[pred_at_6k:pred_at_6k] = ["**Predictions of PROTOCOL.md v1.14, scored by the generator first** (pending until every pair exists; below 8 of 10 pairs inconclusive once the cell has finished). Written after the within-10-calls counts of section 6l were known, so not blind. "
+                                    "The registered reading: B1, B2 and B3 all met, a list of settings is enough where the catch is a choice among named values and not where the model has to find a number, so the notebook's value is the stored value; B1 missed, the list does not match the notebook even on `stack` at this budget; B2 or B3 missed for a model, the notebook's efficiency advantage is not confirmed for that job and model (each reported separately).", "",
+                                    table(["prediction", "result", "status"], pr), "", reading, "",
+                                    f"Validation of the included files: {len(bcov3)} run files, every one with code hash `{BUD_HASH}` and a run seed from 30 to 39: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
 
     # --- 6l: solved within k calls, every arm (descriptive; round 5g)
     wk_src = {"none": [r for r in rep_rows if r["condition"] == "none"], "notebook": [r for r in rep_rows if r["condition"] == "notebook"],
