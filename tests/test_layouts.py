@@ -8,7 +8,7 @@ from robot_play.env import TASKS
 
 @pytest.mark.parametrize("task", ["stack", "bins", "flasks"])
 def test_every_planned_layout_can_be_sampled_in_both_scenes(task):
-    for rs in range(20):
+    for rs in range(30):
         for seed in practice_seeds(rs) + eval_seeds(rs):
             for quirk in (True, False):
                 TASKS[task].build(np.random.default_rng(seed), quirk)            # raises if the points cannot be placed
