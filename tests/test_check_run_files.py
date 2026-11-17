@@ -17,7 +17,8 @@ def header(run_seed=20, condition="lm_generic", code="a" * 16, text=GENERIC_HINT
 def row(cfg, j, **over):
     c = cfg["_config"]
     r = {"run": f"{c['model']}__{c['task']}__{c['condition']}__quirk__p0__s{c['run_seed']}", "model": c["model"], "task": c["task"], "condition": c["condition"], "quirk": True, "run_seed": c["run_seed"],
-         "phase": "eval", "idx": j, "seed": 20000 + 100 * c["run_seed"] + j, "toolset": "skills", "result": {"seed": 20000 + 100 * c["run_seed"] + j, "success": True}}
+         "phase": "eval", "idx": j, "seed": 20000 + 100 * c["run_seed"] + j, "toolset": "skills", "result": {"seed": 20000 + 100 * c["run_seed"] + j, "success": True},
+         "memory": {"notebook": c["borrowed_notebook"], "replay": ""}}
     r.update(over)
     return r
 
@@ -86,3 +87,34 @@ def test_a_changed_registered_memory_text_fails(tmp_path):
     write(tmp_path / "a", cfg, [row(cfg, 0), row(cfg, 1)])
     code, out = check(tmp_path / "a")
     assert code == 1 and "registered text" in out
+
+
+def test_an_episode_whose_memory_differs_from_the_header_fails(tmp_path):
+    cfg = header()
+    write(tmp_path / "a", cfg, [row(cfg, 0), row(cfg, 1, memory={"notebook": GENERIC_HINT + " Extra.", "replay": ""})])
+    code, out = check(tmp_path / "a")
+    assert code == 1 and "memory that differs" in out
+
+
+def test_a_run_seed_outside_the_folders_range_fails(tmp_path):
+    cfg = header(run_seed=35)                                               # wordsplit holds run seeds 20 to 29
+    write(tmp_path / "wordsplit", cfg, [row(cfg, 0), row(cfg, 1)])
+    code, out = check(tmp_path / "wordsplit")
+    assert code == 1 and "outside the folder's range" in out
+    cfg2 = header(run_seed=25)
+    write(tmp_path / "wordsplit2", cfg2, [row(cfg2, 0), row(cfg2, 1)])      # wordsplit2 holds 30 to 39
+    assert check(tmp_path / "wordsplit2")[0] == 1
+    write(tmp_path / "other_folder", cfg2, [row(cfg2, 0), row(cfg2, 1)])    # an unknown folder has no range
+    assert check(tmp_path / "other_folder")[0] == 0
+
+
+def test_a_failed_import_of_the_registered_texts_is_a_failure_not_a_skip(tmp_path):
+    cfg = header()
+    write(tmp_path / "a", cfg, [row(cfg, 0), row(cfg, 1)])
+    stub = tmp_path / "stub"
+    (stub / "robot_play").mkdir(parents=True)
+    (stub / "robot_play" / "__init__.py").write_text("")
+    (stub / "robot_play" / "runner.py").write_text("raise ImportError('simulated')\n")
+    env = {"PYTHONPATH": str(stub), "PATH": "/usr/bin:/bin"}
+    p = subprocess.run([sys.executable, "-S", CHECK, str(tmp_path / "a")], capture_output=True, text=True, env=env)
+    assert p.returncode == 1 and "cannot import robot_play.runner" in p.stdout

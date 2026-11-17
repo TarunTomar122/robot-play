@@ -80,6 +80,18 @@ def mean(rows, key):
     return float(np.mean([r[key] for r in rows])) if rows else float("nan")
 
 
+EPS = 1e-9
+
+
+def at_least(x, t):
+    """Registered threshold 'at least t', immune to float noise (a mean of 26 successes in 40 must count as exactly 0.65)."""
+    return x >= t - EPS
+
+
+def at_most(x, t):
+    return x <= t + EPS
+
+
 def learning_chart(rows, models, out):
     fig, axes = plt.subplots(len(models), 3, figsize=(13, 3.6 * len(models)), sharey=True, facecolor=SURFACE, squeeze=False)
     for i, m in enumerate(models):
@@ -934,9 +946,9 @@ def main():
                 return "pending"
             return "inconclusive (below the registered floor)" if n < 8 else fn() + " (scored with fewer than the planned pairs, above the floor)"
         ri, rn, rf = (vd.get(("lm_instr", "none")), vd.get(("lm_names", "none")), vd.get(("lm_frame", "none")))
-        pr = [("W1: Haiku `stack` with the frame and the instruction (no names) solves at least 75%", f"frame + instruction {f(ri['a'], True)}" if ri else "no data", arm_state("lm_instr", lambda: "met" if ri["a"] >= 0.75 else "MISSED")),
-              ("W2: Haiku `stack` with the frame and the four names (no instruction) solves at most 65%", f"frame + names {f(rn['a'], True)}" if rn else "no data", arm_state("lm_names", lambda: "met" if rn["a"] <= 0.65 else "MISSED")),
-              ("W3: Haiku `stack` with the frame only solves at most 65%", f"frame only {f(rf['a'], True)}" if rf else "no data", arm_state("lm_frame", lambda: "met" if rf["a"] <= 0.65 else "MISSED"))]
+        pr = [("W1: Haiku `stack` with the frame and the instruction (no names) solves at least 75%", f"frame + instruction {f(ri['a'], True)}" if ri else "no data", arm_state("lm_instr", lambda: "met" if at_least(ri["a"], 0.75) else "MISSED")),
+              ("W2: Haiku `stack` with the frame and the four names (no instruction) solves at most 65%", f"frame + names {f(rn['a'], True)}" if rn else "no data", arm_state("lm_names", lambda: "met" if at_most(rn["a"], 0.65) else "MISSED")),
+              ("W3: Haiku `stack` with the frame only solves at most 65%", f"frame only {f(rf['a'], True)}" if rf else "no data", arm_state("lm_frame", lambda: "met" if at_most(rf["a"], 0.65) else "MISSED"))]
         bad_files = bad_cov(wcov2, {WS_HASH}) + bad_cov(rcov, {"8fdcf6b2491b68a3"}) + bad_cov(lcov, {LM_HASH})          # the anchors (no-memory replication, inert and generic arms) must validate too
         pr = void_if(bad_files, pr)
         if final and not bad_files and all(st in ("met", "MISSED") or st.startswith(("met ", "MISSED ")) for _, _, st in pr):
@@ -985,7 +997,7 @@ def main():
         L += [f"Held-out success on `stack` (and calls to success) on the {len(ks)} runs every arm has:", "",
               table(["", *[W2N[c].replace("reads ", "").replace("starts fresh", "no memory") for c in order]], [("Haiku", *cells)]), ""]
         cmp_rows, vd2 = [], {}
-        pairs = [(c, "none") for c in order[1:]] + [("lm_names", "lm_instr"), ("lm_names2", "lm_instr_n"), ("lm_generic", "lm_names2"), ("lm_generic", "lm_instr_n"), ("lm_names", "lm_frame"), ("lm_instr", "lm_frame"), ("lm_instr_n", "lm_frame")]
+        pairs = [(c, "none") for c in order[1:]] + [("lm_names", "lm_instr"), ("lm_names2", "lm_instr_n"), ("lm_generic", "lm_names2"), ("lm_generic", "lm_instr_n"), ("lm_names", "lm_frame"), ("lm_instr", "lm_frame"), ("lm_instr_n", "lm_frame"), ("lm_names", "lm_names2")]
         for x, y in pairs:
             d = A.paired_difference(ws2_rows, hm, x, y, tasks=["stack"])
             if d.get("n_pairs"):
@@ -1011,12 +1023,12 @@ def main():
         none_rate = mean(nn, "success") if nn else float("nan")
         r4 = vd2.get(("lm_names2", "lm_instr_n"))
         allc = [(c, "none") for c in order[1:]]
-        pr = [("R0: Haiku `stack` with no memory solves at most 75% on these layouts (they have room)", f"no memory {f(none_rate, True)}" if nn else "no data", score(allc, lambda: "met" if none_rate <= 0.75 else "MISSED")),
-              ("R1: `lm_names` (frame and the four names) solves at least 80%", f"{f(r1['a'], True)}" if r1 else "no data", score(allc, lambda: "met" if r1["a"] >= 0.80 else "MISSED")),
-              ("R2: `lm_frame` (frame only) solves at most 65%", f"{f(r2['a'], True)}" if r2 else "no data", score(allc, lambda: "met" if r2["a"] <= 0.65 else "MISSED")),
-              ("R3: `lm_instr` (frame and 'change how you call it') solves at most 80%", f"{f(r3['a'], True)}" if r3 else "no data", score(allc, lambda: "met" if r3["a"] <= 0.80 else "MISSED")),
-              ("R4: `lm_names2` minus `lm_instr_n` is at least +10 points", f"{r4['diff'] * 100:+.1f}" if r4 else "no data", score([("lm_names2", "lm_instr_n")] + allc, lambda: "met" if r4["diff"] >= 0.10 else "MISSED")),
-              ("R5: `lm_generic` solves at least 80%", f"{f(r5['a'], True)}" if r5 else "no data", score(allc, lambda: "met" if r5["a"] >= 0.80 else "MISSED"))]
+        pr = [("R0: Haiku `stack` with no memory solves at most 75% on these layouts (they have room)", f"no memory {f(none_rate, True)}" if nn else "no data", score(allc, lambda: "met" if at_most(none_rate, 0.75) else "MISSED")),
+              ("R1: `lm_names` (frame and the four names) solves at least 80%", f"{f(r1['a'], True)}" if r1 else "no data", score(allc, lambda: "met" if at_least(r1["a"], 0.80) else "MISSED")),
+              ("R2: `lm_frame` (frame only) solves at most 65%", f"{f(r2['a'], True)}" if r2 else "no data", score(allc, lambda: "met" if at_most(r2["a"], 0.65) else "MISSED")),
+              ("R3: `lm_instr` (frame and 'change how you call it') solves at most 80%", f"{f(r3['a'], True)}" if r3 else "no data", score(allc, lambda: "met" if at_most(r3["a"], 0.80) else "MISSED")),
+              ("R4: `lm_names2` minus `lm_instr_n` is at least +10 points", f"{r4['diff'] * 100:+.1f}" if r4 else "no data", score([("lm_names2", "lm_instr_n")] + allc, lambda: "met" if at_least(r4["diff"], 0.10) else "MISSED")),
+              ("R5: `lm_generic` solves at least 80%", f"{f(r5['a'], True)}" if r5 else "no data", score(allc, lambda: "met" if at_least(r5["a"], 0.80) else "MISSED"))]
         bad_files = bad_cov(w2cov, {WS2_HASH}, 30, 39)
         pr = void_if(bad_files, pr)
         st = [x[2] for x in pr]
@@ -1067,6 +1079,8 @@ def main():
         def per_run_cost(rows, cond, seeds):
             runs = {}
             for r in A.select(rows, model=hm, condition=cond, quirk=True):
+                if r["phase"] == "eval_disturbed":
+                    continue                      # the replication's 12-episode runs also played disturbed episodes; the dose runs did not
                 if cond in ("nb0", "names") and r["phase"] != "eval":
                     continue                      # no memory and the reminder need no practice: only their held-out episodes are charged
                 if r["task"] == "stack" and r["run_seed"] in seeds:
@@ -1079,7 +1093,7 @@ def main():
         t2 = [(DN[c], *cell(rows_d, c, seeds_all), per_run_cost(rows_d, c, seeds_all)) for c in ("nb0", "nb1", "nb3", "nb6", "nb12", "names")]
         L += ["Run seeds 20 to 39 pooled (20 runs; the 12-episode notebooks are those of the replication on run seeds 20 to 29 and of this cell on 30 to 39):", "", table(["what the model has", "held-out success (calls to success)", "runs", "episode cost per run as recorded (practice, notebook writing and held-out; none and the reminder: held-out only)"], t2), ""]
         cmp_rows, vd3 = [], {}
-        for x, y in (("nb1", "nb0"), ("nb3", "nb0"), ("nb6", "nb0"), ("nb12", "nb0"), ("nb3", "nb1"), ("nb6", "nb1"), ("nb6", "nb3"), ("nb12", "nb6"), ("names", "nb1"), ("names", "nb6"), ("names", "nb12")):
+        for x, y in (("nb1", "nb0"), ("nb3", "nb0"), ("nb6", "nb0"), ("nb12", "nb0"), ("nb3", "nb1"), ("nb6", "nb1"), ("nb6", "nb3"), ("nb12", "nb6"), ("nb12", "nb1"), ("nb12", "nb3"), ("names", "nb1"), ("names", "nb6"), ("names", "nb12")):
             d = A.paired_difference(rows_d, hm, x, y, tasks=["stack"])
             if d.get("n_pairs"):
                 cmp_rows.append((f"{DN[x]} against {DN[y]}", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
@@ -1087,8 +1101,8 @@ def main():
         L += ["Paired differences (run seed; the number of pairs says which run seeds each comparison could use):", "", table(["comparison", "pairs", "first", "second", "difference"], cmp_rows), ""]
         final3 = (ROOT / "logs/dose_done.txt").exists() or sum(int(c["complete"]) for c in dcov) == 70
 
-        def sc(keys, fn, need):
-            n = min([vd3.get(k, {}).get("n_pairs", 0) for k in keys] or [0])
+        def sc(keys, fn, need, n_over=None):
+            n = n_over if n_over is not None else min([vd3.get(k, {}).get("n_pairs", 0) for k in keys] or [0])
             if n >= need:
                 return fn()
             if not final3:
@@ -1100,11 +1114,12 @@ def main():
         k1 = [r for r in A.select(rows_d, model=hm, condition="nb1", phase="eval", quirk=True) if r["task"] == "stack"]
         d2v = mean(k1, "success") if k1 else float("nan")
         d3, d4 = vd3.get(("nb6", "nb1")), vd3.get(("nb3", "nb0"))
-        pr = [("D1: Haiku with 12 practice episodes solves at least 90% on run seeds 30 to 39", f"12 episodes {d1v * 100:.1f}%" if d1r else "no data", sc([("nb12", "nb0")], lambda: "met" if d1v >= 0.90 else "MISSED", 10) if d1r else "pending"),
-              ("D2: with 1 practice episode it solves at most 80% (pooled over 20 runs)", f"1 episode {d2v * 100:.1f}%" if k1 else "no data", sc([("nb1", "nb0")], lambda: "met" if d2v <= 0.80 else "MISSED", 20)),
-              ("D3: with 6 practice episodes it solves at least 10 points more than with 1 (pooled, paired)", f"{d3['diff'] * 100:+.1f}" if d3 else "no data", sc([("nb6", "nb1")], lambda: "met" if d3["diff"] >= 0.10 else "MISSED", 20)),
-              ("D4: with 3 practice episodes it solves at least 20 points more than no memory (pooled, paired)", f"{d4['diff'] * 100:+.1f}" if d4 else "no data", sc([("nb3", "nb0")], lambda: "met" if d4["diff"] >= 0.20 else "MISSED", 20))]
+        pr = [("D1: Haiku with 12 practice episodes solves at least 90% on run seeds 30 to 39", f"12 episodes {d1v * 100:.1f}%" if d1r else "no data", sc([("nb12", "nb0")], lambda: "met" if at_least(d1v, 0.90) else "MISSED", 10, n_over=len({r["run_seed"] for r in d1r})) if d1r else "pending"),
+              ("D2: with 1 practice episode it solves at most 80% (pooled over 20 runs)", f"1 episode {d2v * 100:.1f}%" if k1 else "no data", sc([("nb1", "nb0")], lambda: "met" if at_most(d2v, 0.80) else "MISSED", 20)),
+              ("D3: with 6 practice episodes it solves at least 10 points more than with 1 (pooled, paired)", f"{d3['diff'] * 100:+.1f}" if d3 else "no data", sc([("nb6", "nb1")], lambda: "met" if at_least(d3["diff"], 0.10) else "MISSED", 20)),
+              ("D4: with 3 practice episodes it solves at least 20 points more than no memory (pooled, paired)", f"{d4['diff'] * 100:+.1f}" if d4 else "no data", sc([("nb3", "nb0")], lambda: "met" if at_least(d4["diff"], 0.20) else "MISSED", 20))]
         bad_files = [c for c in dcov if c.get("code") != DOSE_HASH or not isinstance(c.get("run_seed"), int) or not (30 if "__p12__" in str(c.get("file", "")) else 20) <= c["run_seed"] <= 39]
+        bad_files += bad_cov(rcov, {"8fdcf6b2491b68a3"}) + bad_cov(A.coverage(*ex(a.wordsplit)), {WS_HASH}) + bad_cov(w2cov, {WS2_HASH}, 30, 39)          # the anchors (no memory, 12 episodes, the reminder) must validate too
         pr = void_if(bad_files, pr)
         st = [x[2] for x in pr]
         if final3 and not bad_files and all(x.startswith(("met", "MISSED")) for x in st):
@@ -1119,7 +1134,48 @@ def main():
         L[pred_at_6i:pred_at_6i] = ["**Predictions of PROTOCOL.md v1.12, scored by the generator first** (pending until every pair exists; below 80% of the planned runs inconclusive once the cell has finished). Written after the v1.11 results were known, so not blind. "
                                     "The registered reading: D1 missed, nothing else is read; D2 missed, one practice episode already gives a notebook near the reminder's level; D2 and D3 met, success rises with practice and the dose at which it first reaches 90% is the answer; D2 met and D3 missed, the early episodes carry the effect.", "",
                                     table(["prediction", "result", "status"], pr), "", reading, "",
-                                    f"Validation of the included files: {len(dcov)} run files, every one with code hash `{DOSE_HASH}` and a run seed from 20 to 39 (30 to 39 for the 12-episode dose): {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
+                                    f"Validation of the included files: {len(dcov)} run files, every one with code hash `{DOSE_HASH}` and a run seed from 20 to 39 (30 to 39 for the 12-episode dose), plus the anchor files of the replication (`8fdcf6b2491b68a3`), the split (`{WS_HASH}`) and its repeat (`{WS2_HASH}`): {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
+        # within-k: how the dose curve looks when the budget is tight (descriptive, not registered)
+        L += ["**Solved within k calls (descriptive, not registered).** An episode counts when it succeeded and used at most k tool calls, so the same episodes as above are scored against a tighter budget than the 20 calls the model was told. Run seeds 20 to 39 pooled, then run seeds 30 to 39 alone (every dose exists there):", ""]
+        for title_, sd in (("Run seeds 20 to 39 pooled", seeds_all), ("Run seeds 30 to 39 only", seeds_fresh)):
+            wk = []
+            for c in ("nb0", "nb1", "nb3", "nb6", "nb12", "names"):
+                x = [r for r in A.select(rows_d, model=hm, condition=c, phase="eval", quirk=True) if r["task"] == "stack" and r["run_seed"] in sd]
+                if x:
+                    wk.append((DN[c], len(x), *[f"{sum(1 for r in x if r['success'] and r['calls'] <= k)} ({sum(1 for r in x if r['success'] and r['calls'] <= k) / len(x) * 100:.0f}%)" for k in (8, 10, 12, 20)]))
+            L += [f"{title_}:", "", table(["what the model has", "held-out episodes", "within 8 calls", "within 10", "within 12", "within 20 (the success above)"], wk), ""]
+        sp = {}
+        for r in A.select(rows_d, model=hm, condition="nb1", phase="eval", quirk=True):
+            if r["task"] == "stack":
+                sp.setdefault(r["run"], []).append(r)
+        pr1 = {}
+        for r in ds_rows:
+            if kof(r) == 1 and r["phase"] == "practice" and r["idx"] == 0 and r["task"] == "stack":
+                pr1[r["run"]] = bool(r["success"])
+        solved_first = [(sum(1 for r in sp[k] if r["success"]), len(sp[k])) for k in sp if pr1.get(k) is True]
+        failed_first = [(sum(1 for r in sp[k] if r["success"]), len(sp[k])) for k in sp if pr1.get(k) is False]
+        if solved_first or failed_first:
+            L += ["**By the outcome of the single practice episode (descriptive, not registered; runs on the corrected simulator with one practice episode, run seeds 20 to 39 as pooled above):** "
+                  f"after a solved practice episode the held-out layouts were solved {sum(a_ for a_, _ in solved_first)} of {sum(b_ for _, b_ in solved_first)} times ({len(solved_first)} runs); after a failed practice episode {sum(a_ for a_, _ in failed_first)} of {sum(b_ for _, b_ in failed_first)} ({len(failed_first)} runs).", ""]
+
+    # --- 6l: solved within k calls, every arm (descriptive; round 5g)
+    wk_src = {"none": [r for r in rep_rows if r["condition"] == "none"], "notebook": [r for r in rep_rows if r["condition"] == "notebook"],
+              "hint": [r for r in hp_rows if r["condition"] == "hint"], "hint_generic": [r for r in hp_rows if r["condition"] == "hint_generic"],
+              "lm_generic": [r for r in lm_rows if r["condition"] == "lm_generic"]}
+    if all(wk_src.values()):
+        WKN = {"none": "no memory", "hint_generic": "generic sentence (operator label)", "lm_generic": "generic sentence (neutral label)", "hint": "naming sentence (operator label)", "notebook": "own notebook (12 practice episodes)"}
+        wrows = []
+        for m in cheap:
+            for t in ("stack", "bins", "flasks"):
+                for c in ("none", "hint_generic", "lm_generic", "hint", "notebook"):
+                    x = [r for r in wk_src[c] if r["model"] == m and r["task"] == t and r["phase"] == "eval" and r["quirk"]]
+                    if x:
+                        cnt = {k: sum(1 for r in x if r["success"] and r["calls"] <= k) for k in (8, 10, 12, 20)}
+                        wrows.append((m, t, WKN[c], len(x), *[f"{cnt[k]} ({cnt[k] / len(x) * 100:.0f}%)" for k in (8, 10, 12, 20)]))
+        L += ["## 6l. Exploratory: solved within k calls, every arm of the replication (run seeds 20 to 29)", "",
+              "Descriptive and **not registered**: it was added after round 5g of the review showed that the 20-call success rate hides differences in efficiency. An episode counts as solved within k calls when it succeeded and its logged call count (including `observe`) is at most k; the model was told 20 calls, not k, so this scores the same episodes against a tighter budget than the model saw. Section 6k (when present) repeats the question with the budget stated to the model. "
+              "Held-out episodes only, 40 per cell (10 runs of 4 layouts, the same layouts in every arm of a model and job).", "",
+              table(["model", "job", "what the model has", "episodes", "within 8 calls", "within 10", "within 12", "within 20 (the success rate)"], wrows), ""]
 
     # --- pose
     if pose:

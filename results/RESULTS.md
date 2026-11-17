@@ -101,7 +101,7 @@ Runs with practice or a borrowed notebook that did not finish their whole plan a
 
 Planned cells that did not start (exploratory cells included; the borrowed cells are planned only where the Fable notebook they read finished): none (every planned run file exists).
 
-Spend meter (pessimistic pricing): {"anthropic": {"spent": 74.120261, "reserved": 0.0, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 26.958573, "reserved": 0.0, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 0. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
+Spend meter (pessimistic pricing): {"anthropic": {"spent": 78.659452, "reserved": 0.013872, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 27.500984, "reserved": 0.04478, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 11. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
 
 ## 2. Q1: does experience raise held-out success?
 
@@ -869,6 +869,7 @@ Paired differences (run seed):
 | reads the frame and the four names against reads the frame only | 10 | 98% | 65% | +32.5 pp (95% CI +15.5 to +49.5) |
 | reads the frame and 'change how you call it' against reads the frame only | 10 | 65% | 65% | +0.0 pp (95% CI -20.7 to +20.7) |
 | reads the frame and 'change the settings one at a time' (no names) against reads the frame only | 10 | 78% | 65% | +12.5 pp (95% CI -8.6 to +33.6) |
+| reads the frame and the four names against reads the frame, 'read the message' and the four names | 10 | 98% | 88% | +10.0 pp (95% CI -2.4 to +22.4) |
 | **primary: reads the frame and the four names against reads the frame and 'change how you call it', pooled over run seeds 20 to 39 (this cell and section 6g)** | 20 | 95% | 68% | +27.5 pp (95% CI +16.1 to +38.9) |
 
 ## 6i. Exploratory: how much practice does the model's own notebook need?
@@ -886,7 +887,7 @@ Registered before any episode ran, and pushed to GitHub before the first one sta
 
 Registered reading of the outcome: a single practice episode already gives a notebook near the reminder's level (D2 missed). Three practice episodes pay for themselves against no memory (D4 met).
 
-Validation of the included files: 70 run files, every one with code hash `33db266fef842900` and a run seed from 20 to 39 (30 to 39 for the 12-episode dose): yes.
+Validation of the included files: 70 run files, every one with code hash `33db266fef842900` and a run seed from 20 to 39 (30 to 39 for the 12-episode dose), plus the anchor files of the replication (`8fdcf6b2491b68a3`), the split (`0346eddace878d63`) and its repeat (`c44187af32043997`): yes.
 
 Run seeds 30 to 39 (10 runs, every dose exists):
 
@@ -907,7 +908,7 @@ Run seeds 20 to 39 pooled (20 runs; the 12-episode notebooks are those of the re
 | 1 practice episode | 85% (12.3 calls) | 20 | $0.009 |
 | 3 practice episodes | 94% (8.8 calls) | 20 | $0.010 |
 | 6 practice episodes | 90% (10.1 calls) | 20 | $0.017 |
-| 12 practice episodes | 100% (7.5 calls) | 20 | $0.027 |
+| 12 practice episodes | 100% (7.5 calls) | 20 | $0.024 |
 | the zero-practice reminder (frame + the four names) | 95% (8.6 calls) | 20 | $0.003 |
 
 Paired differences (run seed; the number of pairs says which run seeds each comparison could use):
@@ -922,9 +923,74 @@ Paired differences (run seed; the number of pairs says which run seeds each comp
 | 6 practice episodes against 1 practice episode | 20 | 90% | 85% | +5.0 pp (95% CI -11.4 to +21.4) |
 | 6 practice episodes against 3 practice episodes | 20 | 90% | 94% | -3.8 pp (95% CI -22.5 to +15.0) |
 | 12 practice episodes against 6 practice episodes | 20 | 100% | 90% | +10.0 pp (95% CI -4.4 to +25.0) |
+| 12 practice episodes against 1 practice episode | 20 | 100% | 85% | +15.0 pp (95% CI +4.7 to +25.3) |
+| 12 practice episodes against 3 practice episodes | 20 | 100% | 94% | +6.2 pp (95% CI -4.4 to +17.5) |
 | the zero-practice reminder (frame + the four names) against 1 practice episode | 20 | 95% | 85% | +10.0 pp (95% CI -1.6 to +21.6) |
 | the zero-practice reminder (frame + the four names) against 6 practice episodes | 20 | 95% | 90% | +5.0 pp (95% CI -9.0 to +19.0) |
 | the zero-practice reminder (frame + the four names) against 12 practice episodes | 20 | 95% | 100% | -5.0 pp (95% CI -10.7 to +0.7) |
+
+**Solved within k calls (descriptive, not registered).** An episode counts when it succeeded and used at most k tool calls, so the same episodes as above are scored against a tighter budget than the 20 calls the model was told. Run seeds 20 to 39 pooled, then run seeds 30 to 39 alone (every dose exists there):
+
+Run seeds 20 to 39 pooled:
+
+| what the model has | held-out episodes | within 8 calls | within 10 | within 12 | within 20 (the success above) |
+|---|---|---|---|---|---|
+| no memory | 80 | 12 (15%) | 14 (18%) | 19 (24%) | 39 (49%) |
+| 1 practice episode | 80 | 37 (46%) | 40 (50%) | 42 (52%) | 68 (85%) |
+| 3 practice episodes | 80 | 57 (71%) | 60 (75%) | 66 (82%) | 75 (94%) |
+| 6 practice episodes | 80 | 36 (45%) | 58 (72%) | 60 (75%) | 72 (90%) |
+| 12 practice episodes | 80 | 53 (66%) | 71 (89%) | 80 (100%) | 80 (100%) |
+| the zero-practice reminder (frame + the four names) | 80 | 62 (78%) | 68 (85%) | 73 (91%) | 76 (95%) |
+
+Run seeds 30 to 39 only:
+
+| what the model has | held-out episodes | within 8 calls | within 10 | within 12 | within 20 (the success above) |
+|---|---|---|---|---|---|
+| no memory | 40 | 6 (15%) | 6 (15%) | 8 (20%) | 19 (48%) |
+| 1 practice episode | 40 | 19 (48%) | 21 (52%) | 21 (52%) | 36 (90%) |
+| 3 practice episodes | 40 | 27 (68%) | 29 (72%) | 32 (80%) | 36 (90%) |
+| 6 practice episodes | 40 | 16 (40%) | 27 (68%) | 29 (72%) | 36 (90%) |
+| 12 practice episodes | 40 | 26 (65%) | 40 (100%) | 40 (100%) | 40 (100%) |
+| the zero-practice reminder (frame + the four names) | 40 | 32 (80%) | 35 (88%) | 38 (95%) | 39 (98%) |
+
+**By the outcome of the single practice episode (descriptive, not registered; runs on the corrected simulator with one practice episode, run seeds 20 to 39 as pooled above):** after a solved practice episode the held-out layouts were solved 28 of 28 times (7 runs); after a failed practice episode 40 of 52 (13 runs).
+
+## 6l. Exploratory: solved within k calls, every arm of the replication (run seeds 20 to 29)
+
+Descriptive and **not registered**: it was added after round 5g of the review showed that the 20-call success rate hides differences in efficiency. An episode counts as solved within k calls when it succeeded and its logged call count (including `observe`) is at most k; the model was told 20 calls, not k, so this scores the same episodes against a tighter budget than the model saw. Section 6k (when present) repeats the question with the budget stated to the model. Held-out episodes only, 40 per cell (10 runs of 4 layouts, the same layouts in every arm of a model and job).
+
+| model | job | what the model has | episodes | within 8 calls | within 10 | within 12 | within 20 (the success rate) |
+|---|---|---|---|---|---|---|---|
+| claude-haiku-5-5 | stack | no memory | 40 | 6 (15%) | 8 (20%) | 11 (28%) | 20 (50%) |
+| claude-haiku-5-5 | stack | generic sentence (operator label) | 40 | 21 (52%) | 24 (60%) | 24 (60%) | 36 (90%) |
+| claude-haiku-5-5 | stack | generic sentence (neutral label) | 40 | 35 (88%) | 36 (90%) | 36 (90%) | 37 (92%) |
+| claude-haiku-5-5 | stack | naming sentence (operator label) | 40 | 40 (100%) | 40 (100%) | 40 (100%) | 40 (100%) |
+| claude-haiku-5-5 | stack | own notebook (12 practice episodes) | 40 | 27 (68%) | 31 (78%) | 40 (100%) | 40 (100%) |
+| claude-haiku-5-5 | bins | no memory | 40 | 0 (0%) | 0 (0%) | 0 (0%) | 36 (90%) |
+| claude-haiku-5-5 | bins | generic sentence (operator label) | 40 | 0 (0%) | 0 (0%) | 0 (0%) | 36 (90%) |
+| claude-haiku-5-5 | bins | generic sentence (neutral label) | 40 | 0 (0%) | 0 (0%) | 0 (0%) | 40 (100%) |
+| claude-haiku-5-5 | bins | naming sentence (operator label) | 40 | 0 (0%) | 28 (70%) | 40 (100%) | 40 (100%) |
+| claude-haiku-5-5 | bins | own notebook (12 practice episodes) | 40 | 0 (0%) | 0 (0%) | 0 (0%) | 40 (100%) |
+| claude-haiku-5-5 | flasks | no memory | 40 | 16 (40%) | 27 (68%) | 32 (80%) | 38 (95%) |
+| claude-haiku-5-5 | flasks | generic sentence (operator label) | 40 | 17 (42%) | 24 (60%) | 29 (72%) | 37 (92%) |
+| claude-haiku-5-5 | flasks | generic sentence (neutral label) | 40 | 17 (42%) | 22 (55%) | 28 (70%) | 34 (85%) |
+| claude-haiku-5-5 | flasks | naming sentence (operator label) | 40 | 37 (92%) | 39 (98%) | 40 (100%) | 40 (100%) |
+| claude-haiku-5-5 | flasks | own notebook (12 practice episodes) | 40 | 40 (100%) | 40 (100%) | 40 (100%) | 40 (100%) |
+| gpt-6-luna | stack | no memory | 40 | 32 (80%) | 39 (98%) | 39 (98%) | 39 (98%) |
+| gpt-6-luna | stack | generic sentence (operator label) | 40 | 36 (90%) | 38 (95%) | 39 (98%) | 40 (100%) |
+| gpt-6-luna | stack | generic sentence (neutral label) | 40 | 37 (92%) | 39 (98%) | 39 (98%) | 40 (100%) |
+| gpt-6-luna | stack | naming sentence (operator label) | 40 | 40 (100%) | 40 (100%) | 40 (100%) | 40 (100%) |
+| gpt-6-luna | stack | own notebook (12 practice episodes) | 40 | 40 (100%) | 40 (100%) | 40 (100%) | 40 (100%) |
+| gpt-6-luna | bins | no memory | 40 | 0 (0%) | 0 (0%) | 16 (40%) | 37 (92%) |
+| gpt-6-luna | bins | generic sentence (operator label) | 40 | 0 (0%) | 0 (0%) | 17 (42%) | 37 (92%) |
+| gpt-6-luna | bins | generic sentence (neutral label) | 40 | 0 (0%) | 0 (0%) | 19 (48%) | 36 (90%) |
+| gpt-6-luna | bins | naming sentence (operator label) | 40 | 0 (0%) | 40 (100%) | 40 (100%) | 40 (100%) |
+| gpt-6-luna | bins | own notebook (12 practice episodes) | 40 | 0 (0%) | 28 (70%) | 35 (88%) | 40 (100%) |
+| gpt-6-luna | flasks | no memory | 40 | 12 (30%) | 20 (50%) | 22 (55%) | 33 (82%) |
+| gpt-6-luna | flasks | generic sentence (operator label) | 40 | 13 (32%) | 21 (52%) | 24 (60%) | 35 (88%) |
+| gpt-6-luna | flasks | generic sentence (neutral label) | 40 | 18 (45%) | 25 (62%) | 29 (72%) | 37 (92%) |
+| gpt-6-luna | flasks | naming sentence (operator label) | 40 | 40 (100%) | 40 (100%) | 40 (100%) | 40 (100%) |
+| gpt-6-luna | flasks | own notebook (12 practice episodes) | 40 | 40 (100%) | 40 (100%) | 40 (100%) | 40 (100%) |
 
 ## 7. Skill-level against pose-level tools
 

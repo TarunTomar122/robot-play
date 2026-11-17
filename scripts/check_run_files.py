@@ -40,13 +40,23 @@ EXPECTED = {
     "hint": (60, 0, {"088c639d7139a3af"}), "hint_generic": (60, 0, {"088c639d7139a3af"}), "prior": (60, 0, {"088c639d7139a3af"}), "writer_sonnet": (20, 0, {"088c639d7139a3af"}),
     "labelmatch": (180, 0, {"58b19ca1be3740fe"}), "wordsplit": (30, 0, {"0346eddace878d63"}), "wordsplit2": (80, 0, {"c44187af32043997"}), "dose": (70, 0, {"33db266fef842900"}),
 }
+# folder: (lowest, highest) run seed its files may carry (the registered seed plan of each cell; the dose folder holds seeds 20 to 39, its 12-episode runs only 30 to 39)
+RUN_SEEDS = {
+    "main": (0, 9), "main_ext": (10, 19), "control": (0, 9), "frontier": (0, 0), "frontier_exp": (0, 9), "pose": (0, 2), "borrowed": (0, 9), "borrowed_1": (0, 9), "borrowed_3": (0, 9),
+    "borrowed_other": (0, 9), "borrowed_sonnet": (20, 29), "main_fixhold": (0, 9), "main_fixcollide": (0, 9), "rep_fixed": (20, 29), "hint": (20, 29), "hint_generic": (20, 29),
+    "prior": (20, 29), "writer_sonnet": (20, 29), "labelmatch": (20, 29), "wordsplit": (20, 29), "wordsplit2": (30, 39), "dose": (20, 39),
+}
+IMPORT_ERROR = None
+try:
+    from robot_play import runner
+except Exception as exc:                      # the memory-text check cannot run without the registered texts: that is a failure, never a skip
+    runner = None
+    IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
 
 
 def registered_text(cond, task):
     """The memory text a run file of this condition must carry, or None when the condition has no fixed text."""
-    try:
-        from robot_play import runner
-    except Exception:
+    if runner is None:
         return None
     fixed = {"hint_generic": runner.GENERIC_HINT, "lm_inert": runner.INERT_TEXT, "lm_generic": runner.GENERIC_HINT, "lm_frame": runner.SPLIT_TEXTS["lm_frame"],
              "lm_names": runner.SPLIT_TEXTS["lm_names"], "lm_instr": runner.SPLIT_TEXTS["lm_instr"], "lm_instr_n": runner.SPLIT2_TEXTS["lm_instr_n"], "lm_names2": runner.SPLIT2_TEXTS["lm_names2"]}
@@ -61,6 +71,9 @@ if reported:
     args = args[:i] + [f"runs/{x}" for x in EXPECTED] + args[i + 1:]
 bad = 0
 nfiles = 0
+if IMPORT_ERROR:
+    bad += 1
+    print(f"NOT CLEAN: cannot import robot_play.runner, so the registered memory texts cannot be checked ({IMPORT_ERROR}); run from the repository with its environment")
 for d in args or ["runs"]:
     if Path(d).name == "spend":
         print(f"{d}: skipped (the spend ledger is not a run folder)")
@@ -99,6 +112,14 @@ for d in args or ["runs"]:
         want_text = registered_text(cfg.get("condition"), cfg.get("task"))
         if want_text is not None and cfg.get("borrowed_notebook") != want_text:
             problems.append(f"the memory text of condition {cfg.get('condition')} differs from the registered text")
+        if want_text is not None:
+            seen = [(r.get("phase"), r.get("idx")) for r in eps if (r.get("memory") or {}).get("notebook") != want_text]
+            if seen:
+                problems.append(f"{len(seen)} episode(s) carry a memory that differs from the registered text, first {seen[0]}")
+        if Path(d).name in RUN_SEEDS and not (isinstance(rs, int) and RUN_SEEDS[Path(d).name][0] <= rs <= RUN_SEEDS[Path(d).name][1]):
+            problems.append(f"run seed {rs} is outside the folder's range {RUN_SEEDS[Path(d).name]}")
+        if Path(d).name == "dose" and "__p12__" in f.name and not (isinstance(rs, int) and rs >= 30):
+            problems.append(f"the 12-episode dose runs start at run seed 30, not {rs}")
         keys = [(r.get("phase"), r.get("idx")) for r in eps]
         plan = [(p["phase"], p["idx"]) for p in cfg["plan"]]
         if len(set(keys)) != len(keys) or keys != plan[:len(keys)]:
