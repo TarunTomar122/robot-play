@@ -2,7 +2,7 @@
 
 **Can an AI that only gives orders to a robot arm get better at a job just by practising it?**
 
-Prefer to read it in small steps? There is a [progressive report](https://tarunTomar122.github.io/robot-play/) of this study: sections that open one at a time, short explanations behind the underlined terms, and charts. The numbers on it come from [results/RESULTS.md](results/RESULTS.md), which wins if the two ever differ.
+The same study is written up as a [research report on the web](https://tarunTomar122.github.io/robot-play/), with an abstract, figures and a limitations section. Its numbers come from [results/RESULTS.md](results/RESULTS.md), which is the reference if the two ever differ.
 
 Picture a new worker in a workshop. On day one they do not know that one drill sticks, or that one shelf is too tall for the short ladder. They find out by trying, they write a note, and by day ten they are faster and make fewer mistakes. Nobody retrained them. They just remembered.
 

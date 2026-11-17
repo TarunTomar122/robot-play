@@ -43,13 +43,13 @@ window.RESULTS = {
     unit: "%",
     rows: [
       { label: "No memory", v: 50, base: true, tip: "No memory: 50% of 40 held-out episodes." },
-      { label: "A sentence with no settings in it", v: 40, tip: "The neutral sentence that names no setting and gives no advice: 40%." },
-      { label: "Frame only", v: 50, tip: "Only the frame sentence (\"Defaults do not suit every object or surface.\"): 50%." },
-      { label: "Frame and instruction, no names", v: 70, tip: "The frame and the instruction to change settings, with no setting names: 70%. Difference from no memory +20.0 points, 95% interval -10.2 to +50.2." },
-      { label: "Frame and the four names", v: 92, tip: "The frame and the four names: 92%. Difference from no memory +42.5 points, 95% interval +20.1 to +64.9." },
-      { label: "Frame, instruction and names (generic)", v: 92, tip: "The generic sentence: 92%. Difference from no memory +42.5 points, 95% interval +21.8 to +63.2." },
-      { label: "One sentence naming the fix", v: 100, tip: "\"Pick the green cube with grip_level firm.\" 100%." },
-      { label: "Own notebook, 12 episodes", v: 100, tip: "The model's own notebook, 12 practice episodes: 100%." }
+      { label: "A neutral sentence", v: 40, tip: "The neutral sentence that names no setting and gives no advice: 40%." },
+      { label: "Opening sentence only", v: 50, tip: "Only the opening sentence (\"Defaults do not suit every object or surface.\"): 50%." },
+      { label: "Opening sentence and an instruction to change the call", v: 70, tip: "The opening sentence and the instruction to change how the tool is called, with no setting names: 70%. Difference from no memory +20.0 points, 95% interval -10.2 to +50.2." },
+      { label: "Opening sentence and the four setting names", v: 92, tip: "The opening sentence and the four setting names: 92%. Difference from no memory +42.5 points, 95% interval +20.1 to +64.9." },
+      { label: "All three parts together", v: 92, tip: "Opening sentence, instruction and names together: 92%. Difference from no memory +42.5 points, 95% interval +21.8 to +63.2." },
+      { label: "A sentence that names the fix", v: 100, tip: "\"Pick the green cube with grip_level firm.\" 100%." },
+      { label: "Own notebook, 12 practice episodes", v: 100, tip: "The model's own notebook, 12 practice episodes: 100%." }
     ]
   },
 
@@ -95,17 +95,17 @@ window.RESULTS = {
     groups: [
       { name: "Claude Haiku 5.5", rows: [
         { label: "No memory", a: 50, b: 35, tip: "Haiku, no memory: 50% with the message, 35% without." },
-        { label: "Frame and the four names", a: 90, b: 45, tip: "Haiku, frame and the four names: 90% with the message, 45% without." },
-        { label: "Rule: firm for every cube", a: 72, b: 0, tip: "Haiku, \"pick every cube with grip_level firm\": 72% with the message, 0% without. Difference -72.5 points, 95% interval -86.9 to -58.1." },
+        { label: "Sentence listing the four settings", a: 90, b: 45, tip: "Haiku, sentence listing the four settings: 90% with the message, 45% without." },
+        { label: "Wrong rule: firm for every cube", a: 72, b: 0, tip: "Haiku, \"pick every cube with grip_level firm\": 72% with the message, 0% without. Difference -72.5 points, 95% interval -86.9 to -58.1." },
         { label: "Own notebook, 12 episodes", a: 82, b: 28, tip: "Haiku, own notebook: 82% with the message, 28% without. Difference -55.0 points, 95% interval -86.3 to -23.7." },
-        { label: "Written procedure", a: 100, b: 100, tip: "Haiku, written procedure (try the default grip, firm only if the pick fails): 100% both ways." }
+        { label: "Procedure written by us", a: 100, b: 100, tip: "Haiku, written procedure (try the default grip, firm only if the pick fails): 100% both ways." }
       ] },
       { name: "GPT-6 Luna", rows: [
         { label: "No memory", a: 100, b: 57, tip: "Luna, no memory: 100% with the message, 57% without. Difference -42.5 points, 95% interval -58.2 to -26.8." },
-        { label: "Frame and the four names", a: 92, b: 45, tip: "Luna, frame and the four names: 92% with the message, 45% without." },
-        { label: "Rule: firm for every cube", a: 85, b: 0, tip: "Luna, \"pick every cube with grip_level firm\": 85% with the message, 0% without. Difference -85.0 points, 95% interval -97.2 to -72.8." },
+        { label: "Sentence listing the four settings", a: 92, b: 45, tip: "Luna, sentence listing the four settings: 92% with the message, 45% without." },
+        { label: "Wrong rule: firm for every cube", a: 85, b: 0, tip: "Luna, \"pick every cube with grip_level firm\": 85% with the message, 0% without. Difference -85.0 points, 95% interval -97.2 to -72.8." },
         { label: "Own notebook, 12 episodes", a: 90, b: 35, tip: "Luna, own notebook: 90% with the message, 35% without. Difference -55.0 points, 95% interval -81.4 to -28.6." },
-        { label: "Written procedure", a: 100, b: 100, tip: "Luna, written procedure: 100% both ways." }
+        { label: "Procedure written by us", a: 100, b: 100, tip: "Luna, written procedure: 100% both ways." }
       ] }
     ]
   },

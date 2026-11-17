@@ -3,426 +3,345 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>robot-play: a progressive report</title>
-<meta name="description" content="Can a language model get better at a simulated robot job by keeping its own notebook? A report in plain sentences, with the numbers from the repository.">
+<title>Can a language model learn a robot job by keeping notes?</title>
+<meta name="description" content="A research report on language models that drive a simulated robot arm and keep a notebook between attempts.">
 <style>
 :root {
-  --bg: #fcfcfb; --surface: #ffffff; --ink: #1d1f23; --ink2: #464b54; --muted: #656b75;
-  --line: #dcdcd5; --soft: #f1f0eb; --grid: #e7e6e0;
+  --bg: #fdfdfb; --surface: #ffffff; --ink: #1c1d20; --ink2: #40444c; --muted: #6a6f78;
+  --line: #d9d8d1; --soft: #f3f2ed; --grid: #e8e7e1;
   --link: #1a5fb8; --a: #1f6fd1; --b: #c75b12; --base: #959ba4;
-  --reg-bg: #e3edfa; --reg-fg: #164b8f; --exp-bg: #fae9da; --exp-fg: #86390a;
-  --tip-bg: #1d1f23; --tip-fg: #fcfcfb; --focus: #1f6fd1;
+  --tip-bg: #1c1d20; --tip-fg: #fdfdfb; --focus: #1f6fd1;
+  --serif: Charter, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #1a1a19; --surface: #222221; --ink: #ecebe6; --ink2: #c8c7c1; --muted: #a09f98;
-    --line: #3b3b38; --soft: #272725; --grid: #303030;
-    --link: #7db0f0; --a: #4f8fe0; --b: #d0773a; --base: #6f6f69;
-    --reg-bg: #1f3556; --reg-fg: #aecdf7; --exp-bg: #4a2d16; --exp-fg: #f2c59b;
-    --tip-bg: #ecebe6; --tip-fg: #1a1a19; --focus: #7db0f0;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #1a1a19; --surface: #222221; --ink: #ecebe6; --ink2: #c8c7c1; --muted: #a09f98;
-  --line: #3b3b38; --soft: #272725; --grid: #303030;
-  --link: #7db0f0; --a: #4f8fe0; --b: #d0773a; --base: #6f6f69;
-  --reg-bg: #1f3556; --reg-fg: #aecdf7; --exp-bg: #4a2d16; --exp-fg: #f2c59b;
-  --tip-bg: #ecebe6; --tip-fg: #1a1a19; --focus: #7db0f0;
-  color-scheme: dark;
-}
-
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.62 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; }
-a { color: var(--link); }
-code { font: 0.88em/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); padding: 0.1em 0.25em; border-radius: 4px; white-space: nowrap; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 18px/1.65 var(--serif); }
+a { color: var(--link); text-underline-offset: 2px; }
+code { font: 0.82em/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); padding: 0.1em 0.3em; border-radius: 3px; white-space: nowrap; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
-.wrap { max-width: 780px; margin: 0 auto; padding: 0 24px; position: relative; }
-@media (max-width: 600px) { body { font-size: 16.5px; } .wrap { padding: 0 16px; } }
+main { max-width: 720px; margin: 0 auto; padding: 56px 24px 96px; }
+@media (max-width: 600px) { body { font-size: 17px; } main { padding: 32px 16px 64px; } }
 
-/* contents bar */
-#bar { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
-#bar .wrap { display: flex; align-items: center; gap: 10px; min-height: 48px; }
-#toc-btn { all: unset; cursor: pointer; display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 8px 0; font-size: 0.95rem; }
-#toc-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-#toc-btn .lbl { font-weight: 650; flex: none; }
-#toc-cur { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-#toc-btn .chev { margin-left: auto; flex: none; transition: transform 0.15s; color: var(--muted); }
-#toc-btn[aria-expanded="true"] .chev { transform: rotate(180deg); }
-#toc-list { position: absolute; left: 24px; right: 24px; top: 100%; margin: 0; padding: 8px 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 8px 8px; max-height: 70vh; overflow-y: auto; box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
-@media (max-width: 600px) { #toc-list { left: 16px; right: 16px; } }
-#toc-list[hidden] { display: none; }
-#toc-list a { display: block; padding: 6px 16px; color: var(--ink2); text-decoration: none; font-size: 0.95rem; border-left: 3px solid transparent; }
-#toc-list a.sub { padding-left: 34px; font-size: 0.9rem; }
-#toc-list a:hover { background: var(--soft); }
-#toc-list a[aria-current="true"] { color: var(--ink); font-weight: 650; border-left-color: var(--a); background: var(--soft); }
+/* title block */
+.kicker { font: 0.78rem/1.4 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; }
+h1 { font: 600 2.3rem/1.18 var(--serif); letter-spacing: -0.01em; margin: 0 0 12px; text-wrap: balance; }
+.subtitle { font-size: 1.15rem; color: var(--ink2); margin: 0 0 18px; }
+.links { font: 0.88rem/1.5 var(--sans); color: var(--muted); margin: 0 0 32px; }
+@media (max-width: 600px) { h1 { font-size: 1.75rem; } }
 
-/* header */
-header.top { padding: 40px 0 8px; }
-header.top h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 12px; letter-spacing: -0.01em; text-wrap: balance; }
-@media (max-width: 600px) { header.top { padding-top: 28px; } header.top h1 { font-size: 1.6rem; } }
-.lede { font-size: 1.08rem; color: var(--ink2); margin: 0 0 12px; }
-.meta { color: var(--muted); font-size: 0.9rem; margin: 0 0 16px; }
-.tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 24px; }
-.tools button { font: inherit; font-size: 0.85rem; padding: 5px 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; cursor: pointer; }
-.tools button:hover { background: var(--soft); }
-.howto { background: var(--soft); border-radius: 8px; padding: 14px 16px; margin: 0 0 32px; font-size: 0.95rem; }
-.howto p { margin: 0 0 8px; } .howto p:last-child { margin: 0; }
+.abstract { border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); padding: 18px 0 20px; margin: 0 0 36px; }
+.abstract h2 { font: 600 0.8rem/1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 10px; }
+.abstract p { margin: 0; font-size: 0.98em; }
 
-/* sections */
-section.sec { border-top: 1px solid var(--line); }
-section.sec:last-of-type { border-bottom: 1px solid var(--line); }
-details.sec > summary, details.sub > summary { list-style: none; cursor: pointer; display: flex; gap: 12px; align-items: baseline; }
-details > summary::-webkit-details-marker { display: none; }
-details.sec > summary { padding: 18px 0; scroll-margin-top: 56px; }
-details.sec > summary:hover h2, details.sub > summary:hover h3 { color: var(--link); }
-.num { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 650; min-width: 1.1em; }
-h2 { font-size: 1.3rem; line-height: 1.3; margin: 0; }
-h3 { font-size: 1.05rem; line-height: 1.35; margin: 0; font-weight: 650; }
-.gist { color: var(--muted); font-weight: 400; }
-.body { padding: 0 0 20px 20px; }
-@media (max-width: 600px) { .body { padding-left: 0; } }
-.body p { margin: 0 0 14px; }
-.body ul.plain { margin: 0 0 14px; padding-left: 20px; } .body ul.plain li { margin-bottom: 8px; }
-details.sub { border-top: 1px solid var(--line); margin-top: 8px; }
-details.sub > summary { padding: 12px 0; scroll-margin-top: 56px; }
-details.sub > .subbody { padding: 0 0 12px 20px; }
-@media (max-width: 600px) { details.sub > .subbody { padding-left: 0; } }
+nav.contents { margin: 0 0 40px; font-family: var(--sans); font-size: 0.92rem; }
+nav.contents h2 { font: 600 0.8rem/1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 10px; }
+nav.contents ol { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 32px; }
+nav.contents li { margin: 0 0 5px; break-inside: avoid; }
+nav.contents a { color: var(--ink2); text-decoration: none; }
+nav.contents a:hover { color: var(--link); text-decoration: underline; }
+@media (max-width: 600px) { nav.contents ol { columns: 1; } }
 
-/* terms */
-.t { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: var(--a); cursor: pointer; }
+/* side rail on wide screens */
+#rail { display: none; }
+@media (min-width: 1320px) {
+  #rail { display: block; position: fixed; top: 64px; left: max(24px, calc(50% - 360px - 270px)); width: 220px; font: 0.82rem/1.4 var(--sans); }
+  #rail a { display: block; padding: 4px 0 4px 12px; color: var(--muted); text-decoration: none; border-left: 2px solid var(--line); }
+  #rail a:hover { color: var(--ink); }
+  #rail a[aria-current="true"] { color: var(--ink); font-weight: 600; border-left-color: var(--ink); }
+}
+
+/* body text */
+h2.sec { font: 600 1.45rem/1.3 var(--serif); margin: 52px 0 14px; scroll-margin-top: 20px; }
+h3 { font: 600 1.1rem/1.35 var(--serif); margin: 30px 0 10px; scroll-margin-top: 20px; }
+.no { color: var(--muted); font-weight: 400; margin-right: 0.5em; font-variant-numeric: tabular-nums; }
+p { margin: 0 0 16px; }
+ul.limits { margin: 0 0 16px; padding-left: 22px; }
+ul.limits li { margin: 0 0 10px; }
+
+/* definitions */
+.t { text-decoration: underline dotted; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: var(--muted); cursor: help; }
 .t[aria-expanded="true"] { background: var(--soft); border-radius: 3px; }
-.tx { margin: -4px 0 16px; padding: 10px 14px; border-left: 3px solid var(--a); background: var(--soft); border-radius: 0 6px 6px 0; font-size: 0.93rem; line-height: 1.5; }
-.tx strong { font-weight: 650; }
-.tx button { font: inherit; font-size: 0.85rem; margin-left: 8px; padding: 1px 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; cursor: pointer; }
-li > .tx, dd > .tx { margin-top: 8px; }
+#card { position: fixed; z-index: 40; width: 250px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,0.14); font: 0.88rem/1.5 var(--sans); color: var(--ink2); }
+#card[hidden] { display: none; }
+#card .ttl { display: block; font-weight: 650; color: var(--ink); margin-bottom: 4px; }
+#card button { font: inherit; font-size: 0.82rem; margin-top: 10px; padding: 3px 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; cursor: pointer; }
+#card button:hover { background: var(--soft); }
+#card.corner { left: auto; right: 16px; bottom: 16px; top: auto; width: 340px; }
+#card.sheet { left: 12px; right: 12px; bottom: 12px; top: auto; width: auto; max-height: 55vh; overflow-y: auto; }
 
-/* tags */
-.tag { font-size: 0.72rem; font-weight: 650; letter-spacing: 0.02em; text-transform: uppercase; padding: 1px 8px; border-radius: 999px; white-space: nowrap; vertical-align: 1px; text-decoration: none; cursor: pointer; }
-.tag.reg { background: var(--reg-bg); color: var(--reg-fg); }
-.tag.exp { background: var(--exp-bg); color: var(--exp-fg); }
-.tag.t[aria-expanded="true"] { outline: 1px solid currentColor; }
+/* tables */
+.tbl { margin: 26px 0 30px; }
+.tbl .cap, figcaption { font: 0.86rem/1.5 var(--sans); color: var(--ink2); }
+.tbl .cap { margin: 0 0 8px; }
+.cap b, figcaption b { color: var(--ink); font-weight: 650; }
+table.rt { width: 100%; border-collapse: collapse; font: 0.88rem/1.45 var(--sans); border-top: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); }
+table.rt th { text-align: left; font-weight: 650; padding: 7px 12px 7px 0; border-bottom: 1px solid var(--ink); vertical-align: bottom; }
+table.rt td { padding: 8px 12px 8px 0; vertical-align: top; border-bottom: 1px solid var(--line); color: var(--ink2); }
+table.rt tr:last-child td { border-bottom: 0; }
+table.rt td:first-child { color: var(--ink); }
+@media (max-width: 600px) {
+  table.rt, table.rt tbody, table.rt tr, table.rt td { display: block; width: 100%; }
+  table.rt thead { display: none; }
+  table.rt tr { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  table.rt tr:last-child { border-bottom: 0; }
+  table.rt td { border: 0; padding: 1px 0; }
+  table.rt td[data-h]::before { content: attr(data-h) ": "; font-weight: 650; color: var(--ink); }
+}
 
-/* tools and jobs */
-dl.tl { margin: 0 0 14px; }
-dl.tl dt { font-weight: 650; margin-top: 10px; }
-dl.tl dd { margin: 2px 0 0; color: var(--ink2); }
-.jobs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 16px; }
-@media (max-width: 600px) { .jobs { grid-template-columns: 1fr; } }
-.job { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: var(--surface); }
-.job h4 { margin: 0 0 6px; font-size: 1rem; }
-.job p { margin: 0 0 6px; font-size: 0.94rem; line-height: 1.5; } .job p:last-child { margin: 0; }
-.job .k { font-weight: 650; }
-
-/* charts */
-figure.chart { margin: 18px 0 22px; padding: 14px 14px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
-@media (max-width: 600px) { figure.chart { padding: 12px 12px 8px; margin-left: -4px; margin-right: -4px; } }
-.ct { font-weight: 650; font-size: 0.95rem; margin-bottom: 4px; }
-.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.85rem; color: var(--ink2); margin: 4px 0 8px; }
+/* figures */
+figure.chart { margin: 28px 0 32px; padding: 0; }
+.plot { border-top: 1.5px solid var(--ink); border-bottom: 1px solid var(--line); padding: 10px 0 6px; margin-bottom: 8px; font-family: var(--sans); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.82rem; color: var(--ink2); margin: 2px 0 8px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .sw { width: 11px; height: 11px; display: inline-block; }
-.sw.a { background: var(--a); border-radius: 50%; } .sw.b { background: var(--b); border-radius: 2px; } .sw.base { background: var(--base); border-radius: 2px; }
-.cgh { font-size: 0.82rem; font-weight: 650; color: var(--muted); margin: 12px 0 2px; text-transform: none; }
-.crow { min-height: 34px; display: grid; grid-template-columns: 230px 1fr; align-items: center; column-gap: 10px; padding: 1px 0; }
-@media (max-width: 600px) { .crow { grid-template-columns: 1fr; min-height: 0; } .crow .clab { padding-top: 6px; } }
-.clab { font-size: 0.86rem; line-height: 1.3; color: var(--ink2); }
+.sw.a { background: var(--a); border-radius: 50%; } .sw.b { background: var(--b); border-radius: 2px; }
+.cgh { font-size: 0.8rem; font-weight: 650; color: var(--ink); margin: 10px 0 2px; }
+.crow { min-height: 34px; display: grid; grid-template-columns: 240px 1fr; align-items: center; column-gap: 10px; padding: 1px 0; }
+.clab { font-size: 0.84rem; line-height: 1.3; color: var(--ink2); }
 .crow svg, .cax svg { display: block; width: 100%; overflow: visible; }
-.crow svg text, .cax svg text { font: 12px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--ink2); }
-.cax { display: grid; grid-template-columns: 230px 1fr; column-gap: 10px; }
-@media (max-width: 600px) { .cax { grid-template-columns: 1fr; } }
+.crow svg text, .cax svg text { font: 12px var(--sans); fill: var(--ink2); }
+.cax { display: grid; grid-template-columns: 240px 1fr; column-gap: 10px; }
 .cax svg text { fill: var(--muted); font-size: 11px; }
-figcaption { font-size: 0.86rem; color: var(--muted); margin-top: 8px; line-height: 1.45; }
-details.tv { margin-top: 6px; font-size: 0.85rem; }
-details.tv summary { cursor: pointer; color: var(--link); }
+@media (max-width: 600px) { .crow { grid-template-columns: 1fr; min-height: 0; } .crow .clab { padding-top: 6px; } .cax { grid-template-columns: 1fr; } }
+details.tv { margin-top: 6px; font: 0.82rem/1.45 var(--sans); }
+details.tv summary { cursor: pointer; color: var(--muted); }
+details.tv summary:hover { color: var(--link); }
 details.tv table { border-collapse: collapse; width: 100%; margin-top: 6px; }
 details.tv th, details.tv td { text-align: left; padding: 3px 8px 3px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-details.tv th { font-weight: 650; color: var(--ink2); }
-details.tv tr.tr-tip td { color: var(--muted); font-size: 0.8rem; padding-top: 0; }
-#tip { position: fixed; z-index: 50; max-width: 320px; padding: 8px 10px; border-radius: 6px; background: var(--tip-bg); color: var(--tip-fg); font-size: 0.82rem; line-height: 1.4; pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
+details.tv th { font-weight: 650; }
+details.tv tr.tr-tip td { color: var(--muted); font-size: 0.78rem; padding-top: 0; }
+#tip { position: fixed; z-index: 50; max-width: 320px; padding: 8px 10px; border-radius: 6px; background: var(--tip-bg); color: var(--tip-fg); font: 0.8rem/1.4 var(--sans); pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
 #tip[hidden] { display: none; }
 
-footer.end { padding: 24px 0 64px; color: var(--muted); font-size: 0.9rem; }
-footer.end ul { padding-left: 20px; margin: 6px 0 0; }
+footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line); font: 0.85rem/1.5 var(--sans); color: var(--muted); }
 </style>
 </head>
 <body>
 
-<div id="bar">
-  <div class="wrap">
-    <button id="toc-btn" aria-expanded="false" aria-controls="toc-list"><span class="lbl">Contents</span><span id="toc-cur">1. The question</span><span class="chev" aria-hidden="true">&#9662;</span></button>
-    <ol id="toc-list" hidden></ol>
-  </div>
-</div>
+<nav id="rail" aria-label="Sections"></nav>
 
-<main class="wrap">
-<header class="top">
-  <h1>Can a model get better at a robot job by practising it?</h1>
-  <p class="lede">This page reports a study of language models driving a simulated robot arm. Each model keeps its own notebook between attempts, and we measure what the notebook changes.</p>
-  <p class="meta">Every number comes from <a href="https://github.com/TarunTomar122/robot-play/blob/main/results/RESULTS.md">results/RESULTS.md</a>. If this page and that file ever differ, the file is right. Also: <a href="https://github.com/TarunTomar122/robot-play">the repository</a>, <a href="https://github.com/TarunTomar122/robot-play/blob/main/PROTOCOL.md">the plan</a>, <a href="https://github.com/TarunTomar122/robot-play/blob/main/data/README.md">the raw run files</a>.</p>
-  <div class="tools">
-    <button type="button" id="open-all">Open all sections</button>
-    <button type="button" id="close-all">Close all sections</button>
-    <button type="button" id="theme-btn" aria-label="Colour theme">Theme: automatic</button>
-  </div>
-  <div class="howto">
-    <p>Each section opens and closes. Underlined words open a short explanation under the paragraph; select it again to close it.</p>
-    <p>Every result carries one of two tags. <span class="t tag reg" data-t="registered">registered</span> means the comparison was planned and pushed to GitHub before any run. <span class="t tag exp" data-t="exploratory">exploratory</span> means it was added later.</p>
-  </div>
-</header>
+<main>
+<p class="kicker">robot-play &middot; Research report &middot; 17 November 2026</p>
+<h1>Can a language model learn a robot job by keeping notes?</h1>
+<p class="subtitle">A study of learning without retraining, using a simulated robot arm and a 300-word notebook.</p>
+<p class="links">Code, plan and raw data: <a href="https://github.com/TarunTomar122/robot-play">github.com/TarunTomar122/robot-play</a>. Every number in this report is taken from <a href="https://github.com/TarunTomar122/robot-play/blob/main/results/RESULTS.md">results/RESULTS.md</a>, and that file is the reference if the two ever disagree.</p>
 
-<!-- 1 -->
-<section class="sec" id="s1" data-toc="1. The question">
-<details class="sec" open>
-<summary><span class="num">1</span><h2>The question</h2></summary>
-<div class="body">
-<p>Picture a new worker in a workshop. On day one they do not know that one drill sticks, or that one shelf is too high for the short ladder. They find out by trying, they write a note, and by day ten they are faster and make fewer mistakes. Nobody retrained them. They remembered.</p>
-<p>This study asks whether a language model can do the same with a simulated robot arm. The model's weights never change. The only thing that changes is a <span class="t" data-t="notebook">notebook</span>: a short text that the model rewrites after each practice attempt and reads at the start of the next one.</p>
-<p>There are three questions. Does the notebook raise the success rate and cut the number of steps? What does a notebook hold that a one-line tip would not? And what happens when a job gives no clue about what went wrong?</p>
-<p>In short: where a model had room to improve, a notebook raised success from 76% to 99% for Claude Haiku 5.5 and from 91% to 100% for GPT-6 Luna. For Haiku on one job, a one-sentence list of the adjustable settings gave most of that gain. And with no error message to read, the models' own notebooks did not learn the rule.</p>
-</div>
-</details>
+<section class="abstract">
+<h2>Abstract</h2>
+<p>We ask whether a language model that controls a simulated robot arm through a small set of tools gets better at a job when it is allowed to keep a short notebook between attempts. The model is never retrained, so the notebook is the only thing that changes. On three jobs that each hide one physical catch, a notebook raised the success of Claude Haiku 5.5 on layouts it had not seen from 76% to 99%, and that of GPT-6 Luna from 91% to 100%. Both models also needed about a third fewer tool calls. Follow-up experiments narrow down where the gain comes from. For Haiku, one sentence listing the settings it is allowed to change recovered most of it, and so did a single practice episode. On a fourth job, where no single setting works, the models succeeded only when the simulator returned an error message they could read. When we removed the message, twelve episodes of practice did not produce a notebook that solved the job, although a short procedure that we wrote ourselves did.</p>
 </section>
 
-<!-- 2 -->
-<section class="sec" id="s2" data-toc="2. The setup">
-<details class="sec">
-<summary><span class="num">2</span><h2>The setup</h2></summary>
-<div class="body">
-<p>The robot is a simulated Franka Panda arm. The model never moves a motor. It calls tools, and standard robotics code (<span class="t" data-t="ik">inverse kinematics and motion planning</span>) does the careful movement behind each call.</p>
-<p>One <span class="t" data-t="episode">episode</span> is one attempt at one job. The model may make at most 20 <span class="t" data-t="toolcall">tool calls</span>. When it calls <code>done</code>, or makes its 20th call, the simulator checks whether the job was really finished. The model's own claim of success is recorded but is not the score.</p>
-<p>Each model plays 12 <span class="t" data-t="practice">practice episodes</span>. After each one it rewrites its notebook, which may not exceed 300 words. Then the notebook is frozen and the model plays 4 episodes on <span class="t" data-t="heldout">held-out layouts</span> that it has never seen. That sequence is one <span class="t" data-t="run">run</span>, and each model and job is run 10 times.</p>
-<p>The comparison in every result is the notebook against a <span class="t" data-t="fresh">no-memory</span> condition on the same layouts. A third condition, replay, gives the model its last successful episode instead of a notebook. Its numbers were close to the notebook's and are in RESULTS.md.</p>
-<p>The registered results come from the main plan. The exploratory results come from extra experiments. Both kinds were written down in PROTOCOL.md and pushed to GitHub before they ran, but the exploratory ones were chosen after earlier results were known.</p>
-</div>
-</details>
-</section>
+<nav class="contents" aria-label="Contents">
+<h2>Contents</h2>
+<ol id="contents-list"></ol>
+</nav>
 
-<!-- 3 -->
-<section class="sec" id="s3" data-toc="3. The tools">
-<details class="sec">
-<summary><span class="num">3</span><h2>The tools</h2></summary>
-<div class="body">
-<p>The model has eight tools and makes one call per turn, so each call sees the result of the one before it. No tool description mentions a catch. Results report what happened, such as a measurement or the part that would collide, and never what to change.</p>
-<dl class="tl">
-  <dt><code>observe</code></dt>
-  <dd>Returns every object (name, size, position, tilt, whether it is held), the zones objects can be placed on, the gripper opening, the hand position and the elapsed time.</dd>
-  <dt><code>pick</code></dt>
-  <dd>Moves above an object, goes down, closes the gripper and lifts. The settings are <code>grasp_height</code> (how far up the object to grab, from 0 to 1), <code>grip_level</code> (<code>light</code>, <code>normal</code> or <code>firm</code>), <code>speed</code>, <code>lift_height</code> and <code>yaw_offset_deg</code> (how far to turn the hand). It returns the gripper opening after the lift, how far the object rose, its tilt, and any planning or descent error.</dd>
-  <dt><code>place</code></dt>
-  <dd>Carries the held object above a target, lowers it, opens the gripper and backs off. The settings are <code>release_height</code> (the gap between the object and the surface when the fingers open), <code>speed</code> and <code>settle_time</code>. It returns where the object ended up and its tilt, or the planning error.</dd>
-  <dt><code>move_to</code>, <code>open_gripper</code>, <code>close_gripper</code>, <code>home</code></dt>
-  <dd>The basic moves: the hand to a position, fingers open, fingers closed, and back to the home pose.</dd>
-  <dt><code>done</code></dt>
-  <dd>Ends the episode. The simulator then judges the result.</dd>
-</dl>
-<p>Every setting has a default. The defaults that matter below are <code>grip_level</code> normal, <code>grasp_height</code> 0.6 and <code>release_height</code> 0.02 metres.</p>
-</div>
-</details>
-</section>
+<h2 class="sec" id="intro">Introduction</h2>
 
-<!-- 4 -->
-<section class="sec" id="s4" data-toc="4. The four jobs">
-<details class="sec">
-<summary><span class="num">4</span><h2>The four jobs</h2></summary>
-<div class="body">
-<p>Each job hides one physical <span class="t" data-t="catch">catch</span> that makes the default settings fail. The model is never told the catch. Each job also has a <span class="t" data-t="control">control version</span> with the catch removed.</p>
-<div class="jobs">
-  <div class="job"><h4><code>stack</code></h4>
-    <p><span class="k">Goal.</span> Put the green cube on the red one, then the blue cube on the green one.</p>
-    <p><span class="k">Catch.</span> The green cube weighs 250 g and the others 50 g, so a normal grip lets it slip out.</p>
-    <p><span class="k">Fix.</span> <code>grip_level</code> <code>firm</code>.</p></div>
-  <div class="job"><h4><code>bins</code></h4>
-    <p><span class="k">Goal.</span> Put both red cubes in the red bin and both blue cubes in the blue bin.</p>
-    <p><span class="k">Catch.</span> The bin walls are 12 cm tall, and the wide hand hits the rim unless the cube is let go from higher up.</p>
-    <p><span class="k">Fix.</span> A higher <code>release_height</code>.</p></div>
-  <div class="job"><h4><code>flasks</code></h4>
-    <p><span class="k">Goal.</span> Stand each flask upright on its ring.</p>
-    <p><span class="k">Catch.</span> A flask has a wide base and a narrow neck, and the hand opens only 8 cm. The base cannot be grabbed, the neck can.</p>
-    <p><span class="k">Fix.</span> A high <code>grasp_height</code>.</p></div>
-  <div class="job"><h4><code>mixed</code></h4>
-    <p><span class="k">Goal.</span> The same stack as in <code>stack</code>.</p>
-    <p><span class="k">Catch.</span> One of the two odd cubes, drawn from the seed, is heavy and slippery and needs a firm grip. The other is fragile and cracks under one. No single setting works for both.</p>
-    <p><span class="k">Fix.</span> A firm grip on one cube and a normal grip on the other.</p></div>
-</div>
-<p><code>mixed</code> comes in two versions on the same layouts. In the first, a firm grip on the fragile cube is refused with a <span class="t" data-t="squeeze">squeeze-limit message</span>. In the second, the grip is accepted, the cube cracks, and nothing says so until the simulator's final verdict after <code>done</code>.</p>
-<p>Before any model ran, each job was checked with scripted players. On 100 layouts each of <code>stack</code>, <code>bins</code> and <code>flasks</code>, a script that used the default settings won 0 of 100 and a script that knew the catch won 100 of 100. On the control versions the default script won 99 or 100 of 100.</p>
-<p>For <code>mixed</code> with the error message, no fixed setting won more than 1 of 100 layouts. A script that knew which cube was which won 100, and a script that tried a setting and read the result won 96. In the version with no error message, on 50 layouts, fixed settings won 0, the knowing script 50 and the try-and-read script 49.</p>
-</div>
-</details>
-</section>
+<p>Picture a new worker in a workshop. On the first day they do not know that one drill sticks, or that one shelf is too high for the short ladder. They find out by trying, write themselves a note, and by the tenth day they are faster and make fewer mistakes. Nobody retrained them. They remembered.</p>
 
-<!-- 5 -->
-<section class="sec" id="s5" data-toc="5. Results, model by model">
-<details class="sec">
-<summary><span class="num">5</span><h2>Results, model by model</h2></summary>
-<div class="body">
-<p>This chart is the main <span class="t tag reg" data-t="registered">registered</span> comparison. Each row is one model and job, and it plots the share of held-out episodes solved with and without a notebook. Hover over a row, or open the table under the chart, for the <span class="t" data-t="interval">interval</span>.</p>
+<p>This report asks whether a language model can do the same thing with a robot arm. The model in our setup never moves a motor. It decides what to do and calls tools such as <code>pick</code> and <code>place</code>, and conventional robotics code works out the motion. Between attempts the model's weights stay exactly as they were. The only thing that can change is a <span class="t" data-t="notebook">notebook</span>, a text of at most 300 words that the model rewrites after each practice attempt and reads again before the next one.</p>
+
+<p>We built four small jobs for a simulated Franka Panda arm. Each job hides one physical catch, for example a cube that is heavier than it looks, and the default tool settings fail because of it. A model practises a job twelve times, updating its notebook as it goes, and is then tested on four layouts it has not seen. We compare that with the same model starting every attempt with no memory at all.</p>
+
+<p>The report makes three points. A notebook helped wherever a model had something left to learn: Haiku went from 76% to 99% on unseen layouts and Luna from 91% to 100%, and both used about a third fewer tool calls (Section 3). Most of that gain turned out to be cheap to reproduce. For Haiku, one sentence that lists the settings it may change did nearly as well as a notebook built over twelve episodes, and a notebook built from a single episode already recovered most of the gain (Section 4). Finally, the notebooks were only as good as the feedback the models received. On a job where the simulator stopped reporting what had gone wrong, twelve episodes of practice produced notebooks that recorded the damage but not its cause, and success did not improve (Section 5).</p>
+
+<p>Two labels are used throughout. Results from the plan we fixed and published before any run are called <span class="t" data-t="registered">registered</span>. Everything added afterwards is called <span class="t" data-t="exploratory">exploratory</span>. The exploratory experiments were also written down before they ran, but we chose them with earlier results in view, and their intervals are not corrected for the number of comparisons. Words with a dotted underline open a short definition.</p>
+
+<h2 class="sec" id="method">Method</h2>
+
+<h3 id="method-tools">The robot and its tools</h3>
+
+<p>The arm is a simulated Franka Panda. The model works entirely through eight tools (Table 1) and makes one call per turn, so every call can react to the result of the one before it.</p>
+
+<div class="tbl">
+<p class="cap"><b>Table 1.</b> The eight tools available to the model.</p>
+<table class="rt">
+<thead><tr><th>Tool</th><th>What it does and what it reports</th></tr></thead>
+<tbody>
+<tr><td><code>observe</code></td><td>Reports every object with its size, position and tilt, the zones that objects can be placed on, the gripper opening and the hand position.</td></tr>
+<tr><td><code>pick</code></td><td>Moves above an object, descends, closes the gripper and lifts. Reports the gripper opening after the lift, how far the object rose, its tilt, and any error from planning or the descent.</td></tr>
+<tr><td><code>place</code></td><td>Carries the held object above a target, lowers it, opens the gripper and retreats. Reports where the object ended up and its tilt, or the planning error.</td></tr>
+<tr><td><code>move_to</code></td><td>Moves the hand to a given position.</td></tr>
+<tr><td><code>open_gripper</code><br><code>close_gripper</code></td><td>Open or close the fingers where the hand is.</td></tr>
+<tr><td><code>home</code></td><td>Returns the arm to its starting pose.</td></tr>
+<tr><td><code>done</code></td><td>Ends the episode. The simulator then judges the result.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>The tool descriptions never mention a catch, and a result only reports what happened, such as how far the object rose or which part of the hand would have collided. It never says what to change. Three settings matter in what follows. <code>grip_level</code> sets how hard the fingers squeeze and can be light, normal or firm, with normal as the default. <code>grasp_height</code> sets how far up the object the fingers close, from 0 to 1, with a default of 0.6. <code>release_height</code> is the gap under the object at the moment the fingers open, 2 cm by default.</p>
+
+<h3 id="method-jobs">The four jobs</h3>
+
+<p>Each job is easy to state and fails with the default settings for one specific reason (Table 2). The model is told the goal and nothing about the catch.</p>
+
+<div class="tbl">
+<p class="cap"><b>Table 2.</b> The jobs, the catch hidden in each, and what deals with it.</p>
+<table class="rt">
+<thead><tr><th>Job</th><th>Goal</th><th>Hidden catch</th><th>What works</th></tr></thead>
+<tbody>
+<tr><td><code>stack</code></td><td data-h="Goal">Put the green cube on the red one and the blue cube on the green one.</td><td data-h="Catch">The green cube weighs 250 g and the others 50 g. A normal grip lets it slip.</td><td data-h="What works">A firm grip.</td></tr>
+<tr><td><code>bins</code></td><td data-h="Goal">Sort two red and two blue cubes into the bins of their colour.</td><td data-h="Catch">The bin walls are 12 cm tall, and the hand hits the rim on the way down.</td><td data-h="What works">Releasing the cube from higher up.</td></tr>
+<tr><td><code>flasks</code></td><td data-h="Goal">Stand each flask upright on its ring.</td><td data-h="Catch">The base of a flask is wider than the hand can open. Only the neck can be grasped.</td><td data-h="What works">A high grasp.</td></tr>
+<tr><td><code>mixed</code></td><td data-h="Goal">The same tower as in <code>stack</code>.</td><td data-h="Catch">One cube is heavy and needs a firm grip. Another is fragile and cracks under one. Which is which changes with the layout.</td><td data-h="What works">Trying a grip on each cube and reacting to the result.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p><code>mixed</code> exists in two versions that use the same layouts. In the first, a firm grip on the fragile cube is refused, and the <span class="t" data-t="squeeze">error message</span> states the squeeze limit. In the second the grip is accepted, the cube cracks, and nothing reports it until the simulator's verdict at the end of the episode.</p>
+
+<p>Every job also has a <span class="t" data-t="control">control version</span> without the catch. Before any model ran we checked the jobs with scripted players. On 100 layouts of each of the first three jobs, a script using default settings solved none and a script that knew the catch solved all of them. On the control versions the default script solved 99 or 100. On <code>mixed</code>, no fixed setting solved more than 1 layout in 100, a script that knew which cube was which solved all 100, and a script that tried a grip and reacted to the result solved 96.</p>
+
+<h3 id="method-protocol">Practice, notebook and test</h3>
+
+<p>An episode is one attempt at one job from one starting layout. The model may make at most 20 tool calls. The episode ends when it calls <code>done</code> or runs out of calls, and the simulator then checks the scene. Only that check counts as the score. The model's own claim of success is recorded separately.</p>
+
+<p>A run consists of twelve practice episodes followed by four test episodes. After each practice episode the model rewrites its notebook. Before the test episodes the notebook is frozen, and the test layouts are ones the model has not played, so the score reflects what was learned and not what was memorised. Each combination of model and job was run ten times with different layouts, which gives 40 test episodes per cell. The baseline is the same model on the same test layouts with no memory.</p>
+
+<p>The main comparison uses two inexpensive models, Claude Haiku 5.5 and GPT-6 Luna. Claude Sonnet 5.5 appears in two follow-up experiments, and Claude Fable 5.2 and GPT-6 Astra serve as a reference for what larger models do on a first try. All models ran at low reasoning effort.</p>
+
+<h3 id="method-numbers">How to read the numbers</h3>
+
+<p>Success is the share of test episodes that the simulator judged solved. Differences are given in <span class="t" data-t="points">percentage points</span>, followed by an <span class="t" data-t="interval">interval</span> in brackets, and are computed by comparing each notebook run with the no-memory run on the same layouts. When an interval includes zero, the data cannot rule out that there is no difference. The registered tests use 97.5% or 98.75% intervals because several are made at once. Everything else uses 95%.</p>
+
+<h2 class="sec" id="results">Does a notebook help?</h2>
+
+<h3 id="results-success">Success on unseen layouts</h3>
+
+<p>Figure 1 gives the registered comparison. Haiku solved 76% of test episodes with no memory and 99% with its notebook, a gain of 23.3 points (97.5% interval +14.0 to +32.6). Luna went from 91% to 100%, a gain of 8.6 points (+1.2 to +16.0).</p>
+
 <figure class="chart" data-spec="q1" data-kind="dumbbell">
-  <div class="ct">Held-out success, with a notebook and with no memory</div>
-  <figcaption>The pooled rows use 116 held-out episodes per condition, and each job row uses 40 (36 for <code>flasks</code>, see the last section). Registered for the pooled rows; the per-job rows are exploratory.</figcaption>
+  <figcaption><b>Figure 1.</b> Share of test episodes solved with a notebook and with no memory. The pooled rows are the registered comparison, with 116 episodes per condition. The rows for single jobs are exploratory, with 40 episodes each and 36 for <code>flasks</code>.</figcaption>
 </figure>
 
-<details class="sub" id="s5-haiku" data-toc="Claude Haiku 5.5">
-<summary><h3>Claude Haiku 5.5 <span class="gist">&middot; 76% to 99%</span></h3></summary>
-<div class="subbody">
-<p>Haiku solved 76% of held-out episodes with no memory and 99% with its own notebook. That is a gain of 23.3 <span class="t" data-t="points">points</span> (97.5% interval +14.0 to +32.6). <span class="tag reg">registered</span></p>
-<p>Almost all of the gain is one job. On <code>stack</code> Haiku went from 32% to 100%. On <code>bins</code> it started at 100% and on <code>flasks</code> at 97%, so there was no <span class="t" data-t="room">room to improve</span> on either.</p>
-<p>The notebook also cut the work. Haiku needed 15.6 calls per solved episode with no memory and 9.9 with the notebook. <span class="tag exp">exploratory</span></p>
-<p>The main comparison was repeated on new layouts with a corrected simulator. Haiku went from 78% with no memory to 100% with the notebook, a gain of 21.7 points (95% interval +14.1 to +29.2). On <code>stack</code> alone it went from 50% to 100%. <span class="tag exp">exploratory</span></p>
-</div>
-</details>
+<p>The gain is concentrated where the baseline was weak. Nearly all of Haiku's improvement comes from <code>stack</code>, where it rose from 32% to 100%. On <code>bins</code> and <code>flasks</code> it already solved 100% and 97% without help, so there was nothing for a notebook to add. Luna had the opposite profile. It solved <code>stack</code> every time with no memory and gained on <code>flasks</code> (81% to 100%) and <code>bins</code> (92% to 100%), although with ten runs per job neither of those two differences can be told from zero on its own.</p>
 
-<details class="sub" id="s5-luna" data-toc="GPT-6 Luna">
-<summary><h3>GPT-6 Luna <span class="gist">&middot; 91% to 100%</span></h3></summary>
-<div class="subbody">
-<p>Luna solved 91% with no memory and 100% with its notebook, a gain of 8.6 points (97.5% interval +1.2 to +16.0). <span class="tag reg">registered</span></p>
-<p>The gain is smaller because Luna already did well. It is mostly <code>flasks</code> (81% to 100%) and <code>bins</code> (92% to 100%), and <code>stack</code> was 100% either way. With ten runs per job, the interval for each of those jobs alone includes zero. On the new layouts, <code>flasks</code> gained 17.5 points (95% interval +4.8 to +30.2). <span class="tag exp">exploratory</span></p>
-<p>Calls per solved episode fell from 12.1 to 8.1, and on the new layouts the success gain was 9.2 points (+3.6 to +14.7), from 91% to 100%. <span class="tag exp">exploratory</span></p>
+<p>After these runs we found and fixed a defect in the simulator, described in Section 7, so we repeated the comparison on the corrected code with new layouts. The result was the same size. Haiku rose from 78% to 100% (+21.7 points, 95% interval +14.1 to +29.2) and Luna from 91% to 100% (+9.2, +3.6 to +14.7). On <code>stack</code> alone Haiku went from 50% to 100%, and Luna's gain on <code>flasks</code> was 17.5 points (+4.8 to +30.2). This repeat is exploratory.</p>
+
+<h3 id="results-calls">Tool calls</h3>
+
+<p>A notebook also made the models quicker. Counting only solved episodes, Haiku needed 15.6 tool calls with no memory and 9.9 with a notebook, and Luna needed 12.1 and 8.1 (Figure 2). This is what one would expect, since a model with no memory has to rediscover the catch in every episode and spends calls doing it.</p>
+
 <figure class="chart" data-spec="calls" data-kind="dumbbell">
-  <div class="ct">Tool calls per solved episode, for both cheap models</div>
-  <figcaption>Fewer is better. Held-out episodes of the registered runs, all three jobs pooled. Exploratory.</figcaption>
+  <figcaption><b>Figure 2.</b> Tool calls per solved test episode in the registered runs, all three jobs pooled. Fewer is better. Exploratory.</figcaption>
 </figure>
-</div>
-</details>
 
-<details class="sub" id="s5-sonnet" data-toc="Claude Sonnet 5.5">
-<summary><h3>Claude Sonnet 5.5 <span class="gist">&middot; a second writer</span></h3></summary>
-<div class="subbody">
-<p>Sonnet was used as a second model and as a second writer of notebooks. On <code>stack</code> with no memory it solved 70% of the layouts. With its own notebook it solved 100% of held-out episodes on all three jobs (10 runs of <code>stack</code>, 5 each of <code>bins</code> and <code>flasks</code>). <span class="tag exp">exploratory</span></p>
-<p>Its notebooks also work for other models. Haiku and Luna read Sonnet's notebook with no practice of their own and solved 100% of the same layouts, against 71% (Haiku) and 94% (Luna) with no memory. Each cell is 20 runs. <span class="tag exp">exploratory</span></p>
-<figure class="chart" data-spec="borrowed" data-kind="bars">
-  <div class="ct">Reading a notebook that another model wrote</div>
-  <figcaption>Held-out success across all three jobs. A one-sentence text that names the fix does as well, so this means the notebook contained the answer, not that one writer is better than another. Exploratory.</figcaption>
-</figure>
-</div>
-</details>
+<h3 id="results-larger">Larger models</h3>
 
-<details class="sub" id="s5-frontier" data-toc="Fable 5.2 and GPT-6 Astra">
-<summary><h3>Claude Fable 5.2 and GPT-6 Astra <span class="gist">&middot; no room to improve</span></h3></summary>
-<div class="subbody">
-<p>Fable and Astra are the two larger models. On 60 held-out layouts in 15 runs, each solved all 60 on its first try with no memory. The jobs leave them no room to improve, so a notebook cannot be tested on them. Fable with its own notebook also solved 100% of 116 episodes. <span class="tag exp">exploratory</span></p>
-<p>The registered question was whether a cheap model with a notebook comes within 10 points of a larger model's first try. For Luna it did: 100% against 100%, a gap of 0.0 (98.75% interval &minus;6.9 to +6.9). For Haiku the gap was 1.7 points (98% against 100%), but its interval ends at +10.5, just past the limit, so that test did not confirm it. <span class="tag reg">registered</span></p>
-<p>On the same layouts a first try cost $3.58 for Fable and $5.79 for Astra. Haiku with a notebook cost $0.38 in total and Luna $0.28, including all 12 practice episodes and the notebook writing. This is not a cost-matched comparison, and every model ran at low reasoning effort.</p>
-</div>
-</details>
+<p>Fable and Astra solved all 60 of their test layouts on the first attempt with no memory, so these jobs cannot tell us whether a notebook would help them. They do give a reference point for the cheaper models. The registered question was whether a cheap model with a notebook comes within 10 points of a larger model's first try. Luna did, with 100% against 100% (98.75% interval for the gap &minus;6.9 to +6.9). Haiku reached 98% against 100%, but the interval for its gap extends to +10.5, slightly past the limit, so the test does not confirm it.</p>
 
-<details class="sub" id="s5-small" data-toc="Smaller checks">
-<summary><h3>Smaller checks <span class="gist">&middot; disturbances, false &ldquo;done&rdquo;, other tools</span></h3></summary>
-<div class="subbody">
-<p>In some episodes the simulator applies a <span class="t" data-t="disturbance">disturbance</span> part-way through. In the control scenes, where fresh models already did well, a notebook did not change the drop in success: &minus;2.6 points for Haiku (97.5% interval &minus;9.8 to +4.6) and +0.9 for Luna (&minus;6.3 to +8.1). The test had little room, because fresh models kept 94% and 96%. <span class="tag reg">registered</span></p>
-<p>With no memory and a disturbance, Luna called <code>done</code> when the job was not done in 22 of 116 catch-scene episodes (19%). With a notebook it did so in 3 of 116 (3%). This is a count, not a test.</p>
-<p>With <span class="t" data-t="pose">pose-level tools</span>, which have no <code>pick</code> or <code>place</code>, a notebook raised Luna from 50% to 86% and Haiku from 75% to 89%. That is 36 episodes per cell from nine runs, on the registered simulator that has the defect described in the last section, and the Haiku gain cannot be told from zero (+13.9 points, 95% interval &minus;3.8 to +31.5). <span class="tag exp">exploratory</span></p>
-</div>
-</details>
-</div>
-</details>
-</section>
+<p>The costs were far apart. On those 60 layouts a first try cost $3.58 with Fable and $5.79 with Astra. Haiku cost $0.38 and Luna $0.28, and those figures include all twelve practice episodes and the notebook writing. The two sides were not matched on cost, so this is a description and not a controlled comparison.</p>
 
-<!-- 6 -->
-<section class="sec" id="s6" data-toc="6. What the improvement was">
-<details class="sec">
-<summary><span class="num">6</span><h2>What the improvement was</h2></summary>
-<div class="body">
-<p>A notebook is a long text, so which part of it does the work? These five checks look at that in turn. All of them are <span class="t tag exp" data-t="exploratory">exploratory</span>.</p>
+<h3 id="results-other">Disturbances and lower-level tools</h3>
 
-<details class="sub" id="s6-names" data-toc="A list of the settings">
-<summary><h3>A list of the settings did most of the work for Haiku</h3></summary>
-<div class="subbody">
-<p>For this check Haiku played <code>stack</code> with no practice and one fixed sentence in the memory slot. With no memory it solved 50%. A sentence with the <span class="t" data-t="frame">frame</span> and the <span class="t" data-t="names">four setting names</span> lifted that to 92%. The <span class="t" data-t="generic">generic sentence</span> also reached 92%. A sentence that named the fix reached 100%, and so did the notebook.</p>
+<p>In a further set of test episodes the simulator <span class="t" data-t="disturbance">disturbed</span> the scene part-way through, by making the held object slip or by shoving an object on the table. In the control scenes a notebook made no measurable difference to how much success dropped (Haiku &minus;2.6 points, 97.5% interval &minus;9.8 to +4.6; Luna +0.9, &minus;6.3 to +8.1). The models with no memory already succeeded in 94% and 96% of these episodes, which left little to improve. This comparison is registered.</p>
+
+<p>One side effect is worth recording. When disturbed in the scenes with a catch, Luna with no memory declared the job done while it was not in 22 of 116 episodes (19%). With a notebook this happened in 3 of 116.</p>
+
+<p>We also ran a version of the tools without <code>pick</code> and <code>place</code>, in which the model has to assemble them from hand movements and gripper commands and is given three times the call budget. A notebook raised Luna from 50% to 86% there (+36.1 points, 95% interval +11.6 to +60.6). Haiku went from 75% to 89%, a difference that nine runs cannot separate from zero (+13.9, &minus;3.8 to +31.5). These runs used the simulator before the defect was fixed.</p>
+
+<h2 class="sec" id="adds">What does the notebook add?</h2>
+
+<p>A notebook mixes several things: a reminder that settings exist, the particular setting that worked, and whatever else the model chose to write down. The experiments in this section try to separate them. All are exploratory, and most use Haiku on <code>stack</code>, the cell with the largest gain.</p>
+
+<h3 id="adds-sentence">A sentence in place of a notebook</h3>
+
+<p>We removed the practice entirely and put one fixed text where the notebook would be. Figure 3 lists the texts and the results. With no memory Haiku solved 50% of the test episodes. A two-sentence text raised that to 92%. Its opening sentence says that defaults do not suit every object or surface, and its second sentence names the four adjustable settings: <code>grip_level</code>, <code>grasp_height</code>, <code>release_height</code> and <code>speed</code>. It does not say which setting matters or what value to use. A sentence that gives the answer outright, &ldquo;Pick the green cube with grip_level firm&rdquo;, reached 100%, the same as the notebook.</p>
+
 <figure class="chart" data-spec="ladder" data-kind="bars">
-  <div class="ct">Haiku on <code>stack</code>, one fixed text and no practice</div>
-  <figcaption>Held-out success on 10 runs, 40 episodes per row.</figcaption>
+  <figcaption><b>Figure 3.</b> Haiku on <code>stack</code> with no practice and one fixed text in place of the notebook. Share of 40 test episodes solved. The last row is the model's own notebook, for comparison.</figcaption>
 </figure>
-<p>The frame alone stayed at 50%, and a sentence with no settings in it stayed at 40%. The instruction to change settings one at a time, without the names, reached 70%.</p>
-<p>On a second set of new layouts the pattern repeated: 48% with no memory, 98% for the frame and the names, and 65% for the frame alone. Pooled over both sets, the names beat the instruction &ldquo;change how you call it&rdquo; by 27.5 points (95% interval +16.1 to +38.9).</p>
-<p>Sonnet did not follow this pattern. With no memory it solved 70%, the frame alone reached 88%, the names 85%, and the instruction without the names 98%. The list of names is a Haiku result and not a general one.</p>
-</div>
-</details>
 
-<details class="sub" id="s6-dose" data-toc="One practice episode">
-<summary><h3>One practice episode gave most of the gain</h3></summary>
-<div class="subbody">
-<p>This check gave Haiku a notebook after 1, 3, 6 or 12 practice episodes on <code>stack</code>. Pooled over 20 runs, success was 49% with no memory, 85% after one episode, 94% after three, 90% after six and 100% after twelve. Twelve against one is +15.0 points (95% interval +4.7 to +25.3), and the steps between neighbouring doses are inside their intervals.</p>
+<p>The other rows help to say which part of that text matters. The opening sentence alone did nothing (50%), and neither did a neutral sentence that mentions no settings (40%). Adding an instruction to change how the tool is called after a failure, without naming any setting, reached 70%. On a second set of layouts the pattern repeated, with 48% for no memory, 65% for the opening sentence alone and 98% once the names were added. Over both sets the names beat the instruction by 27.5 points (95% interval +16.1 to +38.9).</p>
+
+<p>This did not carry over to a second model. Sonnet solved 70% with no memory, 88% with the opening sentence alone, 85% with the names, and 98% with an instruction that named no settings. The specific finding, that a list of names is what helps, therefore belongs to Haiku on this job. What the two models share is that a line or two of general advice lifted success well above the no-memory level.</p>
+
+<h3 id="adds-practice">How much practice is needed</h3>
+
+<p>If a sentence can do this much, how much practice does a notebook need? We gave Haiku notebooks built from 1, 3, 6 or 12 practice episodes (Figure 4). Success on the test layouts was 49% with no memory, 85% after one episode, 94% after three, 90% after six and 100% after twelve. Twelve episodes are measurably better than one (+15.0 points, 95% interval +4.7 to +25.3), but the differences between neighbouring steps are within their intervals, so the shape of the curve between one and twelve should not be read closely.</p>
+
 <figure class="chart" data-spec="dose" data-kind="bars2">
-  <div class="ct">Haiku on <code>stack</code>, by number of practice episodes</div>
-  <figcaption>Held-out success, 80 episodes per row. The orange bar in each row counts an episode only if it was solved in 10 calls or fewer.</figcaption>
+  <figcaption><b>Figure 4.</b> Haiku on <code>stack</code> by number of practice episodes behind the notebook, 80 test episodes per row. The second bar in each row counts an episode only if it was solved within 10 of the 20 calls.</figcaption>
 </figure>
-<p>Counted by calls, the curve is steeper. The share solved within 10 calls goes from 18% with no memory to 50% after one episode and 89% after twelve.</p>
-<p>The outcome of that single practice episode matters. After a practice episode that succeeded, the held-out layouts were solved 28 of 28 times (7 runs). After one that failed, they were solved 40 of 52 times (13 runs).</p>
-</div>
-</details>
 
-<details class="sub" id="s6-message" data-toc="An error message carries a lot">
-<summary><h3>An error message carries a lot</h3></summary>
-<div class="subbody">
-<p>In <code>mixed</code> with the error message, a firm grip on the fragile cube is refused and the message gives the squeeze limit. Luna with no memory solved all 40 layouts. The rule <span class="t" data-t="constant">&ldquo;firm for every cube&rdquo;</span> is wrong for the fragile cube, yet it still solved 72% for Haiku and 85% for Luna.</p>
-<p>With no error message the same rule solved 0 of 40 layouts for both models, because a cube cracked in every episode and nothing said so until the final verdict. With no memory, success fell to 35% for Haiku and 57% for Luna.</p>
+<p>A stricter count separates the doses more. If an episode only counts when it is solved within 10 calls, the figures are 18%, 50%, 75%, 72% and 89%. Extra practice paid off more in speed than in success.</p>
+
+<p>What happened in the single practice episode mattered. In the 7 runs where that episode succeeded, the model went on to solve 28 of 28 test layouts. In the 13 runs where it failed, it solved 40 of 52.</p>
+
+<h3 id="adds-borrowed">Reading another model's notebook</h3>
+
+<p>A notebook does not have to be the reader's own. Sonnet practised each job and wrote notebooks, and Haiku and Luna then read them with no practice of their own. Both solved 100% of the test layouts, against 71% and 94% with no memory (Figure 5). This fits the picture above, in which the notebook contains the answer and any reader can use it. A notebook that Fable wrote before any practice did not contain the answer, and Haiku solved 65% of <code>stack</code> layouts with it.</p>
+
+<figure class="chart" data-spec="borrowed" data-kind="bars">
+  <figcaption><b>Figure 5.</b> Share of test episodes solved across all three jobs when the model reads a notebook written by Sonnet, without practising itself. 20 runs per model.</figcaption>
+</figure>
+
+<h2 class="sec" id="mixed">A job with no single answer</h2>
+
+<p>In the first three jobs one setting, once found, works on every layout. <code>mixed</code> was built so that it does not. One cube needs a firm grip and another is damaged by one, and which is which changes from layout to layout. A remembered rule is no longer enough, and the model has to try something and react to the result. All results in this section are exploratory and use 40 layouts per cell.</p>
+
+<h3 id="mixed-message">With and without an error message</h3>
+
+<p>We first ran the version in which a firm grip on the fragile cube is refused with an error message. Luna solved all 40 layouts with no memory. Haiku solved 50% with no memory and 82% with its notebook. We also gave each model a deliberately wrong rule, &ldquo;Pick every cube with grip_level firm&rdquo;, and expected it to fail. It solved 72% of layouts for Haiku and 85% for Luna. The message told the models that the grip was too hard, and they adjusted.</p>
+
+<p>Then we removed the message and kept everything else. Figure 6 puts the two versions side by side. The wrong rule now solved none of the 40 layouts for either model, because a cube cracked in every episode and nothing reported it before the end. With no memory, Haiku fell from 50% to 35% and Luna from 100% to 57%. The models' own notebooks, which had reached 82% and 90% with the message, reached 28% and 35% without it.</p>
+
 <figure class="chart" data-spec="mixed" data-kind="dumbbell">
-  <div class="ct">The same job with and without an error message</div>
-  <figcaption>Solved layouts out of 40 per cell, same layouts in both versions. The written procedure is the <span class="t" data-t="answerkey">best case</span>.</figcaption>
+  <figcaption><b>Figure 6.</b> The <code>mixed</code> job with and without an error message, on the same 40 layouts. Each row is one kind of memory given to the model.</figcaption>
 </figure>
-<p>So the message did most of the work. A short written procedure, which tells the model to use a firm grip only on a cube whose pick failed, solved 100% for both models in both versions.</p>
-</div>
-</details>
 
-<details class="sub" id="s6-notebook" data-toc="No message, no rule learned">
-<summary><h3>With no error message, the model's own notebook did not learn the rule</h3></summary>
-<div class="subbody">
-<p>After 12 practice episodes in the version with no error message, the notebook solved 28% for Haiku and 35% for Luna, against 35% and 57% with no memory. The differences are &minus;7.5 points (95% interval &minus;38.0 to +23.0) and &minus;22.5 points (&minus;57.7 to +12.7). Neither can be told from zero, and neither is a gain.</p>
-<p>The notebooks did record that cubes cracked: 9 of 10 Haiku notebooks and 8 of 10 Luna notebooks mention a crack. Only 2 of 10 in each case have a sentence that links the damage to the grip. This count comes from a sentence search, not from a blind reading.</p>
-</div>
-</details>
+<p>The job itself had not become harder to do. A short procedure that we wrote ourselves solved all 40 layouts for both models in both versions. It tells the model to use the default grip first, to switch to a firm grip only for a cube that fails to lift, and to go back to the default for the next cube. What was missing was a way for the models to arrive at that procedure on their own.</p>
 
-<details class="sub" id="s6-guess" data-toc="Letting the writer guess">
-<summary><h3>Letting the notebook writer guess did not help</h3></summary>
-<div class="subbody">
-<p>In the notebooks above, the writer is told never to invent facts, so it records only what it saw (<span class="t" data-t="factsonly">facts only</span>). A second kind of writer was allowed to add sentences marked as guesses (<span class="t" data-t="mayguess">writer may guess</span>). The notebook then solved 25% for Haiku (10 of 40) and 35% for Luna (14 of 40). Facts-only gave 28% and 35%, and no memory gave 35% and 57%.</p>
+<h3 id="mixed-notebooks">What the notebooks recorded</h3>
+
+<p>Twelve practice episodes did not supply it. In the version with no message, a notebook left Haiku at 28% against 35% with no memory (&minus;7.5 points, 95% interval &minus;38.0 to +23.0) and Luna at 35% against 57% (&minus;22.5, &minus;57.7 to +12.7). Neither difference can be told from zero, and neither points upward.</p>
+
+<p>The notebooks did register that something was wrong. Nine of the ten Haiku notebooks and eight of the ten Luna notebooks mention a cracked cube. Only two of ten in each group contain a sentence that connects the damage to the grip. These counts come from a keyword search whose matches we then read, not from blind coding.</p>
+
+<h3 id="mixed-guess">Allowing the writer to guess</h3>
+
+<p>One possible reason is our own instruction. The model that writes the notebook is told never to invent facts, which may discourage it from proposing a cause it has not confirmed. We therefore ran a variant in which the writer may add sentences marked as guesses. It made no difference (Figure 7). Haiku solved 25% of layouts with the guessing notebook against 28% with the facts-only one, and Luna solved 35% with either.</p>
+
 <figure class="chart" data-spec="guess" data-kind="bars">
-  <div class="ct">Facts only against a writer that may guess, no error message</div>
-  <figcaption>Solved layouts out of 40 per row, same layouts in every row. Against facts only, Haiku is &minus;2.5 points (95% interval &minus;45.9 to +40.9).</figcaption>
+  <figcaption><b>Figure 7.</b> The <code>mixed</code> job with no error message. Share of 40 layouts solved with no memory, with a notebook limited to facts, and with a notebook whose writer may guess.</figcaption>
 </figure>
-<p>All ten Haiku notebooks and six of the ten Luna notebooks contain a sentence marked GUESS. Reading the sentences that link damage to the grip by hand, two Haiku notebooks guess that the grip caused the cracks, one hedges and one says the grip is not the cause. None of Luna's do, and its sentences record what happened.</p>
-</div>
-</details>
-</div>
-</details>
-</section>
 
-<!-- 7 -->
-<section class="sec" id="s7" data-toc="7. What is not done">
-<details class="sec">
-<summary><span class="num">7</span><h2>What is not done</h2></summary>
-<div class="body">
-<ul class="plain">
-  <li><strong>Everything is simulated.</strong> Nothing here has been run on a real robot.</li>
-  <li><strong>We built every catch.</strong> Each job has one catch that we wrote, and in three of the four jobs it is about a single setting. Real jobs have catches that nobody wrote down.</li>
-  <li><strong>A simulator defect was found after the registered runs.</strong> With the hand nearly closed on top of an object, <code>close_gripper</code> could report &ldquo;holding&rdquo; with nothing between the fingers. It hit Haiku with no memory on <code>stack</code> hardest, in 9 of 40 episodes, and 8 of those failed. The defect was fixed and the main comparison was repeated on new layouts with the same result. The registered numbers still come from the defective simulator, and the repeat is exploratory.</li>
-  <li><strong>Several of our written predictions were missed.</strong> Each results table in RESULTS.md marks which.</li>
-  <li><strong>The main result rests on two cheap models.</strong> Haiku and Luna each wrote their own notebooks. Sonnet and Fable wrote borrowed ones. Other models may behave differently.</li>
-  <li><strong><code>mixed</code> is one job.</strong> It was tested with two models and ten runs each.</li>
-  <li><strong>Ten runs per cell is few.</strong> The intervals are wide, and those for the exploratory cells are not adjusted for how many comparisons were tried.</li>
-  <li><strong>Many cells had no room to improve.</strong> Haiku on <code>bins</code> and <code>flasks</code>, Luna on <code>stack</code>, and Fable and Astra everywhere already solved nearly everything with no memory.</li>
-  <li><strong>One layout was left out.</strong> The original sampler cannot place the flasks for one evaluation layout, so the <code>flasks</code> cells have 36 held-out episodes instead of 40.</li>
+<p>The writers did use the permission. All ten Haiku notebooks and six of the ten Luna notebooks contain a marked guess. But among the sentences that link damage and grip, only two Haiku notebooks guess that a firm grip causes the cracks. A third hedges, a fourth blames the placement instead, and none of Luna's proposes the grip as the cause.</p>
+
+<h2 class="sec" id="discussion">Discussion</h2>
+
+<p>The first three jobs are the easy case for a notebook. The environment says clearly when something failed, the fix is a single setting, and once the fix is written down it keeps working. In that case notes helped a great deal, but so did much less: a sentence listing the available settings, one practice episode, or a notebook borrowed from another model. The weaker model was missing a pointer to the right setting, and it did not need accumulated experience to use one.</p>
+
+<p><code>mixed</code> is the harder case. As long as the simulator explained each failure the models coped, even when they started from a wrong rule. Once the explanation was gone, they had to connect an outcome at the end of the episode to a choice made several steps earlier, and across twelve episodes they did not. Their notebooks filled with accurate records of what had happened and almost never with the rule that would have prevented it.</p>
+
+<p>We would not stretch this beyond the setup. It is one simulated arm, four jobs with catches of our own design, ten runs per cell and a handful of models at low reasoning effort. Within those limits, the feedback that a tool returned mattered more than the memory the model kept.</p>
+
+<h2 class="sec" id="limits">Limitations</h2>
+
+<ul class="limits">
+<li>Everything was run in simulation. Nothing has been tried on a real arm.</li>
+<li>We designed every catch ourselves, and in three of the four jobs the fix is a single setting. Real workshops hide things that nobody planted.</li>
+<li>A defect in the simulator was found after the registered runs. With the hand nearly closed on top of an object, <code>close_gripper</code> could report that it was holding something when nothing was between the fingers. It affected Haiku with no memory on <code>stack</code> most, in 9 of 40 test episodes, 8 of which failed. We fixed it and repeated the main comparison with the same result (Section 3), but the registered numbers still come from the simulator with the defect, and the repeat is exploratory.</li>
+<li>Several of the predictions we wrote down before the follow-up experiments turned out wrong. The tables in RESULTS.md mark each one.</li>
+<li>The main result rests on two inexpensive models. Sonnet, Fable and Astra appear only in supporting roles.</li>
+<li>Most cells have ten runs, so the intervals are wide, and the exploratory ones are not corrected for the number of comparisons.</li>
+<li>Several cells left no room for improvement: Haiku on <code>bins</code> and <code>flasks</code>, Luna on <code>stack</code>, and the two larger models on every job.</li>
+<li><code>mixed</code> is a single job, tested with two models.</li>
+<li>One <code>flasks</code> layout could not be built by the original layout sampler and was excluded, which is why the <code>flasks</code> cells have 36 test episodes and not 40.</li>
 </ul>
-</div>
-</details>
-</section>
 
-<footer class="end">
-  <p>Updated 17 November 2026. Read next:</p>
-  <ul>
-    <li><a href="https://github.com/TarunTomar122/robot-play/blob/main/README.md">README.md</a>, the same study in one long page with the static charts.</li>
-    <li><a href="https://github.com/TarunTomar122/robot-play/blob/main/results/RESULTS.md">results/RESULTS.md</a>, every table, regenerated from the raw run files.</li>
-    <li><a href="https://github.com/TarunTomar122/robot-play/blob/main/PROTOCOL.md">PROTOCOL.md</a>, the plan, with each prediction and its outcome.</li>
-    <li><a href="https://github.com/TarunTomar122/robot-play/blob/main/results/deviations.md">results/deviations.md</a>, what went wrong or changed.</li>
-  </ul>
-</footer>
+<h2 class="sec" id="data">Data and code</h2>
+
+<p>The repository holds the simulator, the tools, the agent loop and the analysis. <a href="https://github.com/TarunTomar122/robot-play/blob/main/PROTOCOL.md">PROTOCOL.md</a> is the plan, with every prediction and its outcome. <a href="https://github.com/TarunTomar122/robot-play/blob/main/results/RESULTS.md">results/RESULTS.md</a> contains every table and is regenerated from the <a href="https://github.com/TarunTomar122/robot-play/blob/main/data/README.md">raw run files</a> by one script, with no network access needed. <a href="https://github.com/TarunTomar122/robot-play/blob/main/results/deviations.md">results/deviations.md</a> lists what went wrong or changed along the way.</p>
+
+<footer>robot-play, 17 November 2026.</footer>
 </main>
 
 <div id="tip" hidden></div>
+<div id="card" role="dialog" aria-label="Definition" hidden></div>
 
 <script src="data/results.js"></script>
 <script src="data/terms.js"></script>
@@ -432,90 +351,81 @@ footer.end ul { padding-left: 20px; margin: 6px 0 0; }
   var NS = "http://www.w3.org/2000/svg";
   var CAN_HOVER = !window.matchMedia("(hover: none)").matches;
 
-  /* ---------- theme ---------- */
-  var root = document.documentElement, themeBtn = document.getElementById("theme-btn");
-  var THEMES = ["auto", "light", "dark"];
-  function setTheme(t) {
-    if (t === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t);
-    themeBtn.textContent = "Theme: " + (t === "auto" ? "automatic" : t);
-    themeBtn.dataset.t = t;
-    try { localStorage.setItem("rp-theme", t); } catch (e) {}
+  /* ---------- section numbers, contents, side rail ---------- */
+  var list = document.getElementById("contents-list"), rail = document.getElementById("rail"), heads = [];
+  var n = 0, m = 0;
+  document.querySelectorAll("main h2.sec, main h3").forEach(function (h) {
+    var isSec = h.tagName === "H2", label;
+    if (isSec) { n += 1; m = 0; label = String(n); } else { m += 1; label = n + "." + m; }
+    var title = h.textContent;
+    var no = document.createElement("span"); no.className = "no"; no.textContent = label;
+    h.insertBefore(no, h.firstChild);
+    if (!isSec) return;
+    var li = document.createElement("li"), a = document.createElement("a");
+    a.href = "#" + h.id; a.textContent = label + "  " + title; li.appendChild(a); list.appendChild(li);
+    var r = document.createElement("a"); r.href = "#" + h.id; r.textContent = label + "  " + title; rail.appendChild(r);
+    heads.push({ h: h, a: r });
+  });
+  var ticking = false;
+  function mark() {
+    ticking = false;
+    var cur = null;
+    var atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+    heads.forEach(function (it) { if (it.h.getBoundingClientRect().top <= 120 || atBottom) cur = it; });
+    heads.forEach(function (it) { if (it === cur) it.a.setAttribute("aria-current", "true"); else it.a.removeAttribute("aria-current"); });
   }
-  var q = new URLSearchParams(location.search), saved = "auto";
-  try { saved = localStorage.getItem("rp-theme") || "auto"; } catch (e) {}
-  setTheme(THEMES.indexOf(q.get("theme")) >= 0 ? q.get("theme") : (THEMES.indexOf(saved) >= 0 ? saved : "auto"));
-  themeBtn.addEventListener("click", function () { setTheme(THEMES[(THEMES.indexOf(themeBtn.dataset.t) + 1) % 3]); });
+  window.addEventListener("scroll", function () { if (!ticking) { ticking = true; requestAnimationFrame(mark); } }, { passive: true });
+  mark();
 
-  /* ---------- open / close ---------- */
-  function allDetails() { return document.querySelectorAll("details.sec, details.sub"); }
-  document.getElementById("open-all").addEventListener("click", function () { allDetails().forEach(function (d) { d.open = true; }); });
-  document.getElementById("close-all").addEventListener("click", function () { allDetails().forEach(function (d) { d.open = false; }); });
-  if (q.get("open") === "all") allDetails().forEach(function (d) { d.open = true; });
-
-  /* ---------- terms ---------- */
+  /* ---------- definitions: a floating card ---------- */
+  var card = document.getElementById("card"), openTerm = null;
+  function closeCard() {
+    if (openTerm) openTerm.setAttribute("aria-expanded", "false");
+    openTerm = null; card.hidden = true;
+  }
+  function placeCard(el) {
+    var vw = window.innerWidth, vh = window.innerHeight, W = 250, GAP = 24;
+    var main = document.querySelector("main"), wr = main.getBoundingClientRect(), cs = getComputedStyle(main);
+    var right = wr.right - parseFloat(cs.paddingRight);
+    var roomR = vw - right - GAP, r = el.getBoundingClientRect();
+    card.className = ""; card.style.cssText = "width:" + W + "px;visibility:hidden"; card.hidden = false;
+    var h = card.offsetHeight;
+    if (roomR >= W + 12) {
+      var y = Math.min(Math.max(r.top - 8, 16), vh - h - 16);
+      card.style.cssText = "width:" + W + "px;left:" + (right + GAP) + "px;top:" + y + "px";
+    } else {
+      card.style.cssText = ""; card.className = vw >= 700 ? "corner" : "sheet";
+    }
+  }
+  function fillCard(T) {
+    card.textContent = "";
+    var t = document.createElement("span"); t.className = "ttl"; t.textContent = T.title;
+    var p = document.createElement("span"); p.textContent = T.text;
+    var b = document.createElement("button"); b.type = "button"; b.textContent = "Close";
+    b.addEventListener("click", function () { var el = openTerm; closeCard(); if (el) el.focus(); });
+    card.appendChild(t); card.appendChild(p); card.appendChild(document.createElement("br")); card.appendChild(b);
+  }
   document.querySelectorAll(".t[data-t]").forEach(function (el) {
     el.setAttribute("role", "button"); el.setAttribute("tabindex", "0"); el.setAttribute("aria-expanded", "false");
     function toggle() {
       var T = window.TERMS && window.TERMS[el.dataset.t]; if (!T) return;
-      if (el._box) { el._box.remove(); el._box = null; el.setAttribute("aria-expanded", "false"); return; }
-      var box = document.createElement("div"); box.className = "tx"; box.setAttribute("role", "note");
-      var s = document.createElement("strong"); s.textContent = T.title + ". ";
-      var b = document.createElement("button"); b.type = "button"; b.textContent = "Close";
-      box.appendChild(s); box.appendChild(document.createTextNode(T.text)); box.appendChild(b);
-      var host = el.closest("p, li, dd, figcaption") || el.parentElement;
-      if (host.tagName === "P" || host.tagName === "FIGCAPTION") host.after(box); else host.appendChild(box);
-      el._box = box; el.setAttribute("aria-expanded", "true");
-      b.addEventListener("click", function () { toggle(); el.focus(); });
+      if (openTerm === el) { closeCard(); return; }
+      if (openTerm) openTerm.setAttribute("aria-expanded", "false");
+      openTerm = el; fillCard(T); placeCard(el); el.setAttribute("aria-expanded", "true");
     }
     el.addEventListener("click", toggle);
     el.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
   });
+  document.addEventListener("click", function (e) { if (openTerm && !e.target.closest(".t") && !e.target.closest("#card")) closeCard(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeCard(); });
+  window.addEventListener("resize", function () { if (openTerm) placeCard(openTerm); });
+  window.addEventListener("scroll", function () {
+    if (!openTerm) return;
+    var r = openTerm.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) closeCard();
+  }, { passive: true });
 
-  /* ---------- contents ---------- */
-  var tocBtn = document.getElementById("toc-btn"), tocList = document.getElementById("toc-list"), tocCur = document.getElementById("toc-cur");
-  var items = [];
-  document.querySelectorAll("[data-toc]").forEach(function (el) {
-    var isSub = el.classList.contains("sub"), id = el.id;
-    var a = document.createElement("a"); a.href = "#" + id; a.textContent = el.dataset.toc; if (isSub) a.className = "sub";
-    var li = document.createElement("li"); li.appendChild(a); tocList.appendChild(li);
-    var head = isSub ? el.querySelector("summary") : el.querySelector("details > summary");
-    items.push({ el: el, a: a, head: head, label: el.dataset.toc });
-    a.addEventListener("click", function (e) {
-      e.preventDefault(); openTo(el); setToc(false);
-      head.scrollIntoView({ block: "start" }); history.replaceState(null, "", "#" + id);
-    });
-  });
-  function openTo(el) {
-    var d = el.closest("details") || el.querySelector("details");
-    while (d) { d.open = true; d = d.parentElement && d.parentElement.closest("details"); }
-  }
-  function setToc(open) { tocBtn.setAttribute("aria-expanded", String(open)); tocList.hidden = !open; }
-  tocBtn.addEventListener("click", function () { setToc(tocList.hidden); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") setToc(false); });
-  document.addEventListener("click", function (e) { if (!tocList.hidden && !e.target.closest("#bar")) setToc(false); });
-  var ticking = false;
-  function mark() {
-    ticking = false;
-    var cur = items[0];
-    var atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
-    items.forEach(function (it) {
-      if (!it.head.getClientRects().length) return;
-      if (it.head.getBoundingClientRect().top <= 90 || (atBottom && it.head.getBoundingClientRect().top < window.innerHeight)) cur = it;
-    });
-    items.forEach(function (it) { if (it === cur) it.a.setAttribute("aria-current", "true"); else it.a.removeAttribute("aria-current"); });
-    tocCur.textContent = cur.label;
-  }
-  window.addEventListener("scroll", function () { if (!ticking) { ticking = true; requestAnimationFrame(mark); } }, { passive: true });
-  window.addEventListener("resize", mark);
-  document.addEventListener("toggle", mark, true);
-  if (location.hash) {
-    var target = document.getElementById(location.hash.slice(1));
-    if (target) { openTo(target); window.addEventListener("load", function () { var h = target.querySelector("summary"); if (h) h.scrollIntoView({ block: "start" }); mark(); }); }
-  }
-  if (q.get("toc") === "open") setToc(true);
-  mark();
-
-  /* ---------- charts ---------- */
+  /* ---------- figures ---------- */
   var tip = document.getElementById("tip");
   function svg(name, attrs, text) {
     var e = document.createElementNS(NS, name);
@@ -525,16 +435,14 @@ footer.end ul { padding-left: 20px; margin: 6px 0 0; }
   }
   function html(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function fmt(v, unit) { return (Math.round(v * 10) / 10) + unit; }
-
   function scale(kind, spec) {
     var max = spec.max || 100;
     var lo = kind === "dumbbell" ? -0.17 * max : 0, hi = kind === "dumbbell" ? 1.21 * max : 1.2 * max;
-    return { lo: lo, hi: hi, x: function (v) { return ((v - lo) / (hi - lo) * 100) + "%"; }, max: max };
+    return { x: function (v) { return ((v - lo) / (hi - lo) * 100) + "%"; }, max: max };
   }
   function grid(s, h) {
     var g = svg("g", {});
-    var ticks = [0, s.max / 2, s.max];
-    ticks.forEach(function (t) {
+    [0, s.max / 2, s.max].forEach(function (t) {
       g.appendChild(svg("line", { x1: s.x(t), x2: s.x(t), y1: 0, y2: h, stroke: "var(--grid)", "stroke-width": 1 }));
     });
     return g;
@@ -548,23 +456,19 @@ footer.end ul { padding-left: 20px; margin: 6px 0 0; }
     });
     row.addEventListener("mouseleave", function () { tip.hidden = true; });
   }
-  function rowShell(parent, label, tipText, aria) {
+  function rowShell(parent, label, tipText) {
     var r = html("div", "crow"); r.appendChild(html("div", "clab", label));
     addTip(r, tipText); parent.appendChild(r); return r;
   }
   function dumbbellRow(r, row, s, spec) {
     var H = 32, el = svg("svg", { height: H, role: "img", "aria-label": row.label + ": " + spec.a + " " + fmt(row.a, spec.unit) + ", " + spec.b + " " + fmt(row.b, spec.unit) });
     el.appendChild(grid(s, H));
-    var xa = s.x(row.a), xb = s.x(row.b), cy = H / 2;
+    var xa = s.x(row.a), xb = s.x(row.b), cy = H / 2, same = row.a === row.b;
     el.appendChild(svg("line", { x1: xa, x2: xb, y1: cy, y2: cy, stroke: "var(--muted)", "stroke-opacity": 0.55, "stroke-width": 3, "stroke-linecap": "round" }));
-    var same = row.a === row.b;
     el.appendChild(svg("rect", { x: xb, y: cy - 6, width: 12, height: 12, rx: 2, fill: "var(--b)", transform: "translate(-6 0)" }));
-    var dot = svg("circle", { cx: xa, cy: cy, r: same ? 4 : 6, fill: "var(--a)", stroke: "var(--surface)", "stroke-width": same ? 1.5 : 0 });
-    el.appendChild(dot);
-    var unit = spec.unit;
+    el.appendChild(svg("circle", { cx: xa, cy: cy, r: same ? 4 : 6, fill: "var(--a)", stroke: "var(--surface)", "stroke-width": same ? 1.5 : 0 }));
     function lab(v, x, side) {
-      var t = svg("text", { x: x, y: cy + 4, "text-anchor": side === "l" ? "end" : "start", dx: side === "l" ? -11 : 11 }, fmt(v, unit));
-      el.appendChild(t);
+      el.appendChild(svg("text", { x: x, y: cy + 4, "text-anchor": side === "l" ? "end" : "start", dx: side === "l" ? -11 : 11 }, fmt(v, spec.unit)));
     }
     if (same) lab(row.a, xa, "r");
     else if (row.a < row.b) { lab(row.a, xa, "l"); lab(row.b, xb, "r"); }
@@ -574,16 +478,16 @@ footer.end ul { padding-left: 20px; margin: 6px 0 0; }
   function barRow(r, row, s, spec) {
     var H = 32, el = svg("svg", { height: H, role: "img", "aria-label": row.label + ": " + fmt(row.v, spec.unit) });
     el.appendChild(grid(s, H));
-    el.appendChild(svg("rect", { x: 0, y: 9, width: s.x(row.v), height: 14, rx: 3, fill: row.base ? "var(--base)" : "var(--a)" }));
+    el.appendChild(svg("rect", { x: 0, y: 9, width: s.x(row.v), height: 14, rx: 2, fill: row.base ? "var(--base)" : "var(--a)" }));
     el.appendChild(svg("text", { x: s.x(row.v), y: 20, dx: 7 }, fmt(row.v, spec.unit)));
     r.appendChild(el);
   }
   function bar2Row(r, row, s, spec) {
     var H = 40, el = svg("svg", { height: H, role: "img", "aria-label": row.label + ": " + spec.a + " " + fmt(row.a, spec.unit) + ", " + spec.b + " " + fmt(row.b, spec.unit) });
     el.appendChild(grid(s, H));
-    el.appendChild(svg("rect", { x: 0, y: 5, width: s.x(row.a), height: 13, rx: 3, fill: "var(--a)" }));
+    el.appendChild(svg("rect", { x: 0, y: 5, width: s.x(row.a), height: 13, rx: 2, fill: "var(--a)" }));
     el.appendChild(svg("text", { x: s.x(row.a), y: 16, dx: 7 }, fmt(row.a, spec.unit)));
-    el.appendChild(svg("rect", { x: 0, y: 21, width: s.x(row.b), height: 13, rx: 3, fill: "var(--b)" }));
+    el.appendChild(svg("rect", { x: 0, y: 21, width: s.x(row.b), height: 13, rx: 2, fill: "var(--b)" }));
     el.appendChild(svg("text", { x: s.x(row.b), y: 32, dx: 7 }, fmt(row.b, spec.unit)));
     r.appendChild(el);
   }
@@ -603,15 +507,15 @@ footer.end ul { padding-left: 20px; margin: 6px 0 0; }
     parent.appendChild(lg);
   }
   function tableView(parent, spec, kind, groups) {
-    var d = html("details", "tv"); d.appendChild(html("summary", null, "Table of these numbers"));
+    var d = html("details", "tv"); d.appendChild(html("summary", null, "Data for this figure"));
     var t = html("table"), head = html("tr");
     var cols = kind === "bars" ? ["", "Value"] : ["", spec.a, spec.b];
     cols.forEach(function (c) { head.appendChild(html("th", null, c)); });
     t.appendChild(head);
     groups.forEach(function (g) {
       g.rows.forEach(function (row) {
-        var tr = html("tr"), label = (g.name ? g.name + ": " : "") + row.label;
-        tr.appendChild(html("td", null, label));
+        var tr = html("tr");
+        tr.appendChild(html("td", null, (g.name ? g.name + ": " : "") + row.label));
         if (kind === "bars") tr.appendChild(html("td", null, fmt(row.v, spec.unit)));
         else { tr.appendChild(html("td", null, fmt(row.a, spec.unit))); tr.appendChild(html("td", null, fmt(row.b, spec.unit))); }
         t.appendChild(tr);
