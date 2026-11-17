@@ -2,269 +2,56 @@
 
 **Can an AI that only gives orders to a robot arm get better at a job just by practising it?**
 
-The same study is written up as a [research report on the web](https://tarunTomar122.github.io/robot-play/), with an abstract, figures and a limitations section. Its numbers come from [results/RESULTS.md](results/RESULTS.md), which is the reference if the two ever differ.
+![The stack job played by hand: the first pick fails, a firm grip works](media/stack-hand-play.gif)
 
-Picture a new worker in a workshop. On day one they do not know that one drill sticks, or that one shelf is too tall for the short ladder. They find out by trying, they write a note, and by day ten they are faster and make fewer mistakes. Nobody retrained them. They just remembered.
+A language model drives a simulated Franka Panda arm by calling tools such as `pick` and `place`. Each job hides one physical catch, for example a cube that is heavier than it looks. The model practises twelve times, keeps a 300-word notebook that it rewrites after each attempt, and is then tested on layouts it has not seen. Nothing is retrained.
 
-This project asks whether a language model can do the same thing with a simulated robot arm. The model never touches the arm's motors. It calls simple tools such as `pick` and `place`, and ordinary robotics code (inverse kinematics and collision-free motion planning) does the careful movement behind them. Each job hides one small physical "catch". We watch whether the model finds the catch, writes it down, and uses it next time.
+**The full write-up is the [research report](https://tarunTomar122.github.io/robot-play/).** This page is the short version.
 
-> **Status: all cells have run.** The registered matrix ended on 17 Nov at 01:26 with one prespecified-layout exclusion (a flasks layout the original sampler cannot build; see "Limits"); the exploratory cells ended later that night. Every number below comes from [results/RESULTS.md](results/RESULTS.md), which `scripts/analyze.py` regenerates from the raw run files in [data/](data/README.md) (9.6 MB, no network or money needed). The plan written before the runs is [PROTOCOL.md](PROTOCOL.md); what went wrong or changed is in [results/deviations.md](results/deviations.md) (six entries); [results/code_versions.md](results/code_versions.md) says which code produced which folder. Only rows 1, 6 and 7 below are registered (confirmatory); everything else is exploratory.
+## What came out
 
-## The results on one screen
+- **A notebook helped where there was something to learn.** On unseen layouts Claude Haiku 5.5 went from 76% to 99% and GPT-6 Luna from 91% to 100%, with about a third fewer tool calls.
+- **Very little of the notebook was needed.** For Haiku on the stacking job, two sentences that list the adjustable settings gave 92% against 50% with no memory, and one practice episode gave 85%.
+- **Another model's notebook works too.** Haiku and Luna solved 100% of test layouts reading notebooks written by Sonnet, with no practice of their own.
+- **Error messages did most of the work on the hardest job.** When one cube needs a firm grip and another cracks under one, the models coped while the simulator explained each failure. With the message removed, their own notebooks solved 28% (Haiku) and 35% (Luna), and a deliberately wrong rule solved 0 of 40 layouts.
+- **Larger models left no room.** Claude Fable 5.2 and GPT-6 Astra solved every test layout on the first try.
 
-| | What was asked | What happened | Status |
-|---|---|---|---|
-| 1 | Does a self-written notebook help a cheap model, against starting fresh? | **Yes where there was room.** Haiku +23.3 points (97.5% interval +14.0 to +32.6), Luna +8.6 (+1.2 to +16.0). Nearly all of Haiku's gain is one job, `stack` (32% to 100%). | registered |
-| 2 | Does the same hold on a corrected simulator with fresh layouts? | **Yes.** Haiku +21.7 (+14.1 to +29.2), Luna +9.2 (+3.6 to +14.7); four of four predictions met. | exploratory replication |
-| 3 | What does the notebook contain that a one-line note does not? | **Less than it looks.** A sentence naming the fix matches the notebook (both 100%). A generic note (a frame, an instruction to change settings one at a time, and the four setting names) reaches 92% and, on fresh layouts, 98%, against about 50% fresh on Haiku `stack`; the frame plus the four names alone reaches the same. Taking it apart: the four names beat "change how you call it" in both layout sets (pooled +27.5 points, +16.1 to +38.9); the frame alone and the instruction with the word "settings" are not cleanly separated from either (tentative). Counted within 10 calls the generic note buys little efficiency outside Haiku `stack`, while the notebook buys a lot, and Sonnet's efficiency gain came from the instruction, not the names (finding 3). A repeat with Sonnet 5.5 did not reproduce that ordering (names minus instruction −12.5 points, −27.7 to +2.7). Eight of my predictions in this series missed (H2, H3, W1, W2, for Sonnet Q2 and Q4, and for Haiku on the 12-call cell B2 and B3); the Haiku replication's six were met, two of them on the threshold. | exploratory |
-| 4 | How much practice does the model's own notebook need? | **Most of the gain arrives after one episode, and twelve is still above one.** Haiku `stack`, held-out success over 20 runs: no memory 49%, 1 practice episode 85%, 3 episodes 94%, 6 episodes 90%, 12 episodes 100% (12 against 1: +15.0 points, +4.7 to +25.3; neighbouring steps are inside their intervals). Within 10 calls the curve is steeper: 18%, 50%, 75%, 72%, 89%. | exploratory |
-| 5 | Do notes from a stronger writer work with no practice? | **Yes, on these jobs, where a one-line sentence naming the fix does just as well** (so this means the notes contain the answer, not that writers differ). Fable's and Sonnet's notebooks let Haiku skip practice (Sonnet's: 100% against 71% fresh). A notebook written with no practice did not mention the fix by the keyword audit (65%). | exploratory |
-| 6 | Can a cheap model with a notebook match frontier models? | **A ceiling result.** Fable and Astra solved 60 of 60 first tries, so the jobs cannot separate them from anything that also solves them. | registered |
-| 7 | Does practice help recovery from a mid-task disturbance? | **No evidence of an effect** (Haiku −2.6 points, −9.8 to +4.6; Luna +0.9, −6.3 to +8.1). The test had little room: fresh agents already kept 94% and 96%. | registered |
-| 8 | Can the models do the jobs without `pick` and `place`? | **Yes, a notebook helped Luna clearly (50% to 86%) and Haiku by an amount that cannot be told from zero.** Nine runs per model, on the registered simulator whose closed-hand defect sits in the tools these runs use. | exploratory |
-| 9 | What if no single setting works: one cube needs a firm grip and the other breaks under one? | **The error message did most of the work, and the model's own notebook did not learn the rule when there was no error message.** With an error message both models mostly solved the job by reading it (Luna 100% with no memory; the wrong rule "firm for every cube" still gave 72% and 85%). On the same layouts with no error message, that rule solved 0 of 40, no memory gave 35% (Haiku) and 57% (Luna), a one-sentence procedure gave 100% for both, and the model's own notebook after 12 practice episodes gave 28% and 35%. Letting the notebook writer add marked guesses did not help either (Haiku 25%, Luna 35%). | exploratory, registered first |
+All numbers come from [results/RESULTS.md](results/RESULTS.md).
 
-Findings 1 to 6 are explained below (rows 1 to 5 and 9). Rows 6 to 8 and the Fable-notebook results are in [docs/other-findings.md](docs/other-findings.md).
-
-## What we found
-
-**1. A notebook made the weaker models better where they had room to improve, and cut the calls they needed.** The registered comparison (10 runs per job, 4 unseen layouts per run, memory frozen, each model using its **own** notebook) gives:
-
-![held-out success by job](docs/img/headline.png)
-
-| model | success with its own notebook | success starting fresh | difference (97.5% interval) |
-|---|---|---|---|
-| Claude Haiku 5.5 | 99% | 76% | **+23.3 points** (+14.0 to +32.6) |
-| GPT-6 Luna | 100% | 91% | **+8.6 points** (+1.2 to +16.0) |
-
-**How much to trust that.** Almost all of Haiku's gain is one cell, the `stack` job (32% to 100%). In the other five cells the fresh agent already solved at least 81% (Luna on `flasks`: 81% fresh, 100% with a notebook, 36 episodes each, so a wide interval) and mostly 92% to 100%, so there was little room in success rate; there the benefit is fewer calls (Haiku 15.6 calls fresh, 9.9 with a notebook; Luna 12.1 and 8.1). Luna's pooled interval only just clears zero, and my simulation of the interval rule says it covers the truth about 96% of the time for a model this close to the ceiling, not the nominal 97.5% ([results/coverage_sim.md](results/coverage_sim.md)).
-
-**2. A bug in my simulator touched the headline cell, but the same comparison on the corrected simulator with fresh layouts gives the same gain.** When Haiku's first grab on `stack` failed, the hand stayed closed. The next move planned its path as if the hand were open, so it landed on the cube and still answered "ok", and a later `close_gripper` could report `holding` with nothing in the fingers. In the no-memory runs 25 of the 27 failed held-out episodes contained one of those two wrong answers, against none of the 80 notebook and replay episodes. I rebuilt the layer that caused it and repeated the registered comparison on **fresh layouts** (run seeds 20 to 29, both models, all three jobs, 2,400 episodes, [results/RESULTS.md](results/RESULTS.md) section 6c), with four predictions written down before it ran:
-
-| corrected simulator, fresh layouts | with notebook | no memory | difference (95% interval) |
-|---|---|---|---|
-| Haiku, all three jobs | 100% | 78% | **+21.7 points** (+14.1 to +29.2) |
-| Haiku, `stack` only | 100% | 50% | +50.0 points (+31.1 to +68.9) |
-| Luna, all three jobs | 100% | 91% | **+9.2 points** (+3.6 to +14.7) |
-
-All four predictions were met (they were written after the earlier results were known, so they are predictions about a replication, not independent forecasts), and the registered pooled gains (+23.3 and +8.6) sit inside these intervals. The false-`holding` and short-move symptoms are zero in all 480 held-out episodes of the replication. **What the bug did and did not do:** the qualitative gain replicated on corrected code; the exact size of the original effect is uncertain. On the same ten run seeds three simulators gave Haiku `stack` gains of +67.5 (as registered), +60.0 (symptom fixed) and +47.5 points (cause fixed, interval +17.8 to +77.2). That 20-point drop is **not** shown to be the bug's doing: its paired interval is −14.6 to +54.6, the no-memory arm only moved from 13 to 15 to 17 of 40 (inside rerun noise), and half of the drop is one notebook run (run seed 5) that got 0 of 12 in practice and wrote "pick fails. Do not use pick" (a prediction that the notebook arm would stay at 95% or more therefore missed: 90%, recorded as missed in [PROTOCOL.md](PROTOCOL.md)). The registered `stack` gain (+67.5) may be a little high, since fresh layouts gave +50.0.
-
-**3. What a short note can do: a list of the adjustable settings recovers most of the notebook's gain on `stack` (exploratory; I registered predictions before each step, and eight of them missed).** A reader's first question is what a notebook actually adds. I ran the same unseen layouts with no practice and one fixed text in the memory slot (10 runs, 4 layouts each, so 40 episodes per cell; run seeds 20 to 29, and later fresh run seeds 30 to 39). The texts are built from three parts: a **frame** ("Defaults do not suit every object or surface."), an **instruction** ("When a pick or place fails or is refused, read the message and change the settings one at a time instead of repeating the same call.") and the **names** of the four adjustable settings ("grip_level, grasp_height, release_height, speed"). The **generic sentence** is all three; the **naming sentence** says which setting fixes the job ("Pick the green cube with grip_level firm."); the **inert sentence** names no setting and gives no advice about them ("Every object in this scene can be handled with the tools you have, one after another. When a call fails or is refused, read the message and look at the scene again before you carry on, and call done only once the job really is finished."). Except in the "own label" rows, every text sits under **one neutral label** ("NOTES FOR THIS TASK"). Held-out success:
-
-| what the model reads (no practice unless stated) | Haiku, `stack` | Haiku, all three jobs | Luna, all three jobs |
-|---|---|---|---|
-| nothing | 50% | 78% | 91% |
-| the inert sentence | 40% | 75% | 86% |
-| the generic sentence (frame, instruction and names) | **92%** | 92% | 94% |
-| the naming sentence | **100%** | 100% | 100% |
-| Fable's notebook written with zero practice (own label) | 65% | 87% | 89% |
-| its own notebook after 12 practice episodes (own label) | **100%** | 100% | 100% |
-
-**Taking the generic sentence apart** (Haiku, `stack` only; the first split was registered and pushed before it ran, and I then repeated it on fresh layouts with two more wordings, also registered and pushed first). Each text keeps the frame:
-
-| text under the neutral label | run seeds 20 to 29 | run seeds 30 to 39 (fresh) |
-|---|---|---|
-| nothing | 50% | 48% |
-| the inert sentence | 40% | 42% |
-| the frame, then "When a pick or place fails or is refused, read the message before you carry on." (**frame only**) | 50% | 65% |
-| the frame, then "...read the message and change how you call it, one thing at a time, instead of repeating the same call." (**instruction, no names, no word "settings"**) | 70% | 65% |
-| the frame, then "...read the message and change the settings one at a time instead of repeating the same call." (**instruction with "settings", no names**) | | 78% |
-| the frame, then "The adjustable settings are grip_level, grasp_height, release_height and speed." (**names, no instruction**) | **92%** | **98%** |
-| the frame, then "When a pick or place fails or is refused, read the message. The adjustable settings are grip_level, grasp_height, release_height and speed." (**names, with "read the message"**) | | 88% |
-| the generic sentence | 92% | 98% |
-
-- **One sentence naming the fix is as good as the notebook (H1, met, at a 100% ceiling).** The difference from the model's own notebook is 0.0 points (Haiku pooled, interval −2.3 to +2.3), in fewer calls (7.5 against 9.8). A ceiling says "sufficient to match", not that the notebook holds nothing else: with its own notebook Haiku did not set the firm grip in 12 of 40 `stack` episodes and solved those 12 by turning the hand 45 degrees together with slow speed ([results/firm_grip_audit.md](results/firm_grip_audit.md); the one-setting-at-a-time audit found the turn alone works in only 10 of 20 scripted layouts).
-- **A note that lists the settings and tells the reader to change them gets most of the way (H2, MISSED).** I predicted at most 60% on `stack` for the generic sentence; it reached 90% under the operator label, 92% under the neutral one and 98% on the fresh layouts. The rule I wrote in advance says the headline is weakened: a large part of the notebook's gain on `stack` is reproduced by a sentence that does not say which setting to change. In the logs Haiku set the firm grip in 21 of 40 `stack` episodes with no memory, 36 of 40 with the generic sentence (35 under the operator label) and 40 of 40 with the naming sentence.
-- **Which part does the work (v1.10: W1 and W2 MISSED, W3 met; v1.11: R0 to R5 all met, R2 and R4 exactly on their thresholds).** I guessed that the instruction to vary settings mattered most. The opposite came out twice. The frame and the four names, with no instruction, reached 92% and then 98%, the same as the full sentence. The instruction alone ("change how you call it") stayed at 70% and 65%. The primary comparison (names against that instruction, pooled over all 20 runs of both layout sets) is **+27.5 points** (+16.1 to +38.9). It is a descriptive interval from ten-pair cells with no correction for the number of comparisons I looked at. The nested wordings are less clean. The instruction with the word "settings" reached 78% (+30.0 over fresh, +2.3 to +57.7, but only +12.5 over the frame alone, −8.6 to +33.6), and adding "read the message" to the names lowered success from 98% to 88% (−10.0, interval −2.4 to +22.4 when read the other way round, so it includes zero). The gap between the 88% names wording and the "settings" instruction is +10.0 (−12.6 to +32.6), which I cannot tell from zero. So my **tentative** reading is that the names help more than the instruction, that the frame alone and the instruction are not separated by these data (on the fresh layouts the frame alone reached 65%, the same as "change how you call it"), and that the exact wording matters. I did not predict that; the frame alone also moved from 50% to 65% between the two layout sets, a 15-point move that ten runs per cell cannot tell from sampling noise. The four settings are already arguments in the tool descriptions, so a plausible reading is that the list reminds the model what it can change; the experiment cannot tell what the model attends to. The firm-grip counts do not fully explain the instruction's effect either: in the first split it solved 28 of 40 against 20 for the frame alone while setting the firm grip equally often (27 against 26). One model, one job, one or two wordings per part.
-- **No clear label effect was detected for the tested labels (L1 to L4 met), and the inert sentence is not a pure placebo.** The operator label made no measurable difference to either hint sentence (generic: 92% under the neutral label against 90% under the operator label on `stack`; naming: 100% against 100%), though ten runs cannot rule out a small one. The fair headline for the generic sentence is **+42.5 points over fresh** on `stack` (+21.8 to +63.2); the +52.5 over the inert sentence (+32.8 to +72.2) uses a baseline that sat 10 points below fresh. The inert sentence did not help Haiku (40% and 42%) and for Luna on `bins` success fell from 92% to 72% (−20.0, −40.3 to +0.3, an interval that includes zero) with 82 `observe` calls in 40 episodes against 50 without a note; that is consistent with "look at the scene again" using up the 20-call budget, which I did not test. The generic sentence does not help every job either: on Haiku `flasks` it scored 85% against 95% fresh (−10.0, −31.0 to +11.0), a difference I cannot tell from noise at this size.
-- **A second model does not reproduce the ordering of the parts (v1.13: gate met, Q1 and Q3 met, Q2 and Q4 MISSED).** Sonnet 5.5 with no memory solves 70% of the 40 `stack` layouts of run seeds 30 to 39 (the gate asked for at most 75%, so there is room). With the neutral-label texts and no practice it solved 88% with the frame alone, 85% with the four names, 98% with the instruction "change the settings one at a time" and no names, and 92% with the generic sentence (ten runs each). Names minus instruction is **−12.5 points** (−27.7 to +2.7), the opposite sign from Haiku's pooled +27.5; the frame alone already gives +17.5 over no memory (−6.4 to +41.4), and only the instruction arm's interval over no memory excludes zero (+27.5, +6.1 to +48.9). So for a second model the data do not separate what the parts do, and "the names beat the instruction" is not shown to hold beyond Haiku. The registered reading did not cover Q1 met with Q2 missed; the reading here is post hoc, from ten pairs per comparison on one job ([results/RESULTS.md](results/RESULTS.md) section 6j).
-- **A notebook written without practice did not mention the fix (H3, MISSED; its success part met).** By a keyword audit none of the 30 zero-practice notebooks names the fix for its job (they list settings as things to check and say to start with the defaults; [results/prior_notebook_audit.md](results/prior_notebook_audit.md)); a keyword audit does not prove they contain nothing useful. Haiku reading one solved 65% on `stack` (+15.0 over fresh, interval −7.6 to +37.6), 35 points below its own notebook.
-
-**How to read this.** On Haiku `stack`, a one-line note that gives the frame and lists the adjustable settings reproduces most of the **success-rate** gain of a 12-episode notebook; the naming sentence adds the specific value (here "firm"), which is also what the notebooks recorded. The success rate hides how fast the models solve the jobs, so the next two subsections count solved episodes under tighter budgets. Everything in them is descriptive and was added after the results were known (rounds 5g and 5h), except the 12-call cell, which was registered first.
-
-**Counted within 10 of the 20 calls** (results section 6l; solved within 10 calls, out of 40 held-out episodes per cell; where two numbers are given the first is the operator label and the second the neutral label):
-
-| | no memory | the generic sentence | the naming sentence | the 12-episode notebook |
-|---|---|---|---|---|
-| Haiku `stack` | 8 | 24, 36 | 40, 40 | 31 |
-| Haiku `bins` | 0 | 0, 0 | 28, 35 | 0 |
-| Haiku `flasks` | 27 | 24, 22 | 39, 39 | 40 |
-| Luna `stack` | 39 | 38, 39 | 40, 40 | 40 |
-| Luna `bins` | 0 | 0, 0 | 40, 40 | 28 |
-| Luna `flasks` | 20 | 21, 25 | 40, 40 | 40 |
-
-The generic sentence buys no efficiency over no memory on either `flasks` cell or on Luna `bins`, while the notebook and the naming sentence both do. Haiku `stack` is the one cell where the generic sentence is about as fast as the notebook, and only under the neutral label (36 of 40, against 24 under the operator label: +30.0 points, +12.2 to +47.8 between the two labels, so the label matters at this budget even though no clear label effect appeared in the 20-call success rate). Haiku `bins` is the exception for the notebook: it solves that job in 14 to 20 calls and never within 12 (0 of 40). **Sonnet 5.5 does not fit the "list is enough" reading:** on its fresh `stack` layouts (run seeds 30 to 39), within 10 calls, no memory solved 8 of 40, the frame alone 22, the frame and the four names 9, the instruction with the word "settings" 26 and the generic sentence 28; names minus instruction is −42.5 points (−64.9 to −20.1) (results section 6j). A tempting hypothesis is that a list of settings is enough where the fix is a discrete choice (`firm`) and not where the model must find a number (a grasp height of 0.9, a release height); the data do not isolate it, because it is confounded with the job and the model (one discrete job and two number jobs, only Haiku has room on the discrete one, and Sonnet's discrete-job result goes the other way within 10 calls).
-
-**With the call budget stated to the model (v1.14, registered first).** Haiku and Luna, run seeds 30 to 39, 1,740 episodes, "at most 12 tool calls" in the system prompt. The registered scoring rule is that **solved means the simulator's verdict is success and the model called `done` within the 12 calls** (36 held-out episodes were physically finished but never declared and are counted separately in [section 6k](results/RESULTS.md); my first scoring had ignored the `done` condition, and round 5h corrected it, which turned B3 from met to missed for Haiku). **B1 met, B2 MISSED for Haiku, B3 MISSED for Haiku.** Solved within 12 calls, of 40 held-out episodes, own notebook after 12 practice episodes against the generic names list (the frame and the four names): on `stack` Haiku 36 against 34 (+5.0 points, −17.0 to +27.0, an interval wider than B1's 10-point margin; no memory 6 of 40); on `flasks` Haiku 40 against 31 (+22.5, +2.8 to +42.2; the registered +30 not reached, and Haiku with no memory already solved 33 of 40) and Luna 40 against 23 (+42.5, +25.5 to +59.5); on `bins` Haiku 8 against 0 (+20.0, −10.2 to +50.2; +30 not reached) and Luna 38 against 16 (+55.0, +30.0 to +80.0). The names list on its own was not clearly different from no memory outside `stack` (Haiku `flasks` −5.0, −25.3 to +15.3; Haiku `bins` +0.0; Luna `flasks` +20.0, −3.5 to +43.5; Luna `bins` +10.0, −22.9 to +42.9). So in the three cells where the interval excludes zero (Haiku `flasks`, Luna `flasks`, Luna `bins`) the notebook is ahead of the list by 22.5 to 55 points. Haiku `bins` is a tight cell, since the shortest `bins` episode takes 9 calls and Haiku rarely declared done in 12 calls with any arm. Ten pairs per comparison, no multiplicity correction.
-
-**Caveats.** The catch in each job is one constant among a few listed settings, so "practice finds one setting" is partly a property of how I built the jobs. The naming sentence is an answer key by construction. The zero-practice and Sonnet notebooks keep their own labels, which the label control did not re-test. The label control's registration (02:38:40 local time) reached GitHub only together with its results at 02:59, so its ordering rests on local timestamps, and its predictions L2 and L3 were near-certain when written because the same sentences had scored 90% and 100% under the operator label (the two split cells were pushed before they ran). The arms differ in whole sentences, not single words. The room in success rate is almost all in Haiku `stack`, so the split was repeated for one more model only (Sonnet 5.5, above) and on no other job, and the pooled rows are that one cell diluted.
-
-**4. How much practice the notebook needs: most of the gain arrives after one episode, and twelve is still above one (exploratory, registered first; D1 and D4 met, D2 and D3 missed).** The zero-practice reminder of finding 3 raises the question from the other side: how fast does *practice* get there? Haiku on `stack` with its own notebook (memory frozen, 4 unseen layouts per run), after 1, 3, 6 and 12 practice episodes:
-
-| held-out success | no memory | 1 practice episode | 3 | 6 | 12 | the reminder (no practice) |
-|---|---|---|---|---|---|---|
-| run seeds 30 to 39 (10 runs) | 48% | 90% | 90% | 90% | 100% | 98% |
-| run seeds 20 to 39 pooled (20 runs) | 49% | 85% | 94% | 90% | 100% | 95% |
-
-One practice episode already gives **+36.2 points over no memory** (+20.4 to +52.1), three give +45.0 (+30.5 to +59.5) and twelve +51.2 (+39.0 to +63.5). Neighbouring steps are small next to their intervals (3 against 1: +8.8, −7.0 to +24.5; 12 against 6: +10.0, −4.4 to +25.0; 12 against 3: +6.2, −4.4 to +17.5), but twelve against one is **+15.0** (+4.7 to +25.3), so the curve is not flat all the way. Counted within 10 calls it is steeper (pooled, 80 held-out episodes per dose): no memory 14, one episode 40, three 60, six 58, twelve 71, and on the fresh seeds alone 6, 21, 29, 27 and 40 of 40 (descriptive, added after round 5g, section 6i). The reminder is 5 points below the 12-episode notebook in success (95% against 100% on the 20 pooled runs; −5.0, −10.7 to +0.7) and 35 against 40 of 40 within 10 calls on the fresh seeds, so on this job the reminder's estimate (95%) sits between one practice episode (85%) and twelve (100%) and is not separated from one to three episodes by these intervals. I predicted that one episode would stay at or below 80% (it reached 85%) and that six would beat one by 10 points (+5.0). A keyword audit of the final notebooks ([results/dose_notebook_audit.md](results/dose_notebook_audit.md)) finds the firm grip named in 12 of 20 notebooks after one episode and in 19 or 20 of 20 after three or more. **An observational split by how the single practice episode went (not an intervention).** Of the 20 one-episode runs, 13 failed their practice episode; their held-out layouts were solved 40 of 52 times (77%), against 28 of 28 for the 7 runs whose practice episode was solved, and the one-episode notebooks that do not name the firm grip scored 23 of 32 against 45 of 48 for those that do (the keyword was chosen after the fact). A tentative reading is that what matters is whether the job was solved once and the note records the fix, more than the episode count; the runs differ in more than that, and there are 7 and 13 of them. In dollars as recorded (practice episodes, notebook writes and the four held-out episodes of a run), a run with one practice episode costs about 0.9 cent and a run with twelve about 2.4 cents, against 0.3 cent for the reminder's four held-out episodes (no memory costs 0.8 cent, because it uses more calls). With the budget stated at 12 calls (section 6k, registered rule) the dose matters more: Haiku on `stack` solves 17 of 40 held-out layouts after one practice episode and 36 of 40 after twelve (+47.5 points, +16.6 to +78.4; no memory 6 of 40). Caveats: one model and one job; the curve from 1 to 6 is flat within noise at 20 calls; this says nothing about jobs whose catch changes from layout to layout.
-
-**5. Claude Sonnet 5.5's notebook worked for the cheaper models with no practice of their own, on these jobs and layouts (exploratory, registered after the hint result was known; three of four predictions met, one not testable).** Fable was the only writer behind the borrowed-notebook result and it never failed a practice episode, so I repeated it with Sonnet 5.5, which does fail some (7% of its `stack` practice episodes). Sonnet practised for 12 episodes on 20 runs (`stack` run seeds 20 to 29, `bins` and `flasks` 20 to 24) and solved 100% of its held-out layouts; 9 of its 10 `stack` notebooks name the firm grip, and all 5 `bins` and all 5 `flasks` notebooks name theirs. Haiku reading Sonnet's notebook with no practice solved 100% on all three jobs (20 runs), against 71% fresh (**+28.7 points**, +18.6 to +38.9) and 100% with its own notebook (0.0, −3.4 to +3.4). Luna went from 94% to 100% (+6.2, +0.1 to +12.4). Reading Sonnet's notebook, Haiku set the firm grip in 36 of its 40 `stack` episodes and turned the hand 45 degrees in the other 4, so the two writers point to different routes that both work. **The fourth prediction could not be tested**: it asked whether a stronger writer repairs a run where Haiku's own notebook locked in a wrong rule, and none of Haiku's 30 own-notebook runs in this replication failed. A one-line sentence naming the fix scores the same 100% on these jobs, so all these notebooks demonstrate is that a notebook can contain the answer, not that a stronger writer writes a better one. Both writers are Anthropic models, I registered this after the naming hint had reached 100% (two predictions were close to certain when written), and Sonnet's own results sit at a ceiling. Fable's notebook, a different-job control, and the one-episode result are in [docs/other-findings.md](docs/other-findings.md).
-
-**6. When no single setting works, the error message did most of the work, and the model's own notebook did not learn the rule when there was no error message (exploratory: two cells and a follow-up, each registered and pushed before it ran).** The fourth job, `mixed`, is the stack job with two odd cubes. In each layout one cube is heavy and slippery and needs a firm grip, and the other is fragile and breaks under one. The simulator measures how hard each finger presses; above 3.5 N the fragile cube is lost (a normal grip presses with about 2.6 N, a firm one with about 4.95 N). Which cube is which depends on the layout and is not stated anywhere. A script with any single setting solved 0 or 1 of 100 layouts, and a script that reads each result and switches grips solved 96 of 100 ([gate](results/gate_mixed.md)). I ran it twice on the same layouts with Haiku and Luna, 10 runs of 4 held-out layouts per arm. In the first run the tool returns an error message when the fragile cube is squeezed too hard ("squeeze limit exceeded ... it takes at most 3.5 N; the hand let go"). In the second run the tool returns no error: the pick and the place succeed, the tower stands, and only the final verdict says a cube is cracked ([gate](results/gate_mixed_silent.md)).
-
-| held-out layouts solved (40 per cell) | Haiku, error message | Haiku, no error message | Luna, error message | Luna, no error message |
-|---|---|---|---|---|
-| no memory | 50% | 35% | 100% | 57% |
-| the frame and the four setting names | 90% | 45% | 92% | 45% |
-| one sentence: "Pick every cube with grip_level firm." | 72% | **0%** | 85% | **0%** |
-| one sentence stating the procedure (the answer key) | 100% | 100% | 100% | 100% |
-| its own notebook after 12 practice episodes | 82% | **28%** | 90% | **35%** |
-
-![the two-sided job, with and without an error message](docs/img/two_sided.png)
-
-**Results.** With the error message, the models read it and changed grips on their own. Luna solved all 40 no-memory layouts, and the wrong rule "firm for every cube" still gave 72% (Haiku) and 85% (Luna). Three of my six predictions for that run were wrong: the wrong rule did less harm than I predicted, and Luna had no room to improve ([PROTOCOL.md](PROTOCOL.md) v1.15). With no error message, the same wrong rule solved 0 of 40 for both models. On the same layouts that is 72.5 points lower for Haiku (95% interval −86.9 to −58.1) and 85.0 points lower for Luna (−97.2 to −72.8). No memory fell to 35% and 57%, and the one-sentence procedure gave 100%, which is 65.0 and 42.5 points above no memory. Five of my six predictions for that run were right. The wrong one was that the model's own notebook would help. It scored 7.5 points below no memory for Haiku (−7.5, interval −38.0 to +23.0) and 22.5 points below for Luna (−22.5, −57.7 to +12.7), and a cube was cracked in 68% and 65% of its held-out episodes, against 15% and 40% with no memory. The practice episodes were mostly failures (34 of 120 solved for Haiku and 32 of 120 for Luna, against 72 and 97 of 120 with the error message).
-
-**Why, as far as I can tell** (a sentence search plus my reading of the 20 final notebooks, not a blind coding; [audit](results/notebook_audit_mixed.md)). 17 of the 20 notebooks mention the cracks, but only one (Haiku) names the grip as the cause. Seven say the cause is unknown or not established, and fourteen mention release heights in the same notebook as the cracks, so many of the notebooks looked at the wrong setting. The notebook writer in every arm is told "you never invent facts", which may also stop it from proposing a cause. A follow-up (PROTOCOL.md v1.17) let the writer add marked guesses. All 10 Haiku notebooks and 6 of 10 Luna notebooks then contained a guess, but only two Haiku notebooks guessed the grip as the cause and no Luna notebook did. Held-out success did not move: Haiku 25% (28% with the facts-only writer) and Luna 35% (35%), against 35% and 57% with no memory. Two of my four predictions were wrong (H1 and H2). The text search counted Luna's records of what happened as a match for H3, and my reading of them says they are not guesses.
-
-**What this does and does not tell.** Part of the safety in the earlier jobs came from the error message in the tool result and not from memory. When the right grip depends on the object, a one-sentence procedure did better than a stored value and better than the model's own twelve-episode notebook. It does not tell that notebooks cannot learn conditional rules. It is one job with two models, ten runs per arm and one practice dose, the one-sentence procedure contains the answer by construction, and the cube "cracking" is a threshold on measured finger force in a simulator, not a material model.
-
-**More results** ([docs/other-findings.md](docs/other-findings.md)): the frontier models solved every first try, so the cost comparison is a ceiling result (A); the calls cut by a notebook and the learning curves (B); Fable's notebook given to cheap models, one practice episode enough, and what it costs (C); recovery from disturbances in detail (D); and pose-level tools (E).
-
-## Limits
-
-- **It is a simulation.** Nothing here says a real arm would behave the same way. A physical version is future work.
-- **Most of the room in success rate was in one cell.** The headline gain is Haiku on `stack`. The other five model and job cells were at 81% or more already, most at 92% or more (the replication found some room for Luna on `flasks`, +17.5 points, interval +4.8 to +30.2). Counted within 10 calls there is room in the other cells as well (finding 3); that measure was added after the results were known.
-- **My simulator had a bug that hit the no-memory runs of the headline cell much harder than the notebook runs.** I found it, fixed it, and report the registered result, three simulators and a fresh-layout replication above. The registered numbers still use the defective simulator and the replication is exploratory by design, so it does not replace them; it agrees with them pooled.
-- **A self-written notebook can lock in a wrong rule.** On the corrected simulator one of the ten Haiku `stack` runs of the three-simulator test wrote "do not use `pick`" after twelve failed practice episodes and then failed every held-out layout. It did not happen in the 30 own-notebook runs of the fresh-layout replication, or in the 20 registered-simulator Haiku `stack` runs (run seeds 0 to 19); [PROTOCOL.md](PROTOCOL.md) v1.8 prediction 4 (does a stronger writer repair such a run?) could not be tested for that reason. The notebook is only as good as the practice that wrote it.
-- **Two writers, both of which mostly succeed.** The "stronger model's notes" results use Fable (it never failed a practice episode) and Sonnet 5.5 (it failed 7% of `stack` practice episodes). Neither tells what a notebook written after many failures looks like when it is right, and neither says anything about writers from other families.
-- **The hints and the zero-practice notebook differ from the notebook in their wording as well as their content.** The label-matched control found no clear label effect for the two hint sentences on Haiku `stack`, but the notebooks (zero-practice, Sonnet, Fable) keep their own labels. The naming hint is an answer key by construction. The split of the generic sentence used one or two wordings per part and ten pairs per comparison, on one job (Haiku, with a repeat for Sonnet 5.5). Ten runs per job is few for the per-job rows.
-- **The two-sided job is one job with two models.** The one-sentence procedure contains the answer by construction, the fragile cube's cracking is a force threshold in a simulator and not a material model, and the own-notebook arm used one dose (12 episodes) with a writer told never to invent facts (finding 6). The run with the error message got three of its six predictions wrong (M1 for both models, M2 and M3 for Luna, whose 100% with no memory left no room to improve). The run without it got one of six wrong (S5, the notebook).
-- **Luna's registered gain sits near the edge** (97.5% interval +1.2 to +16.0, coverage about 96%); the replication gives +9.2 (+3.6 to +14.7).
-- **Same low reasoning effort everywhere.** A frontier model allowed to think longer might also fix the catch in one attempt, which would change the cost comparison.
-- **29 of 30 runs per condition in the registered cells, not 30.** One planned layout (flasks, evaluation seed 20801) could not be built by the original layout sampler, so the flasks run with run seed 8 stopped there and is left out of every registered condition. That leaves 29 of the 30 (job, run seed) runs per model and condition that a pooled number uses (and 9 of 10 for flasks alone). The sampler now restarts when it paints itself into a corner (a test checks that every planned layout of run seeds 0 to 29 can be built); the replication and the later cells use it and have all 30.
-- **The notebook keyword audit is outcome-informed** ([results/notebook_audit.md](results/notebook_audit.md)): I looked for the fixing setting after seeing that it mattered, so it only means the notebooks contain the fix, not that they were the cause.
-- **Two things went wrong during the run and are on the record** ([results/deviations.md](results/deviations.md) 5 and 6): a merge briefly deleted the model directory (72 empty run files moved aside; 14 further files with an outage abort record were kept and resumed, three of them after 1 to 2 episodes had been played) and orphaned workers wrote repeated episodes into 8 replication files (the 8 runs were played again). `scripts/check_run_files.py --reported` checks every run folder the results use against a documented table (file counts, unfinished files, code hashes and run-seed range) and for empty or header-less files, plan seeds that break the registered seed rule, episode rows that disagree with their header, repeated or out-of-order episodes and, for the cells with a fixed memory text, a text (in the header and in every episode) that differs from the registered one; all of them pass (`--expect HASH` checks any other folder against given hashes, and the check fails if the registered texts cannot be imported). The generator validates each exploratory cell's own files (code hash and run seed) and, for the cells that borrow arms from other folders (6g, 6h, 6i), those anchor files too; the Sonnet room gate (6j) voids its predictions when it fails; the registered gate failures of the validation scripts (section 7 of the plan) are not enforced by the generator. Predictions stay pending until every planned pair exists (6g to 6k). I ran the checker over everything before publishing, so the remaining gaps are failure modes of the tooling on incomplete data and not known errors in a number.
-
-## The three jobs
-
-Each job has one physical catch. The catch is not stated anywhere the model can read. The model has to notice what the simulator reports and change how it acts.
-
-| Job | The catch | Can the model see it? | What a failure looks like | What fixes it |
-|---|---|---|---|---|
-| **Stack** three cubes into a tower | The green cube is heavy (250 g against 50 g) and slippery. A normal squeeze did not hold it in any of 100 test layouts. | **No.** Weight and friction are never shown. | The fingers close to 1.9 cm and the cube stays on the table. | A firm grip. |
-| **Sort** four cubes into a red bin and a blue bin | The bin walls are 12 cm tall, higher than the hand can reach over when it lowers the cube. | **Partly.** The wall heights are in the observation. What they mean for the hand is not stated. | `arm/hand would touch bin_red_wall2` | Letting go from about 6 cm up or higher (the hint and the audit use 14 cm, a safe margin; [threshold scan](results/release_threshold.md)). |
-| **Stand** two flasks upright on rings | Each flask has a wide base (10 cm) that the fully open hand (8 cm) cannot get around. | **Partly.** The flask sizes are in the observation. What they mean for the fingers is not stated. | `hand stopped 1.4 cm short of the requested grasp point` | Grabbing the narrow neck near the top (`grasp_height` 0.9). |
-
-Every job also has a **control** version with no catch, so we can check whether a notebook helps where there is nothing to learn. That informs the question of where a gain comes from; it does not by itself prove the mechanism.
-
-These clips are me playing each job by hand, using only the tools and the numbers an AI would get (the full transcripts are in [docs/TASKS.md](docs/TASKS.md)). I failed the first attempt in each one, read the measurements, and fixed it.
-
-| Stack | Sort | Stand up |
-|---|---|---|
-| ![stack](media/stack-hand-play.gif) | ![bins](media/bins-hand-play.gif) | ![flasks](media/flasks-hand-play.gif) |
-| [full video](media/stack_seed11-v2.mp4) | [full video](media/bins_seed5-v2.mp4) | [full video](media/flasks_seed7-v2.mp4) |
-
-## How an AI drives the arm
-
-The model gets eight tools, one call per turn, so each call sees the result of the one before it. No tool description mentions a catch, and results report what happened (a measurement, or which part would collide) and never what to change.
-
-- **`observe`** returns where every object and zone is.
-- **`pick`** moves above an object, goes down, squeezes, and lifts. You can choose where on the object to grab (`grasp_height`), how hard to squeeze (`grip_level`), how fast to move (`speed`), how far to lift (`lift_height`) and how far to turn the hand (`yaw_offset_deg`).
-- **`place`** moves the held object to a target, lowers it, lets go, and backs off. You can choose how high above the surface to let go (`release_height`), the speed and a pause (`settle_time`).
-- **`move_to`**, **`open_gripper`**, **`close_gripper`**, **`home`** are the basic moves.
-- **`done`** ends the episode. The simulator then judges whether the job was really finished. The model's own claim is recorded separately so we can count how often it says "done" when it is not: 0 to 6% of the clean held-out catch-scene episodes with the skill tools (Luna with no memory 7 of 116; 50% of its pose-level fresh episodes, [other findings](docs/other-findings.md) E), but in the **disturbed** ones GPT-6 Luna with no memory said "done" falsely in 22 of 116 (19%) against 3 of 116 with a notebook (over all held-out catch-scene episodes Luna 32 of 580, Haiku 9 of 580; [results/RESULTS.md](results/RESULTS.md) section 8).
-
-The model has 20 tool calls per episode, so wasting calls on discovering a catch costs it. Each run is 12 practice episodes (the memory is built here), 4 held-out episodes on layouts it has never seen (memory frozen), and four more held-out episodes with a mid-task disturbance (none and notebook arms). There are three memory conditions: none, a **notebook** (the model rewrites its own notes after each practice episode), and a **replay** (it sees its last successful run). There is also a **pose-level version** with no `pick` and `place`, where the model builds them from moves and the gripper, with three times the call budget. Comparing the two is exploratory, because the budget and the planner's feedback differ too.
-
-## How we know the jobs are fair
-
-A badly made job would give meaningless results. So before any AI is allowed near them, the jobs pass these checks. All of them are played through the same wrapper the AI uses, with the same 20-call budget. The tables below are from the registered code. I reran all five checks on the corrected code and they pass with no crashed runs, with identical tables except one mean-calls figure in the pose gate ([results/fixed_code/](results/fixed_code/README.md)).
-
-**1. On 100 sampled layouts a script that knows the answer wins, and one that does not loses** (100 random layouts per row, `python scripts/gate.py`).
-
-| Job | Scene | A script using default settings | A script that knows the catch |
-|---|---|---|---|
-| Stack | with the catch | 0 / 100 | 100 / 100 |
-| Stack | control | 100 / 100 | 100 / 100 |
-| Sort | with the catch | 0 / 100 | 100 / 100 |
-| Sort | control | 99 / 100 | 100 / 100 |
-| Stand up | with the catch | 0 / 100 | 100 / 100 |
-| Stand up | control | 100 / 100 | 100 / 100 |
-
-**2. The catch switches on gradually.** For example, a green cube of 150 g is still fine with default settings, and at 250 g it never works.
-
-![dose response](docs/img/dose_response.png)
-
-**3. We know which settings matter** ([full table](results/settings_audit.md), 20 layouts per cell). Changing one setting at a time from its default, one setting rescues each catch every time: a firm grip for the stack (20 of 20), letting go from 14 cm or higher for the sort (20 of 20; the real threshold for the 12 cm wall is 6 cm, see [results/release_threshold.md](results/release_threshold.md)), and a high grasp for the flasks (20 of 20). Speed, lift height and the pause after letting go never rescue a catch, and fast placing even lowers success in the no-catch scenes. Turning the hand 45 degrees also builds the tower about half the time with the default grip (10 of 20), so for the stack the firm grip is the reliable fix and not the only one. We do not call any setting a harmless decoy.
-
-**4. The disturbances work**, in the catch scenes ([table](results/disturbance.md)) and in the no-catch control scenes ([table](results/disturbance_control.md)), 50 fresh layouts per row, not the layouts the nudge was tuned on. Both the slip and the shove happened in every episode. A script that knows the catch but does not react never recovered (0 of 50 in every row). A script that tries again recovered in 47 to 50 of 50.
-
-**What this does not prove.** It proves the jobs can be solved, are failed by default settings, and respond to the catch. It does not prove that a language model can learn the catch. That is what the experiments are for.
-
-## What was run
-
-The registered cells (main, control, frontier) were fixed in advance in [PROTOCOL.md](PROTOCOL.md), including the result that would count against each claim. Everything added or changed after the launch is dated to the minute, labelled exploratory where it is, and explained in [results/deviations.md](results/deviations.md) (one analysis rule was tightened after the first half of one cell had been seen, which is disclosed there).
-
-| Cell | What it is | Status |
-|---|---|---|
-| main | 2 cheap models x 3 jobs x {none, notebook, replay}, run seeds 0 to 9 | **confirmatory** (Q1, Q3) |
-| control | the same without the catch, with disturbances | **confirmatory** (Q4); 116 of 120 episodes per cell (the flasks run-seed-8 layout) |
-| frontier | Fable and Astra first tries, no memory, 20 layouts per job | confirmatory (Q3) |
-| frontier_exp | Fable with its own notebook (the source of the borrowed notebooks) | exploratory |
-| borrowed (4 variants) | cheap models read Fable's notebook (12, 3 or 1 practice episodes, or the wrong job's notebook) | exploratory |
-| main_ext | Haiku on stack and bins, run seeds 10 to 19 | exploratory |
-| three simulators | Haiku on stack on the registered, partly fixed and cause-fixed simulator | exploratory |
-| corrected-simulator replication | the registered Q1 comparison on fresh layouts, run seeds 20 to 29, 2,400 episodes | exploratory, complete |
-| hint, generic hint, zero-practice notebook | no practice; one naming sentence, one generic sentence, or a Fable notebook written without practice; run seeds 20 to 29, 720 episodes | exploratory, complete |
-| label-matched text control | no practice; one neutral label over an inert, the generic and the naming sentence; run seeds 20 to 29, 720 episodes | exploratory, complete |
-| the generic sentence taken apart | Haiku on `stack`, no practice; the frame alone, with the four names, or with the instruction; run seeds 20 to 29, 120 episodes | exploratory, complete |
-| the split repeated on fresh layouts | Haiku on `stack`, no practice; eight arms including two nested wordings; run seeds 30 to 39, 320 episodes | exploratory, complete |
-| practice dose | Haiku on `stack`, its own notebook after 1, 3, 6 (run seeds 20 to 39) and 12 (30 to 39) practice episodes; 600 episodes | exploratory, complete |
-| the same arms under a stated 12-call budget | Haiku and Luna, all three jobs: no memory, the frame and the four names, own notebook after 1 or 12 practice episodes; run seeds 30 to 39, 1,740 episodes | exploratory, complete |
-| the two-sided job, with an error message | Haiku and Luna on `mixed` (one heavy slippery cube, one fragile cube): no memory, names list, "firm for every cube", the answer key, own notebook after 12 practice episodes, plus a control scene; run seeds 40 to 49, 800 episodes | exploratory, complete |
-| the two-sided job, no error message | the same layouts with no error message (the cube is cracked and only the final verdict says so): the same five arms; 640 episodes | exploratory, complete |
-| may the notebook writer guess? | the silent job, own notebook written by a writer that may add marked guesses; 320 episodes | exploratory, complete |
-| the split with a second model | Sonnet 5.5 on `stack`, no practice: a room check (no memory), then the frame, the names, the instruction with "settings" and the generic sentence; run seeds 30 to 39, 200 episodes | exploratory, complete |
-| second writer | Sonnet 5.5 practises and writes a notebook (320 episodes); Haiku and Luna read it with no practice (160 episodes) | exploratory, complete |
-| pose | the same runs with pose-level tools (pick/place removed), run seeds 0 to 2 | exploratory, complete |
-
-The money is capped in code by an *estimate*: before every call the worst case is reserved, a call that would pass the cap is refused, and Anthropic stops at $90 and OpenAI at $45 (of $100 and $50). The cap counts failed retries and notebook-writing calls too. It is not an invoice audit: Anthropic's prices were checked against its own documentation, OpenAI's were not, and the ledger should be compared with both billing consoles. Final spend by that estimate: $79.43 (Anthropic) and $28.80 (OpenAI).
-
-Every interval is the wider of a cluster bootstrap over runs (a task and run seed share one memory), a stratified t interval, and a binomial sampling-noise floor, because an interval from ten runs that all agree would otherwise have zero width. I checked how often that rule covers the truth by simulation ([scripts/coverage_sim.py](scripts/coverage_sim.py)): 97.5% to 100% in most of the scenarios I simulated and 95.8% in the worst one (a Luna-like ceiling case); the simulations assume independent episodes within a run and a beta mixture of run-level success rates, and the Monte Carlo standard error is about 2.5 points. I recomputed the headline numbers a second way, straight from the raw files ([scripts/recompute_headlines.py](scripts/recompute_headlines.py)), and they match.
-
-## Run it yourself
+## Run it
 
 ```bash
-uv sync --extra dev                      # installs MuJoCo 4.0.1, the pinned packages from uv.lock and pytest
-bash scripts/fetch_models.sh             # downloads the Franka Panda model at the pinned revision
-.venv/bin/python -m pytest -q            # the automated tests (no network, no money)
-.venv/bin/python scripts/play.py start stack 11
+uv sync --extra dev                      # MuJoCo, pinned packages, pytest
+bash scripts/fetch_models.sh             # the Franka Panda model
+.venv/bin/python -m pytest -q            # tests, no network and no money
+.venv/bin/python scripts/play.py start stack 11                        # play a job by hand
 .venv/bin/python scripts/play.py call pick '{"object": "cube_green"}'
-.venv/bin/python scripts/gate.py --seeds 100     # the fairness checks (about 6 minutes)
-.venv/bin/python scripts/audit_settings.py       # the settings audit
-# with ANTHROPIC_API_KEY / OPENAI_API_KEY set (this spends money, behind the spend cap):
-.venv/bin/python scripts/smoke.py --model claude-haiku-5-5 --task stack
-.venv/bin/python scripts/run_experiment.py --cell main --models claude-haiku-5-5 gpt-6-luna --seeds 0-9 --out runs/main
-.venv/bin/python scripts/analyze.py      # writes results/RESULTS.md and the learning-curve chart
+.venv/bin/python scripts/analyze.py      # rebuild results/RESULTS.md from the run files
 ```
 
-**Which revision gives which numbers.** `main` is the corrected simulator plus every exploratory switch. The registered results (main, control, frontier) were produced by the revision tagged `matrix-launch`, which has the simulator defect of finding 2; check that tag out to repeat them. The replication and the gates on corrected code used `code-fixed`, the hint cells and the second writer used `code-hint-prior`, the label-matched control used `code-labelmatch`, the first split of the generic sentence used `code-wordsplit`, its repetition on fresh layouts `code-wordsplit2`, the practice-dose cell `code-dose`, the Sonnet split `code-second` and the stated-budget cell `code-budget`; `main` is the merge of all of them (its `robot_play/` equals `code-budget`). [results/code_versions.md](results/code_versions.md) lists every tag with its hash. **No network, no money:** the raw run files are in [data/](data/README.md), and a recipe there regenerates `results/RESULTS.md` from them byte for byte; `scripts/check_run_files.py --reported` checks them (see the limits above).
+Running models needs `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` and spends money, behind a spend cap:
 
-`play.py` lets you play a job yourself through the exact tools an AI gets. Try the default `pick` on the green cube first.
+```bash
+.venv/bin/python scripts/smoke.py --model claude-haiku-5-5 --task stack
+.venv/bin/python scripts/run_experiment.py --cell main --models claude-haiku-5-5 gpt-6-luna --seeds 0-9 --out runs/main
+```
 
-## What is already known in this area
+## Where things are
 
-Several papers study parts of this ([PROTOCOL.md](PROTOCOL.md) section 9 has the full table): [RoboARCade](https://arxiv.org/abs/2611.08209) (in-context improvement from one example demo in MuJoCo, and false success claims), [WICL / RoboScript](https://arxiv.org/abs/2611.12885) (a frozen task memory learned in simulation), [GPT-Policy](https://arxiv.org/abs/2609.19138) (a model calling IK-backed tools on real robots), [PhysMem](https://arxiv.org/abs/2602.20323) (an AI building and testing guesses about hidden physics while it works, the closest), [Act-Observe-Rewrite](https://arxiv.org/abs/2603.04466) and [PhysCaP](https://arxiv.org/abs/2608.21031) (exploring to find hidden masses). We do not claim any one of those ideas as new, and the in-context memory idea itself comes from Voyager, ExpeL and Reflexion. What this project adds is a set of controls on one such memory: the same jobs through skill-level and pose-level tools, catches proved by validation, held-out layouts, a hint control and a second writer that ask what a notebook actually contains, and recovery from mid-task problems. The most useful single finding is a negative one, and narrower than it first looked: for Haiku on `stack`, a one-line reminder that gives the frame and lists the settings reproduced most of a notebook's success-rate gain (not so for Sonnet within 10 calls), while counted within 10 calls the generic note buys no efficiency on `flasks` or on Luna's `bins`, where the notebook does. Which property of the jobs explains that is not isolated.
+| | |
+|---|---|
+| [Research report](https://tarunTomar122.github.io/robot-play/) | The study, written to be read. |
+| [results/RESULTS.md](results/RESULTS.md) | Every table, generated from the raw run files. |
+| [PROTOCOL.md](PROTOCOL.md) | The plan, each prediction and its outcome, and related work (section 9). |
+| [results/deviations.md](results/deviations.md) | Every change made after the plan was fixed. |
+| [results/code_versions.md](results/code_versions.md) | Which code revision produced which numbers. |
+| [data/](data/README.md) | The raw run files and how to regenerate the results from them. |
+| [docs/TASKS.md](docs/TASKS.md), [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | The jobs in detail and how the simulator and tools work. |
+| [docs/other-findings.md](docs/other-findings.md) | Smaller results that the report only mentions. |
+| [docs/FOLDERS.md](docs/FOLDERS.md) | Folder map. |
 
 ## Not done
 
-- The real SO-101 arm, and any transfer from this simulator to hardware.
-- Jobs hard enough that frontier models fail their first try. On these jobs they solve 60 of 60, so the frontier comparison is a ceiling result and the cheap-versus-frontier question is open for harder tasks.
-- A frontier model at higher reasoning effort, and writers from other model families than Fable and Sonnet.
-- A rerun of the whole registered matrix on the corrected simulator. Only the Q1 comparison was repeated there (and Q3 was not).
-- A cleaner test of what the notebook contains: one or two wordings per part of the sentence, ten runs per job, one job for the split (Haiku, with a Sonnet repeat), and (now partly done, finding 6) a test where the fixing setting changes from layout to layout so that no single constant (or list) would do. The design I had (randomise the bin wall height per layout) does not work: the release scan ([results/release_threshold.md](results/release_threshold.md)) finds that any release above a wall's threshold, up to 0.30 m, solves every layout, so one high constant passes a variable wall height too. A job where a constant fails needs a different mechanism and is not built.
-- Pose-level conclusions: the pose cell is small (3 runs per job and model) and ran on the registered simulator, whose closed-hand planning defect (finding 2) sits in `move_to` and `close_gripper`, the two calls the pose tools depend on; it was not rerun on the corrected code, so its effect there is unknown. Luna fresh also said "done" falsely in 18 of its 36 pose episodes.
-
-## Folder map
-
-See [docs/FOLDERS.md](docs/FOLDERS.md).
+- Nothing has been run on a real arm.
+- The jobs are too easy for the larger models, so the comparison with them is open for harder jobs.
+- Only a few models were tested, all at low reasoning effort.

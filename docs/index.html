@@ -13,13 +13,14 @@
   --tip-bg: #1c1d20; --tip-fg: #fdfdfb; --focus: #1f6fd1;
   --serif: Charter, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 18px/1.65 var(--serif); }
 a { color: var(--link); text-underline-offset: 2px; }
-code { font: 0.82em/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--soft); padding: 0.1em 0.3em; border-radius: 3px; white-space: nowrap; }
+code { font: 0.82em/1 var(--mono); background: var(--soft); padding: 0.1em 0.3em; border-radius: 3px; white-space: nowrap; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
 main { max-width: 720px; margin: 0 auto; padding: 56px 24px 96px; }
 @media (max-width: 600px) { body { font-size: 17px; } main { padding: 32px 16px 64px; } }
@@ -71,7 +72,7 @@ ul.limits li { margin: 0 0 10px; }
 #card.corner { left: auto; right: 16px; bottom: 16px; top: auto; width: 340px; }
 #card.sheet { left: 12px; right: 12px; bottom: 12px; top: auto; width: auto; max-height: 55vh; overflow-y: auto; }
 
-/* tables */
+/* captions, tables */
 .tbl { margin: 26px 0 30px; }
 .tbl .cap, figcaption { font: 0.86rem/1.5 var(--sans); color: var(--ink2); }
 .tbl .cap { margin: 0 0 8px; }
@@ -90,8 +91,30 @@ table.rt td:first-child { color: var(--ink); }
   table.rt td[data-h]::before { content: attr(data-h) ": "; font-weight: 650; color: var(--ink); }
 }
 
-/* figures */
-figure.chart { margin: 28px 0 32px; padding: 0; }
+/* clips, diagram, quoted material */
+figure { margin: 28px 0 32px; padding: 0; }
+figure.clip img { display: block; width: 100%; height: auto; border-radius: 6px; background: #14161a; }
+figure.clip .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 600px) { figure.clip .pair { grid-template-columns: 1fr; } }
+figure.clip figcaption, figure.diagram figcaption { margin-top: 10px; }
+.runs { border-top: 1.5px solid var(--ink); border-bottom: 1px solid var(--line); padding: 14px 0 12px; font: 0.8rem/1.3 var(--sans); color: var(--ink2); }
+.runrow { display: grid; grid-template-columns: repeat(12, 1fr) 0.7fr repeat(4, 1fr); gap: 4px; align-items: center; margin: 4px 0; }
+.runhead { color: var(--ink); font-weight: 650; margin: 10px 0 2px; }
+.runhead:first-child { margin-top: 0; }
+.cell { aspect-ratio: 1; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; }
+.cell.p { border: 1.5px solid var(--a); color: var(--a); }
+.cell.ta { background: var(--a); color: var(--surface); }
+.cell.tb { background: var(--b); color: var(--surface); }
+.cell.none { border: 1.5px dashed var(--line); }
+.runkey { display: grid; grid-template-columns: repeat(12, 1fr) 0.7fr repeat(4, 1fr); gap: 4px; color: var(--muted); font-size: 0.74rem; }
+.runkey .k1 { grid-column: 1 / span 12; } .runkey .k2 { grid-column: 14 / span 4; }
+pre.listing { margin: 22px 0 8px; padding: 14px 16px; background: var(--soft); border-left: 3px solid var(--line); border-radius: 0 6px 6px 0; font: 0.78rem/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink2); }
+pre.listing .call { color: var(--ink); font-weight: 600; }
+blockquote.nb { margin: 22px 0 8px; padding: 14px 18px; background: var(--soft); border-left: 3px solid var(--line); border-radius: 0 6px 6px 0; font: 0.8rem/1.6 var(--mono); color: var(--ink2); }
+blockquote.nb p { margin: 0 0 8px; } blockquote.nb p:last-child { margin: 0; }
+.src { font: 0.84rem/1.5 var(--sans); color: var(--muted); margin: 0 0 22px; }
+
+/* charts */
 .plot { border-top: 1.5px solid var(--ink); border-bottom: 1px solid var(--line); padding: 10px 0 6px; margin-bottom: 8px; font-family: var(--sans); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.82rem; color: var(--ink2); margin: 2px 0 8px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -125,12 +148,12 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line);
 <main>
 <p class="kicker">robot-play &middot; Research report &middot; 17 November 2026</p>
 <h1>Can a language model learn a robot job by keeping notes?</h1>
-<p class="subtitle">A study of learning without retraining, using a simulated robot arm and a 300-word notebook.</p>
-<p class="links">Code, plan and raw data: <a href="https://github.com/TarunTomar122/robot-play">github.com/TarunTomar122/robot-play</a>. Every number in this report is taken from <a href="https://github.com/TarunTomar122/robot-play/blob/main/results/RESULTS.md">results/RESULTS.md</a>, and that file is the reference if the two ever disagree.</p>
+<p class="subtitle">An experiment with a simulated robot arm, five language models and a 300-word notebook.</p>
+<p class="links">Code, plan and raw data: <a href="https://github.com/TarunTomar122/robot-play">github.com/TarunTomar122/robot-play</a>. Every number here is taken from <a href="https://github.com/TarunTomar122/robot-play/blob/main/results/RESULTS.md">results/RESULTS.md</a>, and that file is the reference if the two ever disagree.</p>
 
 <section class="abstract">
 <h2>Abstract</h2>
-<p>We ask whether a language model that controls a simulated robot arm through a small set of tools gets better at a job when it is allowed to keep a short notebook between attempts. The model is never retrained, so the notebook is the only thing that changes. On three jobs that each hide one physical catch, a notebook raised the success of Claude Haiku 5.5 on layouts it had not seen from 76% to 99%, and that of GPT-6 Luna from 91% to 100%. Both models also needed about a third fewer tool calls. Follow-up experiments narrow down where the gain comes from. For Haiku, one sentence listing the settings it is allowed to change recovered most of it, and so did a single practice episode. On a fourth job, where no single setting works, the models succeeded only when the simulator returned an error message they could read. When we removed the message, twelve episodes of practice did not produce a notebook that solved the job, although a short procedure that we wrote ourselves did.</p>
+<p>A language model that directs a robot starts every job cold. I wanted to know whether letting it keep a short notebook between attempts would change that, with no retraining at all. In a simulator, models drove a Franka Panda arm through eight tools on jobs that each hide one physical catch. They practised twelve times and were then tested on layouts they had not seen. The notebook helped: Claude Haiku 5.5 went from solving 76% of test episodes to 99% and GPT-6 Luna from 91% to 100%, and both got there in about a third fewer tool calls. When I looked for what the notebook was contributing, though, most of it turned out to be small. For Haiku, two sentences naming the settings it was allowed to change did almost as well. And on a fourth job, built so that no fixed setting works, the models coped only while the simulator told them what had gone wrong. With that error message removed, twelve practice episodes produced notebooks that mentioned the damage and missed its cause.</p>
 </section>
 
 <nav class="contents" aria-label="Contents">
@@ -140,21 +163,28 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line);
 
 <h2 class="sec" id="intro">Introduction</h2>
 
-<p>Picture a new worker in a workshop. On the first day they do not know that one drill sticks, or that one shelf is too high for the short ladder. They find out by trying, write themselves a note, and by the tenth day they are faster and make fewer mistakes. Nobody retrained them. They remembered.</p>
+<p>A new worker in a workshop does not know, on the first day, that one of the drills sticks or that the top shelf is out of reach from the short ladder. A week later they know both. Nobody retrained them. They tried things, got some of them wrong, and remembered.</p>
 
-<p>This report asks whether a language model can do the same thing with a robot arm. The model in our setup never moves a motor. It decides what to do and calls tools such as <code>pick</code> and <code>place</code>, and conventional robotics code works out the motion. Between attempts the model's weights stay exactly as they were. The only thing that can change is a <span class="t" data-t="notebook">notebook</span>, a text of at most 300 words that the model rewrites after each practice attempt and reads again before the next one.</p>
+<p>I wanted to see whether a language model can pick up a job the same way. In this setup the model does the deciding and ordinary robotics code does the moving: the model calls a tool such as <code>pick</code> or <code>place</code>, and inverse kinematics and a motion planner take care of the joints. The model's weights are never touched. What it gets is a <span class="t" data-t="notebook">notebook</span> of at most 300 words, which it rewrites after every practice attempt and is handed back at the start of the next.</p>
 
-<p>We built four small jobs for a simulated Franka Panda arm. Each job hides one physical catch, for example a cube that is heavier than it looks, and the default tool settings fail because of it. A model practises a job twelve times, updating its notebook as it goes, and is then tested on four layouts it has not seen. We compare that with the same model starting every attempt with no memory at all.</p>
+<p>Here is the kind of thing it has to learn. In the job below the arm has to build a tower of three cubes, and the green one is five times heavier than the other two. Nothing in the scene description says so. With the default grip the fingers close, the cube stays on the table, and the tool reports that the object rose by zero centimetres. Squeeze harder and it works. Figure 1 is me doing exactly that by hand, with only the tools and the numbers a model would see.</p>
 
-<p>The report makes three points. A notebook helped wherever a model had something left to learn: Haiku went from 76% to 99% on unseen layouts and Luna from 91% to 100%, and both used about a third fewer tool calls (Section 3). Most of that gain turned out to be cheap to reproduce. For Haiku, one sentence that lists the settings it may change did nearly as well as a notebook built over twelve episodes, and a notebook built from a single episode already recovered most of the gain (Section 4). Finally, the notebooks were only as good as the feedback the models received. On a job where the simulator stopped reporting what had gone wrong, twelve episodes of practice produced notebooks that recorded the damage but not its cause, and success did not improve (Section 5).</p>
+<figure class="clip">
+  <img src="media/stack-hand-play.gif" alt="A simulated robot arm fails to lift a green cube with the default grip, lifts it with a firm grip, and builds a tower of three cubes." width="640" height="360" loading="lazy">
+  <figcaption><b>Figure 1.</b> The <code>stack</code> job played by hand through the same tools the models use. The first pick fails, the second uses a firm grip, and the tower gets built. The text under the picture is what each tool call returned.</figcaption>
+</figure>
 
-<p>Two labels are used throughout. Results from the plan we fixed and published before any run are called <span class="t" data-t="registered">registered</span>. Everything added afterwards is called <span class="t" data-t="exploratory">exploratory</span>. The exploratory experiments were also written down before they ran, but we chose them with earlier results in view, and their intervals are not corrected for the number of comparisons. Words with a dotted underline open a short definition.</p>
+<p>A model with no memory has to make that discovery again in every episode. A model with a notebook could make it once. The experiment measures how much that is worth. Each model practises a job twelve times, then plays four layouts it has never seen with its notebook frozen, and I compare the result with the same model playing the same layouts cold.</p>
+
+<p>It is worth a lot where there is something to learn, and Section 3 has the numbers. Two things surprised me after that. Very little of the notebook was needed to get the same effect (Section 4). And the benefit depended almost entirely on the simulator explaining its failures, which I only found out by building a job where it stops doing so (Section 5).</p>
+
+<p>A note on two labels. The main comparison and its analysis were planned and pushed to GitHub before any model ran, and I call those results <span class="t" data-t="registered">registered</span>. Everything I added later is <span class="t" data-t="exploratory">exploratory</span>. I wrote each of those experiments down before running it as well, usually with a prediction, but by then I had seen earlier results, and their intervals are not corrected for the number of things I tried. Words with a dotted underline open a definition.</p>
 
 <h2 class="sec" id="method">Method</h2>
 
 <h3 id="method-tools">The robot and its tools</h3>
 
-<p>The arm is a simulated Franka Panda. The model works entirely through eight tools (Table 1) and makes one call per turn, so every call can react to the result of the one before it.</p>
+<p>The arm is a simulated Franka Panda, and the model reaches it only through the eight tools in Table 1. It makes one call at a time and sees the result before deciding on the next.</p>
 
 <div class="tbl">
 <p class="cap"><b>Table 1.</b> The eight tools available to the model.</p>
@@ -172,11 +202,20 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line);
 </table>
 </div>
 
-<p>The tool descriptions never mention a catch, and a result only reports what happened, such as how far the object rose or which part of the hand would have collided. It never says what to change. Three settings matter in what follows. <code>grip_level</code> sets how hard the fingers squeeze and can be light, normal or firm, with normal as the default. <code>grasp_height</code> sets how far up the object the fingers close, from 0 to 1, with a default of 0.6. <code>release_height</code> is the gap under the object at the moment the fingers open, 2 cm by default.</p>
+<p>Two things about these tools were deliberate. None of the descriptions hints at a catch. And a result says what happened, for instance how far the object rose or which part of the hand would have hit something, but never what to do about it. This is a failed pick and the retry that fixed it, from one of Luna's episodes with no memory:</p>
+
+<pre class="listing"><span class="call">pick {"object": "cube_green", "grasp_height": 0.6}</span>
+  {"ok": false, "holding": null, "gripper_width_m": 0.019, "object_rise_m": -0.0, "requested_lift_m": 0.15, "object_tilt_deg": 0.0, "touched": []}
+
+<span class="call">pick {"object": "cube_green", "grasp_height": 0.5, "speed": "slow", "grip_level": "firm"}</span>
+  {"ok": true, "holding": "cube_green", "gripper_width_m": 0.04, "object_rise_m": 0.15, "requested_lift_m": 0.15, "object_tilt_deg": 0.3, "touched": []}</pre>
+<p class="src">The cube is 4 cm wide. After the first call the fingers were 1.9 cm apart, so the cube was no longer between them. Luna looked at the scene once more between these two calls; that call is left out here.</p>
+
+<p>Only three settings end up mattering. <code>grip_level</code> is how hard the fingers squeeze: light, normal or firm, and normal unless the model says otherwise. <code>grasp_height</code> is how far up the object the fingers close, as a fraction from 0 to 1, with a default of 0.6. <code>release_height</code> is the gap left under an object when the fingers let go, 2 cm by default.</p>
 
 <h3 id="method-jobs">The four jobs</h3>
 
-<p>Each job is easy to state and fails with the default settings for one specific reason (Table 2). The model is told the goal and nothing about the catch.</p>
+<p>Table 2 lists the jobs. In the first three the defaults fail, and a single changed setting fixes the job on every layout. The model is told the goal and nothing else.</p>
 
 <div class="tbl">
 <p class="cap"><b>Table 2.</b> The jobs, the catch hidden in each, and what deals with it.</p>
@@ -191,151 +230,196 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line);
 </table>
 </div>
 
-<p><code>mixed</code> exists in two versions that use the same layouts. In the first, a firm grip on the fragile cube is refused, and the <span class="t" data-t="squeeze">error message</span> states the squeeze limit. In the second the grip is accepted, the cube cracks, and nothing reports it until the simulator's verdict at the end of the episode.</p>
+<figure class="clip">
+  <div class="pair">
+    <img src="media/bins-hand-play.gif" alt="The arm tries to lower a cube into a tall bin, is blocked by the rim, then releases the cube from higher up." width="640" height="360" loading="lazy">
+    <img src="media/flasks-hand-play.gif" alt="The arm fails to grasp a flask by its wide base, then grasps it by the neck and stands it on a ring." width="640" height="360" loading="lazy">
+  </div>
+  <figcaption><b>Figure 2.</b> <code>bins</code> (left) and <code>flasks</code> (right), also played by hand. In each clip the first attempt fails and the tool result gives the clue: a collision with the bin wall, and a hand that stopped short of the grasp point.</figcaption>
+</figure>
 
-<p>Every job also has a <span class="t" data-t="control">control version</span> without the catch. Before any model ran we checked the jobs with scripted players. On 100 layouts of each of the first three jobs, a script using default settings solved none and a script that knew the catch solved all of them. On the control versions the default script solved 99 or 100. On <code>mixed</code>, no fixed setting solved more than 1 layout in 100, a script that knew which cube was which solved all 100, and a script that tried a grip and reacted to the result solved 96.</p>
+<p>I added <code>mixed</code> after the first three, to have a job that one remembered setting cannot solve. It comes in two versions on the same layouts. In the first, a firm grip on the fragile cube is refused, and the <span class="t" data-t="squeeze">error message</span> gives the squeeze limit. In the second the grip is accepted, the cube cracks, and nothing reports it until the simulator's verdict at the end of the episode.</p>
+
+<p>Before spending money on models I checked the jobs with scripts. Each job has a <span class="t" data-t="control">control version</span> without the catch. On 100 layouts of each of the first three jobs, a script using the default settings solved none, and a script that knew the catch solved all of them. On the control versions the default script solved 99 or 100. On <code>mixed</code>, no fixed setting solved more than 1 layout in 100. A script that was told which cube was which solved all 100, and one that tried a grip and reacted to the result solved 96.</p>
 
 <h3 id="method-protocol">Practice, notebook and test</h3>
 
-<p>An episode is one attempt at one job from one starting layout. The model may make at most 20 tool calls. The episode ends when it calls <code>done</code> or runs out of calls, and the simulator then checks the scene. Only that check counts as the score. The model's own claim of success is recorded separately.</p>
+<p>An episode is one attempt at one job from one starting layout, with at most 20 tool calls. It ends when the model calls <code>done</code> or runs out of calls, and the simulator then checks the scene. That check is the score. What the model says about its own success is logged but does not count, and Section 3.4 has a case where the two differ.</p>
 
-<p>A run consists of twelve practice episodes followed by four test episodes. After each practice episode the model rewrites its notebook. Before the test episodes the notebook is frozen, and the test layouts are ones the model has not played, so the score reflects what was learned and not what was memorised. Each combination of model and job was run ten times with different layouts, which gives 40 test episodes per cell. The baseline is the same model on the same test layouts with no memory.</p>
+<figure class="diagram">
+  <div class="runs">
+    <div class="runhead">With a notebook</div>
+    <div class="runrow">
+      <span class="cell p">1</span><span class="cell p">2</span><span class="cell p">3</span><span class="cell p">4</span><span class="cell p">5</span><span class="cell p">6</span><span class="cell p">7</span><span class="cell p">8</span><span class="cell p">9</span><span class="cell p">10</span><span class="cell p">11</span><span class="cell p">12</span><span></span>
+      <span class="cell ta">1</span><span class="cell ta">2</span><span class="cell ta">3</span><span class="cell ta">4</span>
+    </div>
+    <div class="runkey"><span class="k1">12 practice episodes, notebook rewritten after each</span><span class="k2">4 test episodes, notebook frozen</span></div>
+    <div class="runhead">No memory</div>
+    <div class="runrow">
+      <span class="cell none"></span><span class="cell none"></span><span class="cell none"></span><span class="cell none"></span><span class="cell none"></span><span class="cell none"></span><span class="cell none"></span><span class="cell none"></span><span class="cell none"></span><span class="cell none"></span><span class="cell none"></span><span class="cell none"></span><span></span>
+      <span class="cell tb">1</span><span class="cell tb">2</span><span class="cell tb">3</span><span class="cell tb">4</span>
+    </div>
+    <div class="runkey"><span class="k1">no practice</span><span class="k2">the same 4 layouts</span></div>
+  </div>
+  <figcaption><b>Figure 3.</b> One run. The four test layouts are never used for practice, and both conditions play the same four. Each model and job gets ten runs with different layouts, so 40 test episodes per cell.</figcaption>
+</figure>
 
-<p>The main comparison uses two inexpensive models, Claude Haiku 5.5 and GPT-6 Luna. Claude Sonnet 5.5 appears in two follow-up experiments, and Claude Fable 5.2 and GPT-6 Astra serve as a reference for what larger models do on a first try. All models ran at low reasoning effort.</p>
+<p>Figure 3 lays out a run. Freezing the notebook before the test, and testing on layouts the model has not played, means the score reflects what was learned and not what was memorised.</p>
+
+<p>The main comparison uses two inexpensive models, Claude Haiku 5.5 and GPT-6 Luna. Claude Sonnet 5.5 appears in two follow-up experiments. Claude Fable 5.2 and GPT-6 Astra are there as a reference for what larger models do on a first try. All of them ran at low reasoning effort.</p>
 
 <h3 id="method-numbers">How to read the numbers</h3>
 
-<p>Success is the share of test episodes that the simulator judged solved. Differences are given in <span class="t" data-t="points">percentage points</span>, followed by an <span class="t" data-t="interval">interval</span> in brackets, and are computed by comparing each notebook run with the no-memory run on the same layouts. When an interval includes zero, the data cannot rule out that there is no difference. The registered tests use 97.5% or 98.75% intervals because several are made at once. Everything else uses 95%.</p>
+<p>Success is the share of test episodes that the simulator judged solved. I give differences in <span class="t" data-t="points">percentage points</span> with an <span class="t" data-t="interval">interval</span> in brackets, computed by pairing each notebook run with the no-memory run on the same layouts. If an interval includes zero, the data cannot rule out that there is no difference. The registered tests use 97.5% or 98.75% intervals because each makes several comparisons at once, and everything else uses 95%.</p>
 
 <h2 class="sec" id="results">Does a notebook help?</h2>
 
 <h3 id="results-success">Success on unseen layouts</h3>
 
-<p>Figure 1 gives the registered comparison. Haiku solved 76% of test episodes with no memory and 99% with its notebook, a gain of 23.3 points (97.5% interval +14.0 to +32.6). Luna went from 91% to 100%, a gain of 8.6 points (+1.2 to +16.0).</p>
+<p>The registered comparison is in Figure 4. With no memory Haiku solved 76% of its test episodes, and with its notebook 99%. That is a gain of 23.3 points (97.5% interval +14.0 to +32.6). Luna started higher, at 91%, and reached 100% (+8.6 points, +1.2 to +16.0).</p>
 
 <figure class="chart" data-spec="q1" data-kind="dumbbell">
-  <figcaption><b>Figure 1.</b> Share of test episodes solved with a notebook and with no memory. The pooled rows are the registered comparison, with 116 episodes per condition. The rows for single jobs are exploratory, with 40 episodes each and 36 for <code>flasks</code>.</figcaption>
+  <figcaption><b>Figure 4.</b> Share of test episodes solved with a notebook and with no memory. The pooled rows are the registered comparison, with 116 episodes per condition. The rows for single jobs are exploratory, with 40 episodes each (36 for <code>flasks</code>, where one layout was excluded).</figcaption>
 </figure>
 
-<p>The gain is concentrated where the baseline was weak. Nearly all of Haiku's improvement comes from <code>stack</code>, where it rose from 32% to 100%. On <code>bins</code> and <code>flasks</code> it already solved 100% and 97% without help, so there was nothing for a notebook to add. Luna had the opposite profile. It solved <code>stack</code> every time with no memory and gained on <code>flasks</code> (81% to 100%) and <code>bins</code> (92% to 100%), although with ten runs per job neither of those two differences can be told from zero on its own.</p>
+<p>Split by job, the picture is less even than those totals suggest. Haiku's gain is almost entirely <code>stack</code>, where it went from 32% to 100%. It needed no help with <code>bins</code> or <code>flasks</code>. Luna was the other way round. It was perfect on <code>stack</code> from the start and made its gains on <code>flasks</code> (81% to 100%) and <code>bins</code> (92% to 100%). With only ten runs per job I cannot separate either of Luna's two gains from zero individually. It is the pooled number that holds up.</p>
 
-<p>After these runs we found and fixed a defect in the simulator, described in Section 7, so we repeated the comparison on the corrected code with new layouts. The result was the same size. Haiku rose from 78% to 100% (+21.7 points, 95% interval +14.1 to +29.2) and Luna from 91% to 100% (+9.2, +3.6 to +14.7). On <code>stack</code> alone Haiku went from 50% to 100%, and Luna's gain on <code>flasks</code> was 17.5 points (+4.8 to +30.2). This repeat is exploratory.</p>
+<p>What do the notebooks say? Mostly what you would hope. These lines are from one that Haiku wrote for <code>stack</code>:</p>
+
+<blockquote class="nb">
+<p>Failed or wasted calls:<br>- Earlier attempt only: pick of cube_green with default settings returned ok:false. gripper_width_m was about 0.019 and nothing rose. Do not use default pick settings.</p>
+<p>Reuse next time:<br>- Do not reuse old coordinates. Positions change between attempts, so observe first.<br>- Use grasp_height 0.5 and grip_level "firm" on every pick.</p>
+</blockquote>
+<p class="src">From Haiku's notebook after twelve practice episodes, shortened. It then solved all four test layouts.</p>
+
+<p>The note over-generalises, since only the green cube needs the firm grip. On <code>stack</code> that costs nothing, because the light cubes tolerate a firm grip too. Section 5 is about a job where it does cost something.</p>
+
+<p>I then ran the whole comparison a second time, on new layouts and a later version of the simulator code (the changes are listed in <a href="https://github.com/TarunTomar122/robot-play/blob/main/results/deviations.md">results/deviations.md</a>). The gains barely moved. Haiku went from 78% to 100% (+21.7 points, 95% interval +14.1 to +29.2) and Luna from 91% to 100% (+9.2, +3.6 to +14.7). On <code>stack</code> alone Haiku went from 50% to 100%, and this time Luna's gain on <code>flasks</code> was clear of zero at 17.5 points (+4.8 to +30.2). The second run is exploratory.</p>
 
 <h3 id="results-calls">Tool calls</h3>
 
-<p>A notebook also made the models quicker. Counting only solved episodes, Haiku needed 15.6 tool calls with no memory and 9.9 with a notebook, and Luna needed 12.1 and 8.1 (Figure 2). This is what one would expect, since a model with no memory has to rediscover the catch in every episode and spends calls doing it.</p>
+<p>The notebook also saved steps. Counting solved episodes only, Haiku needed 15.6 tool calls with no memory and 9.9 with a notebook, and Luna needed 12.1 and 8.1 (Figure 5). In the exchange quoted in Section 2, rediscovering the catch cost Luna a failed pick and a second look at the scene. A model with no memory pays something like that in every episode.</p>
 
 <figure class="chart" data-spec="calls" data-kind="dumbbell">
-  <figcaption><b>Figure 2.</b> Tool calls per solved test episode in the registered runs, all three jobs pooled. Fewer is better. Exploratory.</figcaption>
+  <figcaption><b>Figure 5.</b> Tool calls per solved test episode in the registered runs, all three jobs pooled. Fewer is better. Exploratory.</figcaption>
 </figure>
 
 <h3 id="results-larger">Larger models</h3>
 
-<p>Fable and Astra solved all 60 of their test layouts on the first attempt with no memory, so these jobs cannot tell us whether a notebook would help them. They do give a reference point for the cheaper models. The registered question was whether a cheap model with a notebook comes within 10 points of a larger model's first try. Luna did, with 100% against 100% (98.75% interval for the gap &minus;6.9 to +6.9). Haiku reached 98% against 100%, but the interval for its gap extends to +10.5, slightly past the limit, so the test does not confirm it.</p>
+<p>Fable and Astra could not help with the main question. Both solved all 60 of their test layouts at the first attempt with no memory, which leaves a notebook nothing to improve. What they do provide is a yardstick. I had registered a test of whether a cheap model with a notebook gets within 10 points of a larger model's first try. Luna passed it, with 100% against 100% and a 98.75% interval for the gap of &minus;6.9 to +6.9. Haiku scored 98% against 100%, and its interval runs to +10.5, half a point past the limit, so by the rule I had set it did not pass.</p>
 
-<p>The costs were far apart. On those 60 layouts a first try cost $3.58 with Fable and $5.79 with Astra. Haiku cost $0.38 and Luna $0.28, and those figures include all twelve practice episodes and the notebook writing. The two sides were not matched on cost, so this is a description and not a controlled comparison.</p>
+<p>The larger models were also much more expensive on these layouts: $3.58 for Fable's first tries and $5.79 for Astra's, against $0.38 for Haiku and $0.28 for Luna with all their practice and notebook writing included. I did not try to match the two sides on cost, so read that as bookkeeping.</p>
 
 <h3 id="results-other">Disturbances and lower-level tools</h3>
 
-<p>In a further set of test episodes the simulator <span class="t" data-t="disturbance">disturbed</span> the scene part-way through, by making the held object slip or by shoving an object on the table. In the control scenes a notebook made no measurable difference to how much success dropped (Haiku &minus;2.6 points, 97.5% interval &minus;9.8 to +4.6; Luna +0.9, &minus;6.3 to +8.1). The models with no memory already succeeded in 94% and 96% of these episodes, which left little to improve. This comparison is registered.</p>
+<p>Two smaller experiments belong here. In the first, the simulator <span class="t" data-t="disturbance">interfered</span> half-way through a test episode, either by letting the held object slip or by shoving something on the table. I had hoped a notebook would help a model recover. In the control scenes it made no measurable difference to how much success dropped (Haiku &minus;2.6 points, 97.5% interval &minus;9.8 to +4.6; Luna +0.9, &minus;6.3 to +8.1). The models with no memory were already solving 94% and 96% of these episodes, so there was not much left to gain. This test was registered.</p>
 
-<p>One side effect is worth recording. When disturbed in the scenes with a catch, Luna with no memory declared the job done while it was not in 22 of 116 episodes (19%). With a notebook this happened in 3 of 116.</p>
+<p>The disturbed episodes did turn up something about honesty. In the scenes with a catch, Luna with no memory called <code>done</code> on an unfinished job in 22 of 116 episodes. With a notebook it did so in 3.</p>
 
-<p>We also ran a version of the tools without <code>pick</code> and <code>place</code>, in which the model has to assemble them from hand movements and gripper commands and is given three times the call budget. A notebook raised Luna from 50% to 86% there (+36.1 points, 95% interval +11.6 to +60.6). Haiku went from 75% to 89%, a difference that nine runs cannot separate from zero (+13.9, &minus;3.8 to +31.5). These runs used the simulator before the defect was fixed.</p>
+<p>In the second experiment I took <code>pick</code> and <code>place</code> away, so that the model had to assemble them from hand movements and gripper commands, and gave it three times as many calls. A notebook raised Luna from 50% to 86% there (+36.1 points, 95% interval +11.6 to +60.6). Haiku went from 75% to 89%, which over nine runs is too little to call (+13.9, &minus;3.8 to +31.5).</p>
 
-<h2 class="sec" id="adds">What does the notebook add?</h2>
+<h2 class="sec" id="adds">What is the notebook contributing?</h2>
 
-<p>A notebook mixes several things: a reminder that settings exist, the particular setting that worked, and whatever else the model chose to write down. The experiments in this section try to separate them. All are exploratory, and most use Haiku on <code>stack</code>, the cell with the largest gain.</p>
+<p>A 300-word notebook that takes a model from 32% to 100% makes you ask which of the words are doing it. Is it the specific fix? Or the reminder that there are settings to change at all? I took Haiku on <code>stack</code>, where the gain was largest, and started removing things. Everything in this section is exploratory.</p>
 
 <h3 id="adds-sentence">A sentence in place of a notebook</h3>
 
-<p>We removed the practice entirely and put one fixed text where the notebook would be. Figure 3 lists the texts and the results. With no memory Haiku solved 50% of the test episodes. A two-sentence text raised that to 92%. Its opening sentence says that defaults do not suit every object or surface, and its second sentence names the four adjustable settings: <code>grip_level</code>, <code>grasp_height</code>, <code>release_height</code> and <code>speed</code>. It does not say which setting matters or what value to use. A sentence that gives the answer outright, &ldquo;Pick the green cube with grip_level firm&rdquo;, reached 100%, the same as the notebook.</p>
+<p>First I took away the practice. Haiku played <code>stack</code> cold, with one fixed text sitting where its notebook would have been, and I varied the text (Figure 6).</p>
+
+<p>The text that mattered was two sentences long. The first is &ldquo;Defaults do not suit every object or surface.&rdquo; The second is &ldquo;The adjustable settings are grip_level, grasp_height, release_height and speed.&rdquo; It does not say which of the four is relevant, or what to set it to. I had predicted Haiku would solve at most 65% of test episodes with it. It solved 92%, up from 50% with no memory. Telling it the answer outright (&ldquo;Pick the green cube with grip_level firm.&rdquo;) gave 100%, the same as its own notebook.</p>
 
 <figure class="chart" data-spec="ladder" data-kind="bars">
-  <figcaption><b>Figure 3.</b> Haiku on <code>stack</code> with no practice and one fixed text in place of the notebook. Share of 40 test episodes solved. The last row is the model's own notebook, for comparison.</figcaption>
+  <figcaption><b>Figure 6.</b> Haiku on <code>stack</code> with no practice and one fixed text in place of the notebook. Share of 40 test episodes solved. The last row is the model's own notebook, for comparison.</figcaption>
 </figure>
 
-<p>The other rows help to say which part of that text matters. The opening sentence alone did nothing (50%), and neither did a neutral sentence that mentions no settings (40%). Adding an instruction to change how the tool is called after a failure, without naming any setting, reached 70%. On a second set of layouts the pattern repeated, with 48% for no memory, 65% for the opening sentence alone and 98% once the names were added. Over both sets the names beat the instruction by 27.5 points (95% interval +16.1 to +38.9).</p>
+<p>The remaining rows of the figure are attempts to find the active ingredient. The first sentence by itself did nothing (50%). A neutral sentence that mentions no settings did nothing either (40%). An instruction to change how the tool is called after a failure, with no settings named, got to 70%. When I repeated all of this on a second set of layouts the order held: 48% cold, 65% for the first sentence alone, 98% with the names. Pooled over both sets, the names beat the instruction by 27.5 points (95% interval +16.1 to +38.9).</p>
 
-<p>This did not carry over to a second model. Sonnet solved 70% with no memory, 88% with the opening sentence alone, 85% with the names, and 98% with an instruction that named no settings. The specific finding, that a list of names is what helps, therefore belongs to Haiku on this job. What the two models share is that a line or two of general advice lifted success well above the no-memory level.</p>
+<p>Then I tried the same texts on Sonnet, and the tidy story fell apart. Sonnet solved 70% cold. The first sentence alone took it to 88%, the names to 85%, and an instruction without names to 98%. So &ldquo;the list of names is what matters&rdquo; is a statement about Haiku on this job. The part that survived is looser. For both models, a line or two of general advice lifted success a long way above the cold start.</p>
 
 <h3 id="adds-practice">How much practice is needed</h3>
 
-<p>If a sentence can do this much, how much practice does a notebook need? We gave Haiku notebooks built from 1, 3, 6 or 12 practice episodes (Figure 4). Success on the test layouts was 49% with no memory, 85% after one episode, 94% after three, 90% after six and 100% after twelve. Twelve episodes are measurably better than one (+15.0 points, 95% interval +4.7 to +25.3), but the differences between neighbouring steps are within their intervals, so the shape of the curve between one and twelve should not be read closely.</p>
+<p>If two sentences can do that, twelve practice episodes start to look generous. So I cut the practice down and gave Haiku notebooks built from 1, 3, 6 or 12 episodes (Figure 7). Cold, it solved 49%. After one practice episode it solved 85%, after three 94%, after six 90% and after twelve 100%. I had guessed 80% or less for one episode. The only step in that sequence I would put weight on is twelve against one, at +15.0 points (95% interval +4.7 to +25.3). The neighbouring steps sit inside each other's intervals, and I do not think six episodes are really worse than three.</p>
 
 <figure class="chart" data-spec="dose" data-kind="bars2">
-  <figcaption><b>Figure 4.</b> Haiku on <code>stack</code> by number of practice episodes behind the notebook, 80 test episodes per row. The second bar in each row counts an episode only if it was solved within 10 of the 20 calls.</figcaption>
+  <figcaption><b>Figure 7.</b> Haiku on <code>stack</code> by number of practice episodes behind the notebook, 80 test episodes per row. The orange bar counts an episode only if it was solved within 10 of the 20 calls.</figcaption>
 </figure>
 
-<p>A stricter count separates the doses more. If an episode only counts when it is solved within 10 calls, the figures are 18%, 50%, 75%, 72% and 89%. Extra practice paid off more in speed than in success.</p>
+<p>The orange bars in the figure use a harsher rule and count an episode only if it was solved in 10 calls or fewer. By that rule the sequence is 18%, 50%, 75%, 72% and 89%, so practice was still buying something after the plain success rate had levelled off.</p>
 
-<p>What happened in the single practice episode mattered. In the 7 runs where that episode succeeded, the model went on to solve 28 of 28 test layouts. In the 13 runs where it failed, it solved 40 of 52.</p>
+<p>It also mattered whether the one practice episode went well. In the 7 runs where it succeeded, the model went on to solve 28 of 28 test layouts. In the 13 runs where it failed, the figure was 40 of 52.</p>
 
 <h3 id="adds-borrowed">Reading another model's notebook</h3>
 
-<p>A notebook does not have to be the reader's own. Sonnet practised each job and wrote notebooks, and Haiku and Luna then read them with no practice of their own. Both solved 100% of the test layouts, against 71% and 94% with no memory (Figure 5). This fits the picture above, in which the notebook contains the answer and any reader can use it. A notebook that Fable wrote before any practice did not contain the answer, and Haiku solved 65% of <code>stack</code> layouts with it.</p>
+<p>The last thing I removed was the author. Sonnet practised each job and wrote notebooks, and I handed them to Haiku and Luna, who had not practised at all. Both solved every test layout, against 71% and 94% cold (Figure 8). Fable's notebooks did the same for Haiku in a larger run: 100% against 76% cold, over 29 runs (+24.1 points, 95% interval +16.2 to +32.1).</p>
 
 <figure class="chart" data-spec="borrowed" data-kind="bars">
-  <figcaption><b>Figure 5.</b> Share of test episodes solved across all three jobs when the model reads a notebook written by Sonnet, without practising itself. 20 runs per model.</figcaption>
+  <figcaption><b>Figure 8.</b> Share of test episodes solved across all three jobs when the model reads a notebook written by Sonnet, without practising itself. 20 runs per model.</figcaption>
 </figure>
+
+<figure class="clip">
+  <img src="media/haiku-stack-compare.gif" alt="Two views of the same layout. On the left the arm repeatedly fails to lift the green cube. On the right it lifts it with a firm grip and completes the tower." width="960" height="270" loading="lazy">
+  <figcaption><b>Figure 9.</b> Haiku playing the same <code>stack</code> layout twice, at three times real speed. On the left it has no memory, never tries a firm grip and does not finish. On the right it is reading a notebook written by Fable and finishes in 5 calls.</figcaption>
+</figure>
+
+<p>By this point that is no surprise, since a notebook that states the fix is a longer version of the sentence that states the fix. Two checks support that reading. A Fable notebook written for a different job left Haiku at 67%. And a notebook that Fable wrote before practising, which never mentions the firm grip, left Haiku at 65% on <code>stack</code>.</p>
 
 <h2 class="sec" id="mixed">A job with no single answer</h2>
 
-<p>In the first three jobs one setting, once found, works on every layout. <code>mixed</code> was built so that it does not. One cube needs a firm grip and another is damaged by one, and which is which changes from layout to layout. A remembered rule is no longer enough, and the model has to try something and react to the result. All results in this section are exploratory and use 40 layouts per cell.</p>
+<p>All three jobs so far have the same weakness as tests of learning: there is one right setting, and it never changes. <code>mixed</code> was meant to take that away. Two of the cubes are odd. One is heavy and slippery and needs a firm grip, the other is fragile and cracks under one, and they swap roles from layout to layout, so no rule of the form &ldquo;always use X&rdquo; can work. This section is exploratory, with 40 layouts per cell.</p>
 
 <h3 id="mixed-message">With and without an error message</h3>
 
-<p>We first ran the version in which a firm grip on the fragile cube is refused with an error message. Luna solved all 40 layouts with no memory. Haiku solved 50% with no memory and 82% with its notebook. We also gave each model a deliberately wrong rule, &ldquo;Pick every cube with grip_level firm&rdquo;, and expected it to fail. It solved 72% of layouts for Haiku and 85% for Luna. The message told the models that the grip was too hard, and they adjusted.</p>
+<p>The first version of <code>mixed</code> refuses a firm grip on the fragile cube and says why. I assumed this job would be hard. To check, I gave each model a rule I knew was wrong, &ldquo;Pick every cube with grip_level firm&rdquo;, and wrote down that it would solve at most a quarter of the layouts. Haiku solved 72% with it and Luna 85%. Luna did not even need a rule. With no memory at all it solved 40 out of 40. The simplest explanation is that the models read the refusal and loosened their grip.</p>
 
-<p>Then we removed the message and kept everything else. Figure 6 puts the two versions side by side. The wrong rule now solved none of the 40 layouts for either model, because a cube cracked in every episode and nothing reported it before the end. With no memory, Haiku fell from 50% to 35% and Luna from 100% to 57%. The models' own notebooks, which had reached 82% and 90% with the message, reached 28% and 35% without it.</p>
+<p>So I made a second version with the message taken out. A firm grip on the fragile cube is now accepted, the cube cracks, and the only sign of it is in the simulator's verdict after the episode is over. Nothing else about the job changed, and the layouts are the same ones (Figure 10).</p>
 
 <figure class="chart" data-spec="mixed" data-kind="dumbbell">
-  <figcaption><b>Figure 6.</b> The <code>mixed</code> job with and without an error message, on the same 40 layouts. Each row is one kind of memory given to the model.</figcaption>
+  <figcaption><b>Figure 10.</b> The <code>mixed</code> job with and without an error message, on the same 40 layouts. Each row is one kind of memory given to the model.</figcaption>
 </figure>
 
-<p>The job itself had not become harder to do. A short procedure that we wrote ourselves solved all 40 layouts for both models in both versions. It tells the model to use the default grip first, to switch to a firm grip only for a cube that fails to lift, and to go back to the default for the next cube. What was missing was a way for the models to arrive at that procedure on their own.</p>
+<p>The wrong rule went from 72% and 85% to zero. It did not solve one layout in 40 for either model, since following it cracks a cube every time. Cold, Haiku dropped from 50% to 35% and Luna from 100% to 57%. Their own notebooks, written over twelve practice episodes in this version, managed 28% and 35%. The notebooks from the version with the message had managed 82% and 90%.</p>
+
+<p>The job had not become impossible. I wrote out a procedure by hand (default grip first, firm only for a cube that fails to lift, back to the default for the next cube), and with it both models solved all 40 layouts in both versions. So they could follow the procedure when given it. Left to themselves, they did not find it.</p>
 
 <h3 id="mixed-notebooks">What the notebooks recorded</h3>
 
-<p>Twelve practice episodes did not supply it. In the version with no message, a notebook left Haiku at 28% against 35% with no memory (&minus;7.5 points, 95% interval &minus;38.0 to +23.0) and Luna at 35% against 57% (&minus;22.5, &minus;57.7 to +12.7). Neither difference can be told from zero, and neither points upward.</p>
+<p>I had expected twelve episodes of practice to be enough for at least one model to work it out, and predicted a gain of 15 points or more. There was no gain. With a notebook Haiku solved 28% against 35% cold (&minus;7.5 points, 95% interval &minus;38.0 to +23.0) and Luna 35% against 57% (&minus;22.5, &minus;57.7 to +12.7). Those intervals are wide enough that I would not claim the notebooks hurt. They certainly did not help.</p>
 
-<p>The notebooks did register that something was wrong. Nine of the ten Haiku notebooks and eight of the ten Luna notebooks mention a cracked cube. Only two of ten in each group contain a sentence that connects the damage to the grip. These counts come from a keyword search whose matches we then read, not from blind coding.</p>
+<p>Reading the notebooks explains some of it. They noticed the damage: nine of Haiku's ten mention a cracked cube, and eight of Luna's. What they rarely did was blame the grip. Two notebooks in each group have a sentence that connects the two, and one of Luna's reads, &ldquo;No grip setting is proven to prevent cracks.&rdquo; (I found these with a keyword search and then read the matches, which is weaker than coding them blind.)</p>
 
 <h3 id="mixed-guess">Allowing the writer to guess</h3>
 
-<p>One possible reason is our own instruction. The model that writes the notebook is told never to invent facts, which may discourage it from proposing a cause it has not confirmed. We therefore ran a variant in which the writer may add sentences marked as guesses. It made no difference (Figure 7). Haiku solved 25% of layouts with the guessing notebook against 28% with the facts-only one, and Luna solved 35% with either.</p>
+<p>There was an obvious suspect, and it was my own prompt. The model that writes the notebook is instructed never to invent facts. That is a reasonable rule, but the cause of the cracks is exactly the kind of thing the writer would have to infer. I added a variant in which the writer may include sentences marked GUESS, and predicted it would be worth 20 points. It was worth nothing (Figure 11): 25% for Haiku against 28% with facts only, and 35% either way for Luna.</p>
 
 <figure class="chart" data-spec="guess" data-kind="bars">
-  <figcaption><b>Figure 7.</b> The <code>mixed</code> job with no error message. Share of 40 layouts solved with no memory, with a notebook limited to facts, and with a notebook whose writer may guess.</figcaption>
+  <figcaption><b>Figure 11.</b> The <code>mixed</code> job with no error message. Share of 40 layouts solved with no memory, with a notebook limited to facts, and with a notebook whose writer may guess.</figcaption>
 </figure>
 
-<p>The writers did use the permission. All ten Haiku notebooks and six of the ten Luna notebooks contain a marked guess. But among the sentences that link damage and grip, only two Haiku notebooks guess that a firm grip causes the cracks. A third hedges, a fourth blames the placement instead, and none of Luna's proposes the grip as the cause.</p>
+<p>The writers did guess. Every Haiku notebook and six of Luna's contain a marked guess. Among the sentences that mention both damage and grip, two of Haiku's notebooks get it right, and one says, &ldquo;GUESS 1: Cracking comes from firm grip squeezing the cube, and is intermittent.&rdquo; A third hedges, a fourth blames the way the cube was put down, and Luna never names the grip as a cause.</p>
 
 <h2 class="sec" id="discussion">Discussion</h2>
 
-<p>The first three jobs are the easy case for a notebook. The environment says clearly when something failed, the fix is a single setting, and once the fix is written down it keeps working. In that case notes helped a great deal, but so did much less: a sentence listing the available settings, one practice episode, or a notebook borrowed from another model. The weaker model was missing a pointer to the right setting, and it did not need accumulated experience to use one.</p>
+<p>What I take from this is narrower than the jump from 76% to 99% suggests. On the first three jobs the notebook worked, but so did nearly everything else I tried: two sentences of general advice, a single practice episode, somebody else's notes. Haiku's problem on <code>stack</code> seems to have been knowing where to look. Once anything pointed it at the grip setting, the simulator's clear failure reports did the rest.</p>
 
-<p><code>mixed</code> is the harder case. As long as the simulator explained each failure the models coped, even when they started from a wrong rule. Once the explanation was gone, they had to connect an outcome at the end of the episode to a choice made several steps earlier, and across twelve episodes they did not. Their notebooks filled with accurate records of what had happened and almost never with the rule that would have prevented it.</p>
+<p><code>mixed</code> without the message is the case I would most like to understand better. The evidence was available to the models. Over twelve episodes they used a firm grip on some cubes and a normal grip on others, and a few notebooks noticed that the cracks followed the firm grip. But a guess written in a notebook is not the same as a model acting on it, and I did not check whether the two runs with a correct guess did any better. With ten runs per cell there would have been little to see.</p>
 
-<p>We would not stretch this beyond the setup. It is one simulated arm, four jobs with catches of our own design, ten runs per cell and a handful of models at low reasoning effort. Within those limits, the feedback that a tool returned mattered more than the memory the model kept.</p>
+<p>I also do not know whether a stronger model, more practice or a different notebook prompt would close that gap. None of those was tried. The comparison I can stand behind is the one in Figure 10, where the same models on the same layouts went from coping to failing when one error message was removed.</p>
 
 <h2 class="sec" id="limits">Limitations</h2>
 
 <ul class="limits">
 <li>Everything was run in simulation. Nothing has been tried on a real arm.</li>
-<li>We designed every catch ourselves, and in three of the four jobs the fix is a single setting. Real workshops hide things that nobody planted.</li>
-<li>A defect in the simulator was found after the registered runs. With the hand nearly closed on top of an object, <code>close_gripper</code> could report that it was holding something when nothing was between the fingers. It affected Haiku with no memory on <code>stack</code> most, in 9 of 40 test episodes, 8 of which failed. We fixed it and repeated the main comparison with the same result (Section 3), but the registered numbers still come from the simulator with the defect, and the repeat is exploratory.</li>
-<li>Several of the predictions we wrote down before the follow-up experiments turned out wrong. The tables in RESULTS.md mark each one.</li>
-<li>The main result rests on two inexpensive models. Sonnet, Fable and Astra appear only in supporting roles.</li>
+<li>I designed every catch myself, and in three of the four jobs the fix is a single setting. Real workshops hide things that nobody planted.</li>
+<li>The main result rests on two inexpensive models. Sonnet, Fable and Astra appear only in supporting roles, and every model ran at low reasoning effort.</li>
 <li>Most cells have ten runs, so the intervals are wide, and the exploratory ones are not corrected for the number of comparisons.</li>
 <li>Several cells left no room for improvement: Haiku on <code>bins</code> and <code>flasks</code>, Luna on <code>stack</code>, and the two larger models on every job.</li>
 <li><code>mixed</code> is a single job, tested with two models.</li>
-<li>One <code>flasks</code> layout could not be built by the original layout sampler and was excluded, which is why the <code>flasks</code> cells have 36 test episodes and not 40.</li>
+<li>The registered comparison and its repeat used different versions of the simulator code. Their gains agree, but only the first was planned in advance.</li>
 </ul>
 
 <h2 class="sec" id="data">Data and code</h2>
 
-<p>The repository holds the simulator, the tools, the agent loop and the analysis. <a href="https://github.com/TarunTomar122/robot-play/blob/main/PROTOCOL.md">PROTOCOL.md</a> is the plan, with every prediction and its outcome. <a href="https://github.com/TarunTomar122/robot-play/blob/main/results/RESULTS.md">results/RESULTS.md</a> contains every table and is regenerated from the <a href="https://github.com/TarunTomar122/robot-play/blob/main/data/README.md">raw run files</a> by one script, with no network access needed. <a href="https://github.com/TarunTomar122/robot-play/blob/main/results/deviations.md">results/deviations.md</a> lists what went wrong or changed along the way.</p>
+<p>The repository holds the simulator, the tools, the agent loop and the analysis. <a href="https://github.com/TarunTomar122/robot-play/blob/main/PROTOCOL.md">PROTOCOL.md</a> is the plan, with every prediction and its outcome. <a href="https://github.com/TarunTomar122/robot-play/blob/main/results/RESULTS.md">results/RESULTS.md</a> contains every table and is regenerated from the <a href="https://github.com/TarunTomar122/robot-play/blob/main/data/README.md">raw run files</a> by one script, with no network access needed. <a href="https://github.com/TarunTomar122/robot-play/blob/main/results/deviations.md">results/deviations.md</a> records every change made after the plan was fixed.</p>
 
 <footer>robot-play, 17 November 2026.</footer>
 </main>
@@ -425,7 +509,7 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line);
     if (r.bottom < 0 || r.top > window.innerHeight) closeCard();
   }, { passive: true });
 
-  /* ---------- figures ---------- */
+  /* ---------- charts ---------- */
   var tip = document.getElementById("tip");
   function svg(name, attrs, text) {
     var e = document.createElementNS(NS, name);

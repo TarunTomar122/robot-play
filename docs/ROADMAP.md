@@ -19,7 +19,6 @@ Think of this as a board with three columns. Each card says what the thing is an
 
 | Card | What it is | Why it matters |
 |---|---|---|
-| **Review by two AI judges** | Two independent judges score the work out of 10 on five things and list what to fix. | They found real bugs in round one (a grading mismatch, a stuck arm). We keep going until every score is at least 9.5. |
 
 ## To do
 
