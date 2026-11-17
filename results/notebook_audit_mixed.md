@@ -4,12 +4,12 @@ Not registered. Counts come from regular expressions over the last notebook of e
 
 | job | model | notebooks | mention `firm` | mention a crack | have a damage-and-grip sentence | practice episodes solved |
 |---|---|---|---|---|---|---|
-| announced refusal | Haiku | 10 | 6 | 0 | 4 | 72 of 120 |
-| announced refusal | Luna | 10 | 6 | 0 | 3 | 97 of 120 |
-| silent damage | Haiku | 10 | 6 | 9 | 2 | 34 of 120 |
-| silent damage | Luna | 10 | 10 | 8 | 2 | 32 of 120 |
+| with error message | Haiku | 10 | 6 | 0 | 4 | 72 of 120 |
+| with error message | Luna | 10 | 6 | 0 | 3 | 97 of 120 |
+| no error message | Haiku | 10 | 6 | 9 | 2 | 34 of 120 |
+| no error message | Luna | 10 | 10 | 8 | 2 | 32 of 120 |
 
-## The damage-and-grip sentences of the silent job (read these, not the counts)
+## The damage-and-grip sentences of the job with no error message (read these, not the counts)
 
 - Haiku s48: Green "normal", blue "firm", no cracks.
 - Haiku s48: Green "normal", blue "firm", no cracks.

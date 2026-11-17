@@ -29,7 +29,7 @@ def main():
     print("| job | model | notebooks | mention `firm` | mention a crack | have a damage-and-grip sentence | practice episodes solved |")
     print("|---|---|---|---|---|---|---|")
     detail = []
-    for folder, job in (("runs/mixed", "announced refusal"), ("runs/mixed_silent", "silent damage")):
+    for folder, job in (("runs/mixed", "with error message"), ("runs/mixed_silent", "no error message")):
         for tag, name in (("claude-haiku-5-5", "Haiku"), ("gpt-6-luna", "Luna")):
             files = sorted(glob.glob(f"{folder}/{tag}__*__notebook__quirk__p12__*.jsonl"))
             n = fm = ck = lk = ps = pn = 0
@@ -45,9 +45,9 @@ def main():
                 pn += p
                 detail.append((job, name, Path(f).stem.split("__")[-1], hit))
             print(f"| {job} | {name} | {n} | {fm} | {ck} | {lk} | {ps} of {pn} |")
-    print("\n## The damage-and-grip sentences of the silent job (read these, not the counts)\n")
+    print("\n## The damage-and-grip sentences of the job with no error message (read these, not the counts)\n")
     for job, name, seed, hit in detail:
-        if job == "silent damage" and hit:
+        if job == "no error message" and hit:
             for x in hit:
                 print(f"- {name} {seed}: {x[:260]}")
 

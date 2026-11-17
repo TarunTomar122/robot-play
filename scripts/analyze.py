@@ -104,11 +104,11 @@ def reading_mixed(st):
     """Registered reading of PROTOCOL.md v1.15 from the statuses of M1 to M6 ('met', or 'MISSED (model names or the part that failed)'). A model that missed M2 had no room (it solves the
     job with no memory): by the registered rule its misses of M3 and M6 are reported but not read."""
     if all(x.startswith("met") for x in st):
-        return "M1 to M6 all met: where no single setting works, a note that states the fix is worthless or harmful and only a stated procedure (or practice that finds it) carries the benefit, which is the two-sided version of the main finding."
+        return "M1 to M6 all met: where no single setting works, a note that states the fix does not help or does harm, and only a stated procedure (or practice that finds it) gives the benefit, which is the two-sided version of the main finding."
     noroom = _missed_names(st[1])
     parts = []
     if st[0].startswith("MISSED"):
-        parts.append(f"M1 missed for {' and '.join(_missed_names(st[0]))}: a wrong constant rule did not stop the model, it recovers by reading the error (a rule is not harmful for it)")
+        parts.append(f"M1 missed for {' and '.join(_missed_names(st[0]))}: a wrong constant rule did not stop the model: it recovers by reading the error message")
     if noroom:
         parts.append(f"M2 missed for {' and '.join(noroom)}: no room, the model solves the job with no memory (its M3 and M6 results are reported but not read)")
     for tag, i, text in (("M3", 2, "even the answer key does not teach a procedure through one sentence"), ("M6", 5, "the names list is as good as the procedure")):
@@ -125,7 +125,7 @@ def reading_mixed(st):
 def reading_silent(st):
     """Registered reading of PROTOCOL.md v1.16 from the statuses of S1 to S6. A model that missed S3 had room-less behaviour (it solves the job with no memory): its S4 and S6 misses are reported but not read."""
     if all(x.startswith("met") for x in st):
-        return "S1 to S6 all met: the explicit error was carrying the safety of v1.15, a stale rule is harmful once the failure is silent, and only a stated procedure or practice that read the post-mortem recovers it."
+        return "S1 to S6 all met: the error message was what kept the models safe in v1.15, a wrong rule is harmful once the tool returns no error message, and only a stated procedure, or practice that read the final verdict, recovers it."
     noroom = _missed_names(st[2])
     parts = []
     if st[0].startswith("MISSED"):
@@ -134,12 +134,12 @@ def reading_silent(st):
         parts.append(f"S2 missed for {' and '.join(_missed_names(st[1]))}: removing the message did not remove the recovery")
     if noroom:
         parts.append(f"S3 missed for {' and '.join(noroom)}: no room, the model solves the job with no memory (its S4 and S6 results are reported but not read)")
-    for tag, i, text in (("S4", 3, "even the answer key does not carry a silent trap through one sentence"), ("S6", 5, "the names list is as good as the procedure")):
+    for tag, i, text in (("S4", 3, "one sentence stating the procedure does not solve the job with no error message"), ("S6", 5, "the names list is as good as the procedure")):
         read = [n for n in _missed_names(st[i]) if n not in noroom]
         if read:
             parts.append(f"{tag} missed for {' and '.join(read)}: {text}")
     if st[4].startswith("MISSED"):
-        parts.append("S5 missed (" + st[4].split("(", 1)[1].rstrip(")") + "): practice does not turn a verdict-only post-mortem into a rule at this dose, or the notebook beat the answer key (then the upper-bound reading is void)")
+        parts.append("S5 missed (" + st[4].split("(", 1)[1].rstrip(")") + "): practice does not turn the final verdict alone into a rule at this dose, or the notebook beat the answer key (then the upper-bound reading is void)")
     return ("; ".join(parts) + ".") if parts else "Every miss is a model with no room (see S3); nothing else is read."
 
 
@@ -203,11 +203,11 @@ def at_most(x, t):
 
 
 def two_sided_chart(rows_e, rows_s, out):
-    """Held-out success per arm on the two-sided job: announced damage (section 6m) next to silent damage (section 6n), Haiku and Luna side by side (conditions e_* and s_*)."""
+    """Held-out success per arm on the two-sided job: damage with an error message (section 6m) next to damage without one (section 6n), Haiku and Luna side by side (conditions e_* and s_*)."""
     arms = [("none", "no memory"), ("lm_names", "names\nlist"), ("lm_firm", "firm for\nevery cube"), ("lm_proc", "answer key\n(procedure)"), ("nb12", "own notebook\n(12 episodes)")]
     models = [("claude-haiku-5-5", "Haiku 5.5", "#2a78d6"), ("gpt-6-luna", "GPT-6 Luna", "#eb6834")]
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.0), sharey=True, facecolor=SURFACE)
-    for ax, rows, pre, title in ((axes[0], rows_e, "e_", "The refusal is announced (squeeze-limit message)"), (axes[1], rows_s, "s_", "The damage is silent (only the final verdict shows it)")):
+    for ax, rows, pre, title in ((axes[0], rows_e, "e_", "The tool returns an error message (squeeze limit)"), (axes[1], rows_s, "s_", "The tool returns no error (only the final verdict names the cracked cube)")):
         ax.set_facecolor(SURFACE)
         for k, (m, nm, col) in enumerate(models):
             vals = []
@@ -280,7 +280,7 @@ def main():
     ap.add_argument("--second", nargs="*", default=["runs/second"], help="exploratory second model (PROTOCOL.md v1.13): Claude Sonnet 5.5 on stack, run seeds 30-39, room check then four split arms")
     ap.add_argument("--budget", nargs="*", default=["runs/budget"], help="exploratory stated-budget cell (PROTOCOL.md v1.14): Haiku and Luna, three jobs, run seeds 30-39, 12 calls stated to the model")
     ap.add_argument("--mixed", nargs="*", default=["runs/mixed"], help="exploratory two-sided job (PROTOCOL.md v1.15): Haiku and Luna, job mixed, run seeds 40-49, six arms plus a control scene")
-    ap.add_argument("--silent", nargs="*", default=["runs/mixed_silent"], help="exploratory two-sided job with silent damage (PROTOCOL.md v1.16): Haiku and Luna, job mixed_silent, run seeds 40-49, five arms")
+    ap.add_argument("--silent", nargs="*", default=["runs/mixed_silent"], help="exploratory two-sided job with no error message for the fragile cube (PROTOCOL.md v1.16): Haiku and Luna, job mixed_silent, run seeds 40-49, five arms")
     ap.add_argument("--hyp", nargs="*", default=["runs/mixed_hyp"], help="exploratory guess-allowed notebook writer (PROTOCOL.md v1.17): Haiku and Luna, job mixed_silent, run seeds 40-49")
     ap.add_argument("--writer", nargs="*", default=["runs/writer_sonnet"], help="exploratory second writer (PROTOCOL.md v1.8): Claude Sonnet 5.5 with its own notebook, run seeds 20-29 (stack) and 20-24 (bins, flasks)")
     ap.add_argument("--borrowed-sonnet", nargs="*", default=["runs/borrowed_sonnet"], help="cheap models reading the Sonnet notebooks with no practice (PROTOCOL.md v1.8)")
@@ -1401,8 +1401,8 @@ def main():
                         mrows.append((m, "catch (one heavy, one fragile)" if quirk else "control (two ordinary cubes)", MN[c], len(x), f"{len(suc)} ({len(suc) / len(x) * 100:.0f}%)",
                                       f"{np.mean([r['calls'] for r in suc]):.1f}" if suc else "-", f"{sum(1 for r in x if r['squeezed'] > 0)} ({sum(1 for r in x if r['squeezed'] > 0) / len(x) * 100:.0f}%)",
                                       f"{sum(1 for r in x if r['silent_pick'] > 0)} ({sum(1 for r in x if r['silent_pick'] > 0) / len(x) * 100:.0f}%)"))
-        L += ["Columns: held-out episodes; solved (the simulator's verdict); calls used by the solved episodes; episodes with at least one squeeze-limit refusal (the hand pressed too hard on the fragile cube); episodes with at least one silent failed pick (a cube slipped out of the grip with no error message).", "",
-              table(["model", "scene", "what the model has", "episodes", "solved", "calls of the solved", "with a squeeze refusal", "with a silent failed pick"], mrows), ""]
+        L += ["Columns: held-out episodes; solved (the simulator's verdict); calls used by the solved episodes; episodes with at least one squeeze-limit refusal (the hand pressed too hard on the fragile cube); episodes with at least one failed pick with no error text (a cube slipped out of the grip with no error message).", "",
+              table(["model", "scene", "what the model has", "episodes", "solved", "calls of the solved", "with a squeeze refusal", "with a failed pick and no error"], mrows), ""]
         cmp_m, vm = [], {}
         for m in mm:
             for x_, y_, qk in (("lm_firm", "none", True), ("lm_names", "none", True), ("lm_proc", "none", True), ("nb12", "none", True), ("nb12", "lm_proc", True), ("lm_names", "lm_proc", True), ("lm_proc", "none", False)):
@@ -1471,8 +1471,8 @@ def main():
         rows_x = rows_s + rows_e
         SN = {"none": "no memory", "lm_names": "the frame and the four names", "lm_firm": "constant rule: firm for every cube", "lm_proc": "answer key: try, switch, no message", "nb12": "own notebook, 12 practice episodes"}
         ms = [m for m in ("claude-haiku-5-5", "gpt-6-luna") if any(r["model"] == m for r in rows_s)]
-        L += ["## 6n. Exploratory: the two-sided job with silent damage (`mixed_silent`)", "",
-              "Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.16, branch `silent-crush`, tag `code-silent`). The same layouts and the same two odd cubes as section 6m, but a firm grip on the fragile cube is accepted without a word: the pick and the place answer like a sound pick, `observe` shows nothing, and only the final verdict fails and names the cracked cube. "
+        L += ["## 6n. Exploratory: the two-sided job with no error message (`mixed_silent`)", "",
+              "Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.16, branch `silent-crush`, tag `code-silent`). The same layouts and the same two odd cubes as section 6m, but a firm grip on the fragile cube is accepted without a word: the pick and the place answer like a sound pick, `observe` reports nothing unusual, and only the final verdict fails and names the cracked cube. "
               "The scripted gate (`results/gate_mixed_silent.md`, 50 layouts, no model): every fixed setting 0 of 50, an oracle 50, a try-then-switch player 49, a player that keeps a fix once it worked 21 of 50. Haiku 5.5 and Luna, run seeds 40 to 49 (the layouts of section 6m, so the comparison with it is paired), four held-out episodes per run, 20 calls. "
               f"Run files started {len(scov2)}, complete {sum(int(c['complete']) for c in scov2)} (planned 100). Unadjusted 95% intervals by the project's interval rule, paired by run seed, no multiplicity correction, never pooled with registered rows or with section 6m.", ""]
         pred_at_6n = len(L)
@@ -1487,16 +1487,16 @@ def main():
                                   f"{sum(1 for r in x if r['silent_pick'] > 0)} ({sum(1 for r in x if r['silent_pick'] > 0) / len(x) * 100:.0f}%)"))
         Path(a.img).mkdir(parents=True, exist_ok=True)
         two_sided_chart(rows_e, rows_s, Path(a.img) / "two_sided.png")
-        L += ["![the two-sided job: announced against silent damage](docs/img/two_sided.png)", ""]
-        L += ["Columns: held-out episodes; solved; calls used by the solved episodes; episodes in which the final verdict names a cracked cube; episodes with at least one silent failed pick (the heavy cube slipping out).", "",
-              table(["model", "what the model has", "episodes", "solved", "calls of the solved", "verdict names a cracked cube", "with a silent failed pick"], srows), ""]
+        L += ["![the two-sided job: with an error message against without one](docs/img/two_sided.png)", ""]
+        L += ["Columns: held-out episodes; solved; calls used by the solved episodes; episodes in which the final verdict names a cracked cube; episodes with at least one failed pick with no error text (the heavy cube slipping out).", "",
+              table(["model", "what the model has", "episodes", "solved", "calls of the solved", "verdict names a cracked cube", "with a failed pick and no error"], srows), ""]
         cmp_s, vs = [], {}
         for m in ms:
             for x_, y_ in (("s_lm_firm", "s_none"), ("s_lm_names", "s_none"), ("s_lm_proc", "s_none"), ("s_nb12", "s_none"), ("s_nb12", "s_lm_proc"), ("s_lm_names", "s_lm_proc"),
                            ("s_lm_firm", "e_lm_firm"), ("s_none", "e_none"), ("s_lm_proc", "e_lm_proc"), ("s_nb12", "e_nb12")):
                 d = A.paired_difference(rows_x, m, x_, y_)
                 if d.get("n_pairs"):
-                    cmp_s.append((m, f"{SN[x_[2:]]} ({'silent' if x_.startswith('s_') else 'explicit'}) against {SN[y_[2:]]} ({'silent' if y_.startswith('s_') else 'explicit'})", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
+                    cmp_s.append((m, f"{SN[x_[2:]]} ({'no error message' if x_.startswith('s_') else 'error message'}) against {SN[y_[2:]]} ({'no error message' if y_.startswith('s_') else 'error message'})", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
                     vs[(m, x_, y_)] = d
         L += ["Paired differences (run seed, per model; `explicit` is the same arm in section 6m on the same layouts):", "", table(["model", "comparison", "pairs", "first", "second", "difference"], cmp_s), ""]
         finals = (ROOT / "logs/silent_done.txt").exists() or (len(scov2) == 100 and all(c["complete"] for c in scov2))
@@ -1560,8 +1560,8 @@ def main():
                   + [dict(r, task="mixed", condition="s_none") for r in silent_all if r["condition"] == "none"])
         HN = {"h_nb": "own notebook, writer may guess", "s_nb12": "own notebook, facts only (section 6n)", "s_none": "no memory (section 6n)"}
         mh = [m for m in ("claude-haiku-5-5", "gpt-6-luna") if any(r["model"] == m for r in hyp_rows)]
-        L += ["## 6o. Exploratory: may the notebook writer guess? (`notebook_hyp` on the silent job)", "",
-              "Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.17, tag `code-hyp`). Section 6n found that the model's own notebook after 12 practice episodes did not carry the silent trap. Every notebook arm so far has a writer that is told \"you never invent facts\", which also keeps it from proposing a cause. Here only the writer changes: it records results as facts and may add clearly marked guesses with a test for each. Same practice seeds, same held-out layouts and same cap as the facts-only arm of section 6n, Haiku 5.5 and Luna, run seeds 40 to 49. "
+        L += ["## 6o. Exploratory: may the notebook writer guess? (`notebook_hyp` on the job with no error message)", "",
+              "Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.17, tag `code-hyp`). Section 6n found that the model's own notebook after 12 practice episodes did not learn the rule when the tool returned no error message. Every notebook arm so far has a writer that is told \"you never invent facts\", which also keeps it from proposing a cause. Here only the writer changes: it records results as facts and may add clearly marked guesses with a test for each. Same practice seeds, same held-out layouts and same cap as the facts-only arm of section 6n, Haiku 5.5 and Luna, run seeds 40 to 49. "
               f"Run files started {len(hcov)}, complete {sum(int(c['complete']) for c in hcov)} (planned 20). Unadjusted 95% intervals by the project's interval rule, paired by run seed, no multiplicity correction.", ""]
         pred_at_6o = len(L)
         hrows = []
@@ -1645,7 +1645,7 @@ def main():
                         cnt = {k: sum(1 for r in x if r["success"] and r["calls"] <= k) for k in (8, 10, 12, 20)}
                         wrows.append((m, t, WKN[c], len(x), *[f"{cnt[k]} ({cnt[k] / len(x) * 100:.0f}%)" for k in (8, 10, 12, 20)]))
         L += ["## 6l. Exploratory: solved within k calls, every arm of the replication (run seeds 20 to 29)", "",
-              "Descriptive and **not registered**: it was added after round 5g of the review showed that the 20-call success rate hides differences in efficiency. An episode counts as solved within k calls when it succeeded and its logged call count (including `observe`) is at most k; the model was told 20 calls, not k, so this scores the same episodes against a tighter budget than the model saw. An episode that never calls `done` uses the whole 20-call budget, so for k below 20 \"solved within k\" also implies that `done` was called. Section 6k (when present) repeats the question with the budget stated to the model. "
+              "Descriptive and **not registered**: it was added after round 5g of the review found that the 20-call success rate hides differences in efficiency. An episode counts as solved within k calls when it succeeded and its logged call count (including `observe`) is at most k; the model was told 20 calls, not k, so this scores the same episodes against a tighter budget than the model saw. An episode that never calls `done` uses the whole 20-call budget, so for k below 20 \"solved within k\" also implies that `done` was called. Section 6k (when present) repeats the question with the budget stated to the model. "
               "Held-out episodes only, 40 per cell (10 runs of 4 layouts, the same layouts in every arm of a model and job).", "",
               table(["model", "job", "what the model has", "episodes", "within 8 calls", "within 10", "within 12", "within 20 (the success rate)"], wrows), ""]
 
