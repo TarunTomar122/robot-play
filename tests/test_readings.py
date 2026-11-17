@@ -50,3 +50,9 @@ def test_pick_flags_count_squeeze_refusals_and_silent_failed_picks_separately():
            {"tool": "pick", "result": {"ok": False, "holding": None}}, {"tool": "pick", "result": {"ok": True}},
            {"tool": "pick", "result": {"ok": False, "error": "unreachable"}}, {"tool": "place", "result": {"ok": False}}]
     assert pick_flags(log) == {"squeezed": 1, "silent_pick": 1} and pick_flags(None) == {"squeezed": 0, "silent_pick": 0}
+
+
+def test_v1_16_reading_names_each_missed_prediction():
+    assert "S1 to S6 all met" in analyze.reading_silent(["met"] * 6)
+    r = analyze.reading_silent(["met", "MISSED", "met", "MISSED", "met", "met"])
+    assert "S2 missed" in r and "S4 missed" in r and "S1 missed" not in r and "all met" not in r

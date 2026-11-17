@@ -103,7 +103,7 @@ def load(*dirs: str | Path, complete_only: bool = False) -> list[dict]:
                 row.update(episode_flags(r.get("log")))
                 row.update(pick_flags(r.get("log")))
                 row.update(success=int(res["success"]), calls=res["calls"], sim_time_s=res["sim_time_s"], claimed_done=int(res["claimed_done"]),
-                           false_claim=int(res["false_success_claim"]), fired=int(res["disturbance_fired"]),
+                           false_claim=int(res["false_success_claim"]), fired=int(res["disturbance_fired"]), cracked=len((res["detail"] or {}).get("cracked", [])) if isinstance(res.get("detail"), dict) else 0,
                            tokens_in=r["usage"]["input"] + r["usage"]["cache_read"] + r["usage"]["cache_write"], tokens_out=r["usage"]["output"])
                 budget = row.get("max_calls") or res["calls"]
                 row["calls_to_success"] = res["calls"] if res["success"] else budget           # a failure is charged the whole budget

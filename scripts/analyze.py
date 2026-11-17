@@ -36,6 +36,7 @@ DOSE_HASH = "33db266fef842900"      # code hash of tag code-dose (PROTOCOL.md v1
 SEC_HASH = "216aab61b6c8b09e"       # code hash of tag code-second (PROTOCOL.md v1.13)
 BUD_HASH = "a047eaf9c4a9c258"       # code hash of tag code-budget (PROTOCOL.md v1.14)
 MIX_HASH = "6119571baae3816f"       # code hash of tag code-mixed (PROTOCOL.md v1.15)
+SIL_HASH = "f2f91f6508ec38c7"       # code hash of tag code-silent (PROTOCOL.md v1.16)
 NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job",
          "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes",
          "hint": "reads a one-sentence hint naming the fix", "hint_generic": "reads a generic tip (lists the four adjustable settings, names no fix)", "prior": "reads Fable's notebook written with no practice"}
@@ -99,6 +100,20 @@ def reading_mixed(st):
              3: "M4 missed: practice does not discover a two-sided rule at this dose, or the notebook beat the answer key (see the table, the upper-bound reading is void in the second case)",
              4: "M5 missed: the sentence has a cost on ordinary cubes (size in the table)",
              5: "M6 missed: the names list is as good as the procedure here"}
+    return "; ".join(names[i] for i, o in enumerate(ok) if not o) + "."
+
+
+def reading_silent(st):
+    """Registered reading of PROTOCOL.md v1.16 from the statuses of S1 to S6 (each starts with 'met' or 'MISSED')."""
+    ok = [x.startswith("met") for x in st]
+    if all(ok):
+        return "S1 to S6 all met: the explicit error was carrying the safety of v1.15, a stale rule is harmful once the failure is silent, and only a stated procedure or practice that read the post-mortem recovers it."
+    names = {0: "S1 missed: a model avoids the trap even without the message (it does not keep the fix; see the share of cracked episodes in the table)",
+             1: "S2 missed: removing the message did not remove the recovery for a model",
+             2: "S3 missed: no room for that model (S4 to S6 are reported but not read for it)",
+             3: "S4 missed: even the answer key does not carry a silent trap through one sentence",
+             4: "S5 missed: practice does not turn a verdict-only post-mortem into a rule at this dose, or the notebook beat the answer key (the upper-bound reading is void in the second case)",
+             5: "S6 missed: the names list is as good as the procedure here"}
     return "; ".join(names[i] for i, o in enumerate(ok) if not o) + "."
 
 
@@ -190,6 +205,7 @@ def main():
     ap.add_argument("--second", nargs="*", default=["runs/second"], help="exploratory second model (PROTOCOL.md v1.13): Claude Sonnet 5.5 on stack, run seeds 30-39, room check then four split arms")
     ap.add_argument("--budget", nargs="*", default=["runs/budget"], help="exploratory stated-budget cell (PROTOCOL.md v1.14): Haiku and Luna, three jobs, run seeds 30-39, 12 calls stated to the model")
     ap.add_argument("--mixed", nargs="*", default=["runs/mixed"], help="exploratory two-sided job (PROTOCOL.md v1.15): Haiku and Luna, job mixed, run seeds 40-49, six arms plus a control scene")
+    ap.add_argument("--silent", nargs="*", default=["runs/mixed_silent"], help="exploratory two-sided job with silent damage (PROTOCOL.md v1.16): Haiku and Luna, job mixed_silent, run seeds 40-49, five arms")
     ap.add_argument("--writer", nargs="*", default=["runs/writer_sonnet"], help="exploratory second writer (PROTOCOL.md v1.8): Claude Sonnet 5.5 with its own notebook, run seeds 20-29 (stack) and 20-24 (bins, flasks)")
     ap.add_argument("--borrowed-sonnet", nargs="*", default=["runs/borrowed_sonnet"], help="cheap models reading the Sonnet notebooks with no practice (PROTOCOL.md v1.8)")
     ap.add_argument("--meter", default="runs/spend")
@@ -1360,6 +1376,85 @@ def main():
                                     "If M2 is missed for a model there is no room for it: M3 to M5 are then reported but not read for that model.", "",
                                     table(["prediction", "result", "status"], pr), "", reading, "",
                                     f"Validation of the included files: {len(mcov)} run files, every one with code hash `{MIX_HASH}` and a run seed from 40 to 49: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
+
+    # --- 6n: the two-sided job with silent damage (v1.16; exploratory)
+    sil_rows = [r for r in (A.load(*ex(a.silent), complete_only=True) if ex(a.silent) else []) if 40 <= r["run_seed"] <= 49 and r["task"] == "mixed_silent"]
+    if sil_rows:
+        import re as _re
+        scov2 = A.coverage(*ex(a.silent))
+        kofs = lambda r: int(_re.search(r"__p(\d+)__s", r["run"]).group(1))
+        explicit = [r for r in (A.load(*ex(a.mixed), complete_only=True) if ex(a.mixed) else []) if 40 <= r["run_seed"] <= 49 and r["task"] == "mixed" and r["quirk"]]
+        rows_s = [dict(r, task="mixed", condition=("s_nb12" if r["condition"] == "notebook" else "s_" + r["condition"])) for r in sil_rows if r["condition"] != "notebook" or kofs(r) == 12]
+        rows_e = [dict(r, condition=("e_nb12" if r["condition"] == "notebook" else "e_" + r["condition"])) for r in explicit if r["condition"] != "notebook" or kofs(r) == 12]
+        rows_x = rows_s + rows_e
+        SN = {"none": "no memory", "lm_names": "the frame and the four names", "lm_firm": "constant rule: firm for every cube", "lm_proc": "answer key: try, switch, no message", "nb12": "own notebook, 12 practice episodes"}
+        ms = [m for m in ("claude-haiku-5-5", "gpt-6-luna") if any(r["model"] == m for r in rows_s)]
+        L += ["## 6n. Exploratory: the two-sided job with silent damage (`mixed_silent`)", "",
+              "Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.16, branch `silent-crush`, tag `code-silent`). The same layouts and the same two odd cubes as section 6m, but a firm grip on the fragile cube is accepted without a word: the pick and the place answer like a sound pick, `observe` shows nothing, and only the final verdict fails and names the cracked cube. "
+              "The scripted gate (`results/gate_mixed_silent.md`, 50 layouts, no model): every fixed setting 0 of 50, an oracle 50, a try-then-switch player 49, a player that keeps a fix once it worked 21 of 50. Haiku 5.5 and Luna, run seeds 40 to 49 (the layouts of section 6m, so the comparison with it is paired), four held-out episodes per run, 20 calls. "
+              f"Run files started {len(scov2)}, complete {sum(int(c['complete']) for c in scov2)} (planned 100). Unadjusted 95% intervals by the project's interval rule, paired by run seed, no multiplicity correction, never pooled with registered rows or with section 6m.", ""]
+        pred_at_6n = len(L)
+        srows = []
+        for m in ms:
+            for c in ("none", "lm_names", "lm_firm", "lm_proc", "nb12"):
+                x = A.select(rows_s, model=m, condition="s_" + c, phase="eval", quirk=True)
+                if x:
+                    suc = [r for r in x if r["success"]]
+                    cr = sum(1 for r in x if r["cracked"] > 0)
+                    srows.append((m, SN[c], len(x), f"{len(suc)} ({len(suc) / len(x) * 100:.0f}%)", f"{np.mean([r['calls'] for r in suc]):.1f}" if suc else "-", f"{cr} ({cr / len(x) * 100:.0f}%)",
+                                  f"{sum(1 for r in x if r['silent_pick'] > 0)} ({sum(1 for r in x if r['silent_pick'] > 0) / len(x) * 100:.0f}%)"))
+        L += ["Columns: held-out episodes; solved; calls used by the solved episodes; episodes in which the final verdict names a cracked cube; episodes with at least one silent failed pick (the heavy cube slipping out).", "",
+              table(["model", "what the model has", "episodes", "solved", "calls of the solved", "verdict names a cracked cube", "with a silent failed pick"], srows), ""]
+        cmp_s, vs = [], {}
+        for m in ms:
+            for x_, y_ in (("s_lm_firm", "s_none"), ("s_lm_names", "s_none"), ("s_lm_proc", "s_none"), ("s_nb12", "s_none"), ("s_nb12", "s_lm_proc"), ("s_lm_names", "s_lm_proc"),
+                           ("s_lm_firm", "e_lm_firm"), ("s_none", "e_none"), ("s_lm_proc", "e_lm_proc"), ("s_nb12", "e_nb12")):
+                d = A.paired_difference(rows_x, m, x_, y_)
+                if d.get("n_pairs"):
+                    cmp_s.append((m, f"{SN[x_[2:]]} ({'silent' if x_.startswith('s_') else 'explicit'}) against {SN[y_[2:]]} ({'silent' if y_.startswith('s_') else 'explicit'})", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
+                    vs[(m, x_, y_)] = d
+        L += ["Paired differences (run seed, per model; `explicit` is the same arm in section 6m on the same layouts):", "", table(["model", "comparison", "pairs", "first", "second", "difference"], cmp_s), ""]
+        finals = (ROOT / "logs/silent_done.txt").exists() or (len(scov2) == 100 and all(c["complete"] for c in scov2))
+        need_s = [("s_lm_firm", "s_none"), ("s_lm_proc", "s_none"), ("s_nb12", "s_none"), ("s_nb12", "s_lm_proc"), ("s_lm_names", "s_lm_proc"), ("s_lm_firm", "e_lm_firm")]
+        ready_s = all(vs.get((m, x_, y_), {}).get("n_pairs", 0) >= 10 for m in ("claude-haiku-5-5", "gpt-6-luna") for x_, y_ in need_s)
+
+        def scs(keys, fn):
+            n = min([vs.get(k, {}).get("n_pairs", 0) for k in keys] or [0])
+            if n >= 10 and (ready_s or finals):
+                return fn()
+            if not finals:
+                return "pending"
+            return "inconclusive (below the registered floor)" if n < 8 else fn() + " (scored with fewer than the planned pairs, above the floor)"
+        H, Lu = "claude-haiku-5-5", "gpt-6-luna"
+        rate = lambda m, c: (lambda x: (sum(r["success"] for r in x) / len(x)) if x else float("nan"))(A.select(rows_s, model=m, condition="s_" + c, phase="eval", quirk=True))
+        both = lambda fn: all(fn(m) for m in (H, Lu))
+        dd = lambda m, x_, y_: vs.get((m, x_, y_), {}).get("diff", float("nan"))
+        show = lambda fn: " / ".join(f"{nm} {fn(m)}" for nm, m in (("Haiku", H), ("Luna", Lu)))
+        pr = []
+        pr.append(("S1: `lm_firm` solves at most 10% of the layouts for Haiku and Luna", show(lambda m: f"{rate(m, 'lm_firm') * 100:.0f}%"),
+                   scs([(m, "s_lm_firm", "s_none") for m in (H, Lu)], lambda: "met" if both(lambda m: at_most(rate(m, "lm_firm"), 0.10)) else "MISSED")))
+        pr.append(("S2: `lm_firm` here minus `lm_firm` in section 6m (same layouts) is at most -30 points for Haiku and Luna", show(lambda m: f"{dd(m, 's_lm_firm', 'e_lm_firm') * 100:+.1f}"),
+                   scs([(m, "s_lm_firm", "e_lm_firm") for m in (H, Lu)], lambda: "met" if both(lambda m: at_most(dd(m, "s_lm_firm", "e_lm_firm"), -0.30)) else "MISSED")))
+        pr.append(("S3: `none` solves less than 80% of the layouts for Haiku and Luna (room check)", show(lambda m: f"{rate(m, 'none') * 100:.0f}%"),
+                   scs([(m, "s_lm_firm", "s_none") for m in (H, Lu)], lambda: "met" if both(lambda m: not at_least(rate(m, "none"), 0.80)) else "MISSED")))
+        pr.append(("S4: `lm_proc` minus `none` is at least +15 points for Haiku and Luna", show(lambda m: f"{dd(m, 's_lm_proc', 's_none') * 100:+.1f}"),
+                   scs([(m, "s_lm_proc", "s_none") for m in (H, Lu)], lambda: "met" if both(lambda m: at_least(dd(m, "s_lm_proc", "s_none"), 0.15)) else "MISSED")))
+        pr.append(("S5: own notebook (12) minus `none` is at least +15 points for at least one model, and the notebook is not above `lm_proc` for either", show(lambda m: f"vs none {dd(m, 's_nb12', 's_none') * 100:+.1f}, vs lm_proc {dd(m, 's_nb12', 's_lm_proc') * 100:+.1f}"),
+                   scs([(m, "s_nb12", "s_none") for m in (H, Lu)] + [(m, "s_nb12", "s_lm_proc") for m in (H, Lu)],
+                       lambda: "met" if (any(at_least(dd(m, "s_nb12", "s_none"), 0.15) for m in (H, Lu)) and both(lambda m: at_most(dd(m, "s_nb12", "s_lm_proc"), 0.0))) else "MISSED")))
+        pr.append(("S6: `lm_names` is not above `lm_proc` for either model", show(lambda m: f"{dd(m, 's_lm_names', 's_lm_proc') * 100:+.1f}"),
+                   scs([(m, "s_lm_names", "s_lm_proc") for m in (H, Lu)], lambda: "met" if both(lambda m: at_most(dd(m, "s_lm_names", "s_lm_proc"), 0.0)) else "MISSED")))
+        bad_files = bad_cov(scov2, {SIL_HASH}, 40, 49)
+        pr = void_if(bad_files, pr)
+        st = [x[2] for x in pr]
+        if finals and not bad_files and all(x.startswith(("met", "MISSED")) for x in st):
+            reading = "Registered reading of the outcome: " + reading_silent(st)
+        else:
+            reading = "Registered reading: scored when the cell has finished."
+        L[pred_at_6n:pred_at_6n] = ["**Predictions of PROTOCOL.md v1.16, scored by the generator first** (pending until every pair exists; below 8 of 10 pairs inconclusive once the cell has finished). Written after the scripted gate and after an informal first look at half of the section 6m episodes, so not blind to the explicit-message finding. "
+                                    "If S3 is missed for a model there is no room for it: S4 to S6 are then reported but not read for that model.", "",
+                                    table(["prediction", "result", "status"], pr), "", reading, "",
+                                    f"Validation of the included files: {len(scov2)} run files, every one with code hash `{SIL_HASH}` and a run seed from 40 to 49: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
 
     # --- 6l: solved within k calls, every arm (descriptive; round 5g)
     wk_src = {"none": [r for r in rep_rows if r["condition"] == "none"], "notebook": [r for r in rep_rows if r["condition"] == "notebook"],
