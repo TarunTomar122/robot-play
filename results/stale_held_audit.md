@@ -1,6 +1,6 @@
 # Stale held state after `home` (audit)
 
-Episodes scanned: 5584. Times `pick` came directly after `home`: 9. Times `pick` answered "already holding": 10, of which 7 came after a false hold (a `close_gripper` that said `holding` with the fingers under 3 cm apart). Episodes containing a false hold: 120.
+Episodes scanned: 6818. Times `pick` came directly after `home`: 11. Times `pick` answered "already holding": 10, of which 7 came after a false hold (a `close_gripper` that said `holding` with the fingers under 3 cm apart). Episodes containing a false hold: 122.
 
 | run | phase | episode | call | the three calls before it |
 |---|---|---|---|---|
