@@ -62,3 +62,12 @@ def test_v1_13_second_model_cells_split_the_arms_into_a_room_check_and_four_text
     assert {s.condition for s in split} == {"lm_frame", "lm_names", "lm_instr_n", "lm_generic"} and len(split) == 8
     from robot_play.runner import SPLIT2_TEXTS
     assert all(s.borrowed_notebook == SPLIT2_TEXTS[s.condition] for s in split)
+
+
+def test_v1_14_budget_cell_plans_four_arms_per_job_and_seed_with_the_stated_budget():
+    specs = build_specs("budget", ["claude-haiku-5-5", "gpt-6-luna"], [30, 31], "runs/x", max_calls=12)
+    assert len(specs) == 2 * 3 * 2 * 4 and all(s.max_calls == 12 for s in specs)
+    one = [s for s in specs if s.model == "gpt-6-luna" and s.task == "flasks" and s.run_seed == 30]
+    assert sorted((s.condition, s.practice) for s in one) == [("lm_names", 0), ("none", 0), ("notebook", 1), ("notebook", 12)]
+    assert [s.borrowed_notebook for s in one if s.condition == "lm_names"] == [SPLIT_TEXTS["lm_names"]]
+    assert len({s.key for s in specs}) == len(specs)
