@@ -69,6 +69,18 @@ class Skills:
     def _fail(self, reason: str, **extra):
         return {"ok": False, "error": reason, **extra}
 
+    def _squeeze_violation(self, name: str):
+        """(force, limit) in newtons when the fingers press a fragile object harder than it takes, else None."""
+        o = self._obj(name)
+        if o is None or getattr(o, "crush_n", None) is None:
+            return None
+        f = self.w.finger_normal_force(name)
+        return (f, o.crush_n) if f > o.crush_n else None
+
+    def _squeeze_error(self, name: str, viol):
+        return self._fail(f"squeeze limit exceeded on {name}: the fingers pressed with {viol[0]:.1f} N, it takes at most {viol[1]:.1f} N; the hand let go",
+                          gripper_width_m=round(self.w.gripper_width(), 3))
+
     def _refresh_held(self):
         """The hand only holds what both fingers still touch. If the object has slipped out (or was knocked away), forget it: `observe` and `close_gripper` then
         say what is true, and the planner treats the object as an obstacle again instead of as part of the hand."""
@@ -103,6 +115,12 @@ class Skills:
         self.w.data.ctrl[7] = GRIP[grip_level]
         self.w.settle(0.5)
         self._refresh_held()
+        for o in self.w.scene.objects:               # a fragile object squeezed harder than it takes: the hand lets go
+            if getattr(o, "crush_n", None) is not None and self.w.fingers_touching(o.name) == 2:
+                viol = self._squeeze_violation(o.name)
+                if viol:
+                    self.open_gripper()
+                    return self._squeeze_error(o.name, viol)
         if not self.mv.held:                       # an object squeezed between both fingers is part of the hand from now on: the planner carries it and does not treat it as an obstacle
             width = self.w.gripper_width()
             for o in self.w.scene.objects:
@@ -191,6 +209,11 @@ class Skills:
             self.open_gripper()
             self._retreat(p, yaw, z_hover, object)
             return self._fail("fingers closed on nothing", gripper_width_m=round(width, 3))
+        viol = self._squeeze_violation(object)
+        if viol:
+            self.open_gripper()
+            self._retreat(p, yaw, z_hover, object)
+            return self._squeeze_error(object, viol)
         mv.attach(object)
         z_up = float(w.tcp()[2] + lift_height)
         try:

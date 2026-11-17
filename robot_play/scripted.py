@@ -113,3 +113,51 @@ def run_pose_script(task: str, seed: int, quirk: bool, policy: str, max_calls: i
     res = ep.result()
     return {"ok": bool(res["success"]), "detail": res["detail"], "trace": trace, "sim_time": res["sim_time_s"], "fired": res["disturbance_fired"],
             "calls": res["calls"], "over_budget": ep.over_budget}
+
+
+MIXED_POLICIES = {
+    "normal": [{}],                                                   # defaults everywhere
+    "normal_slow": [{"speed": "slow"}],
+    "normal_turn": [{"speed": "slow", "yaw_offset_deg": 45.0}],       # the one non-grip setting that helps the heavy cube about half the time
+    "light": [{"grip_level": "light", "speed": "slow"}],
+    "firm": [{"grip_level": "firm", "speed": "slow"}],
+}
+
+
+def run_mixed(seed: int, quirk: bool, policy: str, max_calls: int | None = None, **env_kw) -> dict:
+    """Scripted players for the `mixed` job. A fixed policy in MIXED_POLICIES uses one pick setting for both cubes. `oracle` knows which cube is heavy and which is fragile.
+    `procedure` knows nothing: it picks with a normal grip and, when the pick fails, reads the error (a squeeze-limit message means the grip was too hard, any other failure
+    means it was too soft) and tries the other grip once."""
+    ep = Episode("mixed", seed, quirk=quirk, max_calls=max_calls, env_kw=env_kw)
+    mv, meta = ep.env.skills.mv, ep.env.meta
+    trace = []
+    for obj in ORDER["stack"]:
+        if policy in MIXED_POLICIES:
+            attempts = MIXED_POLICIES[policy]
+        elif policy == "oracle":
+            attempts = [{"grip_level": "firm", "speed": "slow"} if obj == meta.get("heavy") else {"speed": "slow"}]
+        else:
+            attempts = [{"speed": "slow"}, {"grip_level": "firm", "speed": "slow"}, {"speed": "slow"}]
+        last = None
+        for i, kw in enumerate(attempts):
+            if ep.finished:
+                break
+            if policy == "procedure" and i == 1 and last and "squeeze limit" in str(last):
+                kw = {"speed": "slow"}                                # too hard: go back to the normal grip
+            if policy == "procedure" and i == 2 and not (last and not last.get("ok")):
+                break
+            if mv.held and mv.held != obj:
+                ep.call("open_gripper")
+            r = ep.call("pick", {"object": obj, **kw})
+            trace.append(("pick", obj, r.get("ok"), r.get("error")))
+            last = r
+            if r.get("ok"):
+                r2 = ep.call("place", {"target": _dest("stack", obj), "speed": "slow"})
+                trace.append(("place", obj, r2.get("ok"), r2.get("error")))
+                break
+    if not ep.finished:
+        ep.call("home")
+    if not ep.finished:
+        ep.call("done")
+    res = ep.result()
+    return {"ok": bool(res["success"]), "detail": res["detail"], "trace": trace, "calls": res["calls"], "heavy": meta.get("heavy"), "fragile": meta.get("fragile")}
