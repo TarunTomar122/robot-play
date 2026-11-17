@@ -89,6 +89,11 @@ class Memory:
         if self.condition in ("borrowed", "borrowed_1", "borrowed_3") and self.notebook:        # a frozen notebook written by a stronger model on the same task (exploratory cell, PROTOCOL.md section 10, v1.4)
             return ("\n\nA NOTEBOOK written by a more capable assistant after it practised this same task (object positions change between attempts, "
                     "and the notes may be incomplete or wrong):\n" + self.notebook)
+        if self.condition in ("hint", "hint_generic") and self.notebook:                         # exploratory v1.7: one fixed sentence, no practice
+            return ("\n\nA HINT from an experienced operator of this same task (object positions change between attempts):\n" + self.notebook)
+        if self.condition == "prior" and self.notebook:                                         # exploratory v1.7: a notebook written by a stronger model that had NOT practised
+            return ("\n\nA NOTEBOOK written by a more capable assistant that had read about this task but not yet attempted it (it may be incomplete or wrong; "
+                    "object positions change between attempts):\n" + self.notebook)
         if self.condition == "borrowed_other" and self.notebook:  # the control for "borrowed": a stronger model's notebook for a DIFFERENT task, labelled as such
             return ("\n\nA NOTEBOOK written by a more capable assistant after it practised a DIFFERENT task in this same simulator (it may or may not apply to your task; "
                     "object positions change between attempts, and the notes may be incomplete or wrong):\n" + self.notebook)
@@ -111,6 +116,17 @@ def notebook_request(instruction: str, notebook: str, verdict: str, calls: int, 
             "Object positions change at every attempt and the transcript is shortened, so do not record positions or coordinates. Rewrite the notebook now. "
             "Replace it, do not append. Keep it under 300 words. Say which settings or approaches worked or failed and what in the results showed that, "
             "and note anything that wasted calls. Output only the notebook text.")
+
+
+PRIOR_SYSTEM = ("You write a short notebook for an agent that will control a simulated robot arm through tools. The agent has not attempted the task yet. "
+                "You only know the task description and the tool descriptions you are given. You never invent facts about the simulator: if you do not know something, say what to check.")
+
+
+def prior_request(instruction: str, tool_text: str, max_calls: int) -> str:
+    """The zero-practice notebook of PROTOCOL.md v1.7: written from the task text and the tool descriptions only, no episode played."""
+    return (f"TASK: {instruction}\n\nTOOLS (names, descriptions, parameters):\n{tool_text}\n\nThe agent gets {max_calls} tool calls per attempt. No attempt has been made yet, "
+            "so there is no transcript and no verdict. Write the notebook the agent should have in front of it before its first attempt, using only the task and the tool descriptions. "
+            "Do not record positions or coordinates. Keep it under 300 words. Output only the notebook text.")
 
 
 # ------------------------------------------------------------------------------------------------ episodes

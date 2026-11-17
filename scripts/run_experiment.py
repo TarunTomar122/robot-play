@@ -25,7 +25,7 @@ def parse_seeds(s: str) -> list[int]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cell", required=True, choices=["main", "control", "frontier", "frontier_exp", "pilot", "pilot_pose", "pose", "borrowed", "borrowed_other", "borrowed_1", "borrowed_3"])
+    ap.add_argument("--cell", required=True, choices=["main", "control", "frontier", "frontier_exp", "pilot", "pilot_pose", "pose", "borrowed", "borrowed_other", "borrowed_1", "borrowed_3", "hint", "hint_generic", "prior"])
     ap.add_argument("--models", nargs="+", required=True)
     ap.add_argument("--tasks", nargs="+", default=None)
     ap.add_argument("--seeds", default="0")
@@ -33,7 +33,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--meter", default="runs/spend")
     ap.add_argument("--max-calls", type=int, default=None)
-    ap.add_argument("--source-dir", default="runs/frontier_exp", help="borrowed cell: where the finished frontier-with-notebook runs are")
+    ap.add_argument("--source-dir", default="runs/frontier_exp", help="borrowed cells: where the finished frontier-with-notebook runs are; prior cell: where the zero-practice notebooks are (runs/prior_notebooks)")
     ap.add_argument("--conditions", nargs="+", default=None, help="keep only these memory conditions")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()

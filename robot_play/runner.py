@@ -269,6 +269,18 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
                     text = frontier_notebook(source_dir, source_model, t, s, after=after)
                     if text:
                         specs.append(RunSpec(m, t, cell, s, True, practice=0, borrowed_notebook=text, **common))
+    elif cell in ("hint", "hint_generic"):      # exploratory (v1.7): no practice, the memory slot holds one fixed sentence
+        for m in models:
+            for t in tasks:
+                for s in run_seeds:
+                    specs.append(RunSpec(m, t, cell, s, True, practice=0, borrowed_notebook=HINTS[t] if cell == "hint" else GENERIC_HINT, **common))
+    elif cell == "prior":                       # exploratory (v1.7): no practice, a notebook Fable wrote with zero practice (source_dir holds the generated files)
+        for m in models:
+            for t in tasks:
+                for s in run_seeds:
+                    text = prior_notebook(source_dir, t, s)
+                    if text:
+                        specs.append(RunSpec(m, t, "prior", s, True, practice=0, borrowed_notebook=text, **common))
     elif cell == "borrowed_other":              # the control for "borrowed": the notebook of a DIFFERENT task (stack reads the sort notebook, sort the flask one, flasks the stack one)
         shift = {"stack": "bins", "bins": "flasks", "flasks": "stack"}
         for m in models:
@@ -280,6 +292,19 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
     else:
         raise ValueError(cell)
     return specs
+
+
+HINTS = {"stack": "Pick the green cube with grip_level firm.",                              # PROTOCOL.md v1.7: one sentence naming the fixing setting of each job
+         "bins": "Release each cube from release_height 0.14 or more.",
+         "flasks": "Grasp each flask near its top: grasp_height 0.9."}
+GENERIC_HINT = ("Defaults do not suit every object or surface. When a pick or place fails or is refused, read the message and change the settings "
+                "(grip_level, grasp_height, release_height, speed) one at a time instead of repeating the same call.")
+
+
+def prior_notebook(source_dir: str, task: str, run_seed: int) -> str:
+    """The zero-practice notebook Fable wrote for this job and run seed (scripts/make_prior_notebooks.py), "" if there is none."""
+    f = Path(source_dir) / f"{task}__s{run_seed}.json"
+    return json.loads(f.read_text()).get("text", "") if f.exists() else ""
 
 
 def frontier_notebook(source_dir: str, source_model: str, task: str, run_seed: int, after: int | None = None) -> str:
