@@ -101,7 +101,7 @@ Runs with practice or a borrowed notebook that did not finish their whole plan a
 
 Planned cells that did not start (exploratory cells included; the borrowed cells are planned only where the Fable notebook they read finished): none (every planned run file exists).
 
-Spend meter (pessimistic pricing): {"anthropic": {"spent": 78.659452, "reserved": 0.013872, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 27.500984, "reserved": 0.04478, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 11. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
+Spend meter (pessimistic pricing): {"anthropic": {"spent": 78.927704, "reserved": 0.020646, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 27.929819, "reserved": 0.031694, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 11. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
 
 ## 2. Q1: does experience raise held-out success?
 
@@ -991,6 +991,44 @@ Descriptive and **not registered**: it was added after round 5g of the review sh
 | gpt-6-luna | flasks | generic sentence (neutral label) | 40 | 18 (45%) | 25 (62%) | 29 (72%) | 37 (92%) |
 | gpt-6-luna | flasks | naming sentence (operator label) | 40 | 40 (100%) | 40 (100%) | 40 (100%) | 40 (100%) |
 | gpt-6-luna | flasks | own notebook (12 practice episodes) | 40 | 40 (100%) | 40 (100%) | 40 (100%) | 40 (100%) |
+
+## 6j. Exploratory: the split with a second model (Claude Sonnet 5.5)
+
+Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.13, branch `second-model`, tag `code-second`). Only Haiku has room on `stack`, so this was a **room check first**: Sonnet 5.5 with no memory on run seeds 30 to 39 (the layouts of section 6h); the four text arms ran only because it solved at most 75%. Run files started 50, complete 50. Plain 95% intervals, ten pairs per comparison.
+
+**Predictions of PROTOCOL.md v1.13, scored by the generator first** (pending until every pair exists; below 8 of 10 pairs inconclusive once the cell has finished). Written after the Haiku results were known, so not blind. The registered reading: gate failed, no reading, ceiling reported; Q1, Q2 and Q3 met, the Haiku pattern also holds for a second model; Q1 missed, the names result is Haiku-specific; Q4 reported either way.
+
+| prediction | result | status |
+|---|---|---|
+| Gate: Sonnet 5.5 with no memory solves at most 75% of the 40 layouts (room for the second model) | no memory 70% | met |
+| Q1: `lm_names` solves at least 80% | 85% | met |
+| Q2: `lm_frame` solves at most 65% | 88% | MISSED |
+| Q3: `lm_generic` solves at least 80% | 92% | met |
+| Q4: `lm_names` minus `lm_instr_n` is at least +10 points (reported either way) | -12.5 | MISSED |
+
+Registered reading of the outcome: the registered reading does not cover this combination (Q1 met with Q2 or Q3 missed).
+
+**What the numbers show (written after seeing them, not registered).** With Sonnet 5.5 no memory solved 70%; 1 had an interval over no memory that excludes zero (of the four text arms), and the frame alone already reached 88% (over fresh +17.5 pp (95% CI -6.4 to +41.4)) and the arms' intervals overlap. The four names alone reached 85% and the instruction with the word "settings" and no names reached 98%: names minus instruction is -12.5 pp (95% CI -27.7 to +2.7), the opposite sign from Haiku's pooled +27.5 points. So for a second model on this job the data do not separate what the parts of the sentence do, and the names-over-instruction ordering is not shown to hold beyond Haiku; ten pairs per comparison and one job.
+
+Validation of the included files: 50 run files, every one with code hash `216aab61b6c8b09e` and a run seed from 30 to 39: yes.
+
+Held-out success on `stack` (and calls to success) on the 10 runs every arm has:
+
+|  | no memory | the frame only | the frame and the four names | the frame and 'change the settings one at a time' (no names) | the generic sentence |
+|---|---|---|---|---|---|
+| Sonnet 5.5 | 70% (15.0 calls) | 88% (12.2 calls) | 85% (14.3 calls) | 98% (10.8 calls) | 92% (10.7 calls) |
+
+Paired differences (run seed):
+
+| comparison | pairs | first | second | difference |
+|---|---|---|---|---|
+| the frame only against no memory | 10 | 88% | 70% | +17.5 pp (95% CI -6.4 to +41.4) |
+| the frame and the four names against no memory | 10 | 85% | 70% | +15.0 pp (95% CI -4.2 to +34.2) |
+| the frame and 'change the settings one at a time' (no names) against no memory | 10 | 98% | 70% | +27.5 pp (95% CI +6.1 to +48.9) |
+| the generic sentence against no memory | 10 | 92% | 70% | +22.5 pp (95% CI -0.5 to +45.5) |
+| the frame and the four names against the frame only | 10 | 85% | 88% | -2.5 pp (95% CI -23.9 to +18.9) |
+| the frame and the four names against the frame and 'change the settings one at a time' (no names) | 10 | 85% | 98% | -12.5 pp (95% CI -27.7 to +2.7) |
+| the generic sentence against the frame and 'change the settings one at a time' (no names) | 10 | 92% | 98% | -5.0 pp (95% CI -16.3 to +6.3) |
 
 ## 7. Skill-level against pose-level tools
 

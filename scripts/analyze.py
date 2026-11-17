@@ -33,6 +33,7 @@ LM_HASH = "58b19ca1be3740fe"        # code hash of tag code-labelmatch (PROTOCOL
 WS_HASH = "0346eddace878d63"        # code hash of tag code-wordsplit (PROTOCOL.md v1.10)
 WS2_HASH = "c44187af32043997"       # code hash of tag code-wordsplit2 (PROTOCOL.md v1.11)
 DOSE_HASH = "33db266fef842900"      # code hash of tag code-dose (PROTOCOL.md v1.12)
+SEC_HASH = "216aab61b6c8b09e"       # code hash of tag code-second (PROTOCOL.md v1.13)
 NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job",
          "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes",
          "hint": "reads a one-sentence hint naming the fix", "hint_generic": "reads a generic tip (lists the four adjustable settings, names no fix)", "prior": "reads Fable's notebook written with no practice"}
@@ -136,6 +137,7 @@ def main():
     ap.add_argument("--wordsplit", nargs="*", default=["runs/wordsplit"], help="exploratory split of the generic sentence (PROTOCOL.md v1.10): frame only, frame + names, frame + instruction under the neutral label; Haiku, stack, run seeds 20-29, no practice")
     ap.add_argument("--wordsplit2", nargs="*", default=["runs/wordsplit2"], help="exploratory repeat of the split on fresh layouts (PROTOCOL.md v1.11): Haiku, stack, run seeds 30-39, eight arms")
     ap.add_argument("--dose", nargs="*", default=["runs/dose"], help="exploratory practice-dose cell (PROTOCOL.md v1.12): Haiku, stack, own notebook after 1, 3, 6 (and 12 on run seeds 30-39) practice episodes")
+    ap.add_argument("--second", nargs="*", default=["runs/second"], help="exploratory second model (PROTOCOL.md v1.13): Claude Sonnet 5.5 on stack, run seeds 30-39, room check then four split arms")
     ap.add_argument("--writer", nargs="*", default=["runs/writer_sonnet"], help="exploratory second writer (PROTOCOL.md v1.8): Claude Sonnet 5.5 with its own notebook, run seeds 20-29 (stack) and 20-24 (bins, flasks)")
     ap.add_argument("--borrowed-sonnet", nargs="*", default=["runs/borrowed_sonnet"], help="cheap models reading the Sonnet notebooks with no practice (PROTOCOL.md v1.8)")
     ap.add_argument("--meter", default="runs/spend")
@@ -1176,6 +1178,75 @@ def main():
               "Descriptive and **not registered**: it was added after round 5g of the review showed that the 20-call success rate hides differences in efficiency. An episode counts as solved within k calls when it succeeded and its logged call count (including `observe`) is at most k; the model was told 20 calls, not k, so this scores the same episodes against a tighter budget than the model saw. Section 6k (when present) repeats the question with the budget stated to the model. "
               "Held-out episodes only, 40 per cell (10 runs of 4 layouts, the same layouts in every arm of a model and job).", "",
               table(["model", "job", "what the model has", "episodes", "within 8 calls", "within 10", "within 12", "within 20 (the success rate)"], wrows), ""]
+
+    # --- 6j: the split with a second model (v1.13; exploratory)
+    sec_rows = [r for r in (A.load(*ex(a.second), complete_only=True) if ex(a.second) else []) if 30 <= r["run_seed"] <= 39 and r["model"] == "claude-sonnet-5-5"]
+    if sec_rows:
+        scov = A.coverage(*ex(a.second))
+        sm = "claude-sonnet-5-5"
+        SN = {"none": "no memory", "lm_frame": "the frame only", "lm_names": "the frame and the four names", "lm_instr_n": "the frame and 'change the settings one at a time' (no names)", "lm_generic": "the generic sentence"}
+        NAMES.update({k: ("starts fresh" if k == "none" else "reads " + v + " (neutral label)") for k, v in SN.items()})
+        L += ["## 6j. Exploratory: the split with a second model (Claude Sonnet 5.5)", "",
+              "Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.13, branch `second-model`, tag `code-second`). Only Haiku has room on `stack`, so this was a **room check first**: Sonnet 5.5 with no memory on run seeds 30 to 39 (the layouts of section 6h); the four text arms ran only because it solved at most 75%. "
+              f"Run files started {len(scov)}, complete {sum(int(c['complete']) for c in scov)}. Plain 95% intervals, ten pairs per comparison.", ""]
+        pred_at_6j = len(L)
+        order = ("none", "lm_frame", "lm_names", "lm_instr_n", "lm_generic")
+        ks = None
+        for c in order:
+            kc = {r["run_seed"] for r in A.select(sec_rows, model=sm, condition=c, phase="eval", quirk=True)}
+            ks = kc if ks is None else ks & kc
+        ks = ks or set()
+        cells = []
+        for c in order:
+            x = [r for r in A.select(sec_rows, model=sm, condition=c, phase="eval", quirk=True) if r["run_seed"] in ks]
+            cells.append(f"{f(mean(x, 'success'), True)} ({mean(x, 'calls_to_success'):.1f} calls)" if x else "-")
+        nn = A.select(sec_rows, model=sm, condition="none", phase="eval", quirk=True)
+        L += [f"Held-out success on `stack` (and calls to success) on the {len(ks)} runs every arm has:", "", table(["", *[SN[c] for c in order]], [("Sonnet 5.5", *cells)]), ""]
+        cmp_rows, vd4 = [], {}
+        for x, y in [(c, "none") for c in order[1:]] + [("lm_names", "lm_frame"), ("lm_names", "lm_instr_n"), ("lm_generic", "lm_instr_n")]:
+            d = A.paired_difference(sec_rows, sm, x, y, tasks=["stack"])
+            if d.get("n_pairs"):
+                cmp_rows.append((f"{SN[x]} against {SN[y]}", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
+                vd4[(x, y)] = d
+        L += ["Paired differences (run seed):", "", table(["comparison", "pairs", "first", "second", "difference"], cmp_rows), ""]
+        none_rate = mean(nn, "success") if nn else float("nan")
+        gate = bool(nn) and len({r["run_seed"] for r in nn}) >= 10 and at_most(none_rate, 0.75)
+        final4 = (ROOT / "logs/second_done.txt").exists() or all(vd4.get((c, "none"), {}).get("n_pairs", 0) >= 10 for c in order[1:])
+
+        def sc4(keys, fn):
+            n = min([vd4.get(k, {}).get("n_pairs", 0) for k in keys] or [0])
+            if n >= 10:
+                return fn()
+            if not final4:
+                return "pending"
+            return "inconclusive (below the registered floor)" if n < 8 else fn() + " (scored with fewer than the planned pairs, above the floor)"
+        allk = [(c, "none") for c in order[1:]]
+        g4 = lambda c: vd4.get((c, "none"))
+        q1, q2, q3, q4 = g4("lm_names"), g4("lm_frame"), g4("lm_generic"), vd4.get(("lm_names", "lm_instr_n"))
+        pr = [("Gate: Sonnet 5.5 with no memory solves at most 75% of the 40 layouts (room for the second model)", f"no memory {f(none_rate, True)}" if nn else "no data", "met" if gate else ("MISSED (stage 2 must not have run)" if nn and len({r['run_seed'] for r in nn}) >= 10 else "pending")),
+              ("Q1: `lm_names` solves at least 80%", f"{f(q1['a'], True)}" if q1 else "no data", sc4(allk, lambda: "met" if at_least(q1["a"], 0.80) else "MISSED")),
+              ("Q2: `lm_frame` solves at most 65%", f"{f(q2['a'], True)}" if q2 else "no data", sc4(allk, lambda: "met" if at_most(q2["a"], 0.65) else "MISSED")),
+              ("Q3: `lm_generic` solves at least 80%", f"{f(q3['a'], True)}" if q3 else "no data", sc4(allk, lambda: "met" if at_least(q3["a"], 0.80) else "MISSED")),
+              ("Q4: `lm_names` minus `lm_instr_n` is at least +10 points (reported either way)", f"{q4['diff'] * 100:+.1f}" if q4 else "no data", sc4(allk + [("lm_names", "lm_instr_n")], lambda: "met" if at_least(q4["diff"], 0.10) else "MISSED"))]
+        bad_files = bad_cov(scov, {SEC_HASH}, 30, 39)
+        pr = void_if(bad_files, pr)
+        st = [x[2] for x in pr]
+        if final4 and not bad_files and all(x.startswith(("met", "MISSED")) for x in st):
+            m = [x.startswith("met") for x in st]
+            reading = ("the gate failed, so there was no room and no reading." if not m[0] else
+                       "the Haiku pattern also holds for a second, more capable model (the list reproduces the generic sentence, the frame alone does little)." if (m[1] and m[2] and m[3]) else
+                       "the names result is Haiku-specific on these layouts (Q1 missed)." if not m[1] else "the registered reading does not cover this combination (Q1 met with Q2 or Q3 missed).")
+            reading = "Registered reading of the outcome: " + reading
+            if m[0] and m[1] and not (m[2] and m[3]) and q1 and q2 and q3 and q4:
+                reading += (f"\n\n**What the numbers show (written after seeing them, not registered).** With Sonnet 5.5 no memory solved {f(none_rate, True)}; "
+                            f"{sum(1 for c in order[1:] if vd4.get((c, 'none')) and vd4[(c, 'none')]['lo'] > 0)} had an interval over no memory that excludes zero (of the four text arms), and the frame alone already reached {f(q2['a'], True)} (over fresh {ci(q2, pct=True)}) and the arms' intervals overlap. The four names alone reached {f(q1['a'], True)} and the instruction with the word \"settings\" and no names reached "
+                            f"{f(q4['b'], True)}: names minus instruction is {ci(q4, pct=True)}, the opposite sign from Haiku's pooled +27.5 points. So for a second model on this job the data do not separate what the parts of the sentence do, and the names-over-instruction ordering is not shown to hold beyond Haiku; ten pairs per comparison and one job.")
+        else:
+            reading = "Registered reading: scored when the cell has finished."
+        L[pred_at_6j:pred_at_6j] = ["**Predictions of PROTOCOL.md v1.13, scored by the generator first** (pending until every pair exists; below 8 of 10 pairs inconclusive once the cell has finished). Written after the Haiku results were known, so not blind. "
+                                    "The registered reading: gate failed, no reading, ceiling reported; Q1, Q2 and Q3 met, the Haiku pattern also holds for a second model; Q1 missed, the names result is Haiku-specific; Q4 reported either way.", "",
+                                    table(["prediction", "result", "status"], pr), "", reading, "",
+                                    f"Validation of the included files: {len(scov)} run files, every one with code hash `{SEC_HASH}` and a run seed from 30 to 39: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
 
     # --- pose
     if pose:
