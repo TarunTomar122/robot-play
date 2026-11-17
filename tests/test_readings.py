@@ -37,11 +37,17 @@ def test_a_failed_validation_voids_every_prediction():
     assert analyze.void_if([], pr) == pr
 
 
-def test_v1_15_reading_names_each_missed_prediction():
+def test_who_missed_names_the_model_and_the_reading_skips_a_model_with_no_room():
+    assert analyze.who_missed([("Haiku", True), ("Luna", True)]) == "met"
+    assert analyze.who_missed([("Haiku", True), ("Luna", False)]) == "MISSED (Luna)"
+    assert analyze.who_missed([("Haiku", False), ("Luna", False)]) == "MISSED (Haiku and Luna)"
+    st = ["MISSED (Haiku and Luna)", "MISSED (Luna)", "MISSED (Luna)", "met", "met", "met"]           # the v1.15 outcome: Luna had no room, so its M3 miss is not read
+    r = analyze.reading_mixed(st)
+    assert "M1 missed for Haiku and Luna" in r and "M2 missed for Luna" in r and "M3 missed" not in r and "all met" not in r
+    assert "M3 missed for Haiku" in analyze.reading_mixed(["met", "met", "MISSED (Haiku)", "met", "met", "met"])
+    assert "M6 missed for Luna" in analyze.reading_mixed(["met", "met", "met", "met", "met", "MISSED (Luna)"])
+    assert "M4 missed (notebook above the answer key: Luna)" in analyze.reading_mixed(["met", "met", "met", "MISSED (notebook above the answer key: Luna)", "met", "met"])
     assert "M1 to M6 all met" in analyze.reading_mixed(["met"] * 6)
-    r = analyze.reading_mixed(["MISSED", "MISSED", "met", "met", "met", "met"])
-    assert "M1 missed" in r and "M2 missed" in r and "M3 missed" not in r and "all met" not in r
-    assert "M6 missed" in analyze.reading_mixed(["met"] * 5 + ["MISSED"])
 
 
 def test_pick_flags_count_squeeze_refusals_and_silent_failed_picks_separately():
@@ -52,7 +58,9 @@ def test_pick_flags_count_squeeze_refusals_and_silent_failed_picks_separately():
     assert pick_flags(log) == {"squeezed": 1, "silent_pick": 1} and pick_flags(None) == {"squeezed": 0, "silent_pick": 0}
 
 
-def test_v1_16_reading_names_each_missed_prediction():
+def test_v1_16_reading_skips_a_model_with_no_room_and_names_each_miss():
     assert "S1 to S6 all met" in analyze.reading_silent(["met"] * 6)
-    r = analyze.reading_silent(["met", "MISSED", "met", "MISSED", "met", "met"])
-    assert "S2 missed" in r and "S4 missed" in r and "S1 missed" not in r and "all met" not in r
+    r = analyze.reading_silent(["met", "MISSED (Luna)", "met", "MISSED (Haiku)", "met", "met"])
+    assert "S2 missed for Luna" in r and "S4 missed for Haiku" in r and "S1 missed" not in r and "all met" not in r
+    r2 = analyze.reading_silent(["met", "met", "MISSED (Luna)", "MISSED (Luna)", "met", "MISSED (Luna)"])
+    assert "S3 missed for Luna" in r2 and "S4 missed" not in r2 and "S6 missed" not in r2

@@ -89,32 +89,57 @@ def registered_solved(r):
     return int(bool(r["success"]) and bool(r["claimed_done"]))
 
 
+def who_missed(pairs):
+    """A prediction that holds for every model reads 'met'; otherwise 'MISSED (Haiku)', 'MISSED (Luna)' or 'MISSED (Haiku and Luna)' so a reading can say for which model."""
+    bad = [n for n, ok in pairs if not ok]
+    return "met" if not bad else "MISSED (" + " and ".join(bad) + ")"
+
+
+def _missed_names(status):
+    return [x.strip() for x in status.split("(", 1)[1].rstrip(") ").split(" and ")] if status.startswith("MISSED (") else []
+
+
 def reading_mixed(st):
-    """Registered reading of PROTOCOL.md v1.15 from the statuses of M1 to M6 (each starts with 'met', 'MISSED' or 'not read')."""
-    ok = [x.startswith("met") for x in st]
-    if all(ok):
+    """Registered reading of PROTOCOL.md v1.15 from the statuses of M1 to M6 ('met', or 'MISSED (model names or the part that failed)'). A model that missed M2 had no room (it solves the
+    job with no memory): by the registered rule its misses of M3 and M6 are reported but not read."""
+    if all(x.startswith("met") for x in st):
         return "M1 to M6 all met: where no single setting works, a note that states the fix is worthless or harmful and only a stated procedure (or practice that finds it) carries the benefit, which is the two-sided version of the main finding."
-    names = {0: "M1 missed: a model recovers from a wrong rule by reading the error, so a rule is not harmful for it",
-             1: "M2 missed: no room for that model (its M3 to M5 are reported but not read)",
-             2: "M3 missed: even the answer key does not teach a procedure through one sentence",
-             3: "M4 missed: practice does not discover a two-sided rule at this dose, or the notebook beat the answer key (see the table, the upper-bound reading is void in the second case)",
-             4: "M5 missed: the sentence has a cost on ordinary cubes (size in the table)",
-             5: "M6 missed: the names list is as good as the procedure here"}
-    return "; ".join(names[i] for i, o in enumerate(ok) if not o) + "."
+    noroom = _missed_names(st[1])
+    parts = []
+    if st[0].startswith("MISSED"):
+        parts.append(f"M1 missed for {' and '.join(_missed_names(st[0]))}: a wrong constant rule did not stop the model, it recovers by reading the error (a rule is not harmful for it)")
+    if noroom:
+        parts.append(f"M2 missed for {' and '.join(noroom)}: no room, the model solves the job with no memory (its M3 and M6 results are reported but not read)")
+    for tag, i, text in (("M3", 2, "even the answer key does not teach a procedure through one sentence"), ("M6", 5, "the names list is as good as the procedure")):
+        read = [n for n in _missed_names(st[i]) if n not in noroom]
+        if read:
+            parts.append(f"{tag} missed for {' and '.join(read)}: {text}")
+    if st[3].startswith("MISSED"):
+        parts.append("M4 missed (" + st[3].split("(", 1)[1].rstrip(")") + "): practice does not discover a two-sided rule at this dose, or the notebook beat the answer key (then the upper-bound reading is void)")
+    if st[4].startswith("MISSED"):
+        parts.append(f"M5 missed for {' and '.join(_missed_names(st[4]))}: the sentence has a cost on ordinary cubes (size in the table)")
+    return ("; ".join(parts) + ".") if parts else "Every miss is a model with no room (see M2); nothing else is read."
 
 
 def reading_silent(st):
-    """Registered reading of PROTOCOL.md v1.16 from the statuses of S1 to S6 (each starts with 'met' or 'MISSED')."""
-    ok = [x.startswith("met") for x in st]
-    if all(ok):
+    """Registered reading of PROTOCOL.md v1.16 from the statuses of S1 to S6. A model that missed S3 had room-less behaviour (it solves the job with no memory): its S4 and S6 misses are reported but not read."""
+    if all(x.startswith("met") for x in st):
         return "S1 to S6 all met: the explicit error was carrying the safety of v1.15, a stale rule is harmful once the failure is silent, and only a stated procedure or practice that read the post-mortem recovers it."
-    names = {0: "S1 missed: a model avoids the trap even without the message (it does not keep the fix; see the share of cracked episodes in the table)",
-             1: "S2 missed: removing the message did not remove the recovery for a model",
-             2: "S3 missed: no room for that model (S4 to S6 are reported but not read for it)",
-             3: "S4 missed: even the answer key does not carry a silent trap through one sentence",
-             4: "S5 missed: practice does not turn a verdict-only post-mortem into a rule at this dose, or the notebook beat the answer key (the upper-bound reading is void in the second case)",
-             5: "S6 missed: the names list is as good as the procedure here"}
-    return "; ".join(names[i] for i, o in enumerate(ok) if not o) + "."
+    noroom = _missed_names(st[2])
+    parts = []
+    if st[0].startswith("MISSED"):
+        parts.append(f"S1 missed for {' and '.join(_missed_names(st[0]))}: the model avoids the trap even without the message (it does not keep the fix; see the share of cracked episodes in the table)")
+    if st[1].startswith("MISSED"):
+        parts.append(f"S2 missed for {' and '.join(_missed_names(st[1]))}: removing the message did not remove the recovery")
+    if noroom:
+        parts.append(f"S3 missed for {' and '.join(noroom)}: no room, the model solves the job with no memory (its S4 and S6 results are reported but not read)")
+    for tag, i, text in (("S4", 3, "even the answer key does not carry a silent trap through one sentence"), ("S6", 5, "the names list is as good as the procedure")):
+        read = [n for n in _missed_names(st[i]) if n not in noroom]
+        if read:
+            parts.append(f"{tag} missed for {' and '.join(read)}: {text}")
+    if st[4].startswith("MISSED"):
+        parts.append("S5 missed (" + st[4].split("(", 1)[1].rstrip(")") + "): practice does not turn a verdict-only post-mortem into a rule at this dose, or the notebook beat the answer key (then the upper-bound reading is void)")
+    return ("; ".join(parts) + ".") if parts else "Every miss is a model with no room (see S3); nothing else is read."
 
 
 def reading_budget(st):
@@ -1352,19 +1377,25 @@ def main():
         dd = lambda m, x_, y_, qk=True: vm.get((m, x_, y_, qk), {}).get("diff", float("nan"))
         show = lambda fn: " / ".join(f"{nm} {fn(m)}" for nm, m in (("Haiku", H), ("Luna", Lu)))
         pr = []
+        MODELS = (("Haiku", H), ("Luna", Lu))
         pr.append(("M1: `lm_firm` solves at most 25% of the catch layouts for Haiku and Luna", show(lambda m: f"{rate(m, 'lm_firm') * 100:.0f}%"),
-                   scm([(m, "lm_firm", "none", True) for m in (H, Lu)], lambda: "met" if both(lambda m: at_most(rate(m, "lm_firm"), 0.25)) else "MISSED")))
+                   scm([(m, "lm_firm", "none", True) for m in (H, Lu)], lambda: who_missed([(nm, at_most(rate(m, "lm_firm"), 0.25)) for nm, m in MODELS]))))
         pr.append(("M2: `none` solves less than 60% of the catch layouts for Haiku and Luna (room check)", show(lambda m: f"{rate(m, 'none') * 100:.0f}%"),
-                   scm([(m, "lm_firm", "none", True) for m in (H, Lu)], lambda: "met" if both(lambda m: not at_least(rate(m, "none"), 0.60)) else "MISSED")))
+                   scm([(m, "lm_firm", "none", True) for m in (H, Lu)], lambda: who_missed([(nm, not at_least(rate(m, "none"), 0.60)) for nm, m in MODELS]))))
         pr.append(("M3: `lm_proc` minus `none` is at least +20 points for Haiku and Luna", show(lambda m: f"{dd(m, 'lm_proc', 'none') * 100:+.1f}"),
-                   scm([(m, "lm_proc", "none", True) for m in (H, Lu)], lambda: "met" if both(lambda m: at_least(dd(m, "lm_proc", "none"), 0.20)) else "MISSED")))
+                   scm([(m, "lm_proc", "none", True) for m in (H, Lu)], lambda: who_missed([(nm, at_least(dd(m, "lm_proc", "none"), 0.20)) for nm, m in MODELS]))))
+
+        def m4():
+            first = any(at_least(dd(m, "nb12", "none"), 0.15) for m in (H, Lu))
+            above = [nm for nm, m in MODELS if not at_most(dd(m, "nb12", "lm_proc"), 0.0)]
+            bad = ([] if first else ["no model gains 15 points"]) + ([f"notebook above the answer key: {' and '.join(above)}"] if above else [])
+            return "met" if not bad else "MISSED (" + "; ".join(bad) + ")"
         pr.append(("M4: own notebook (12) minus `none` is at least +15 points for at least one model, and the notebook is not above `lm_proc` for either", show(lambda m: f"vs none {dd(m, 'nb12', 'none') * 100:+.1f}, vs lm_proc {dd(m, 'nb12', 'lm_proc') * 100:+.1f}"),
-                   scm([(m, "nb12", "none", True) for m in (H, Lu)] + [(m, "nb12", "lm_proc", True) for m in (H, Lu)],
-                       lambda: "met" if (any(at_least(dd(m, "nb12", "none"), 0.15) for m in (H, Lu)) and both(lambda m: at_most(dd(m, "nb12", "lm_proc"), 0.0))) else "MISSED")))
+                   scm([(m, "nb12", "none", True) for m in (H, Lu)] + [(m, "nb12", "lm_proc", True) for m in (H, Lu)], m4)))
         pr.append(("M5: in the control scene `lm_proc` solves at least 80% for both models and is within 10 points of `none`", show(lambda m: f"{rate(m, 'lm_proc', False) * 100:.0f}% (difference {dd(m, 'lm_proc', 'none', False) * 100:+.1f})"),
-                   scm([(m, "lm_proc", "none", False) for m in (H, Lu)], lambda: "met" if both(lambda m: at_least(rate(m, "lm_proc", False), 0.80) and at_most(abs(dd(m, "lm_proc", "none", False)), 0.10)) else "MISSED")))
+                   scm([(m, "lm_proc", "none", False) for m in (H, Lu)], lambda: who_missed([(nm, at_least(rate(m, "lm_proc", False), 0.80) and at_most(abs(dd(m, "lm_proc", "none", False)), 0.10)) for nm, m in MODELS]))))
         pr.append(("M6: `lm_names` is not above `lm_proc` for either model", show(lambda m: f"{dd(m, 'lm_names', 'lm_proc') * 100:+.1f}"),
-                   scm([(m, "lm_names", "lm_proc", True) for m in (H, Lu)], lambda: "met" if both(lambda m: at_most(dd(m, "lm_names", "lm_proc"), 0.0)) else "MISSED")))
+                   scm([(m, "lm_names", "lm_proc", True) for m in (H, Lu)], lambda: who_missed([(nm, at_most(dd(m, "lm_names", "lm_proc"), 0.0)) for nm, m in MODELS]))))
         bad_files = bad_cov(mcov, {MIX_HASH}, 40, 49)
         pr = void_if(bad_files, pr)
         st = [x[2] for x in pr]
@@ -1431,19 +1462,25 @@ def main():
         dd = lambda m, x_, y_: vs.get((m, x_, y_), {}).get("diff", float("nan"))
         show = lambda fn: " / ".join(f"{nm} {fn(m)}" for nm, m in (("Haiku", H), ("Luna", Lu)))
         pr = []
+        MODELS = (("Haiku", H), ("Luna", Lu))
         pr.append(("S1: `lm_firm` solves at most 10% of the layouts for Haiku and Luna", show(lambda m: f"{rate(m, 'lm_firm') * 100:.0f}%"),
-                   scs([(m, "s_lm_firm", "s_none") for m in (H, Lu)], lambda: "met" if both(lambda m: at_most(rate(m, "lm_firm"), 0.10)) else "MISSED")))
+                   scs([(m, "s_lm_firm", "s_none") for m in (H, Lu)], lambda: who_missed([(nm, at_most(rate(m, "lm_firm"), 0.10)) for nm, m in MODELS]))))
         pr.append(("S2: `lm_firm` here minus `lm_firm` in section 6m (same layouts) is at most -30 points for Haiku and Luna", show(lambda m: f"{dd(m, 's_lm_firm', 'e_lm_firm') * 100:+.1f}"),
-                   scs([(m, "s_lm_firm", "e_lm_firm") for m in (H, Lu)], lambda: "met" if both(lambda m: at_most(dd(m, "s_lm_firm", "e_lm_firm"), -0.30)) else "MISSED")))
+                   scs([(m, "s_lm_firm", "e_lm_firm") for m in (H, Lu)], lambda: who_missed([(nm, at_most(dd(m, "s_lm_firm", "e_lm_firm"), -0.30)) for nm, m in MODELS]))))
         pr.append(("S3: `none` solves less than 80% of the layouts for Haiku and Luna (room check)", show(lambda m: f"{rate(m, 'none') * 100:.0f}%"),
-                   scs([(m, "s_lm_firm", "s_none") for m in (H, Lu)], lambda: "met" if both(lambda m: not at_least(rate(m, "none"), 0.80)) else "MISSED")))
+                   scs([(m, "s_lm_firm", "s_none") for m in (H, Lu)], lambda: who_missed([(nm, not at_least(rate(m, "none"), 0.80)) for nm, m in MODELS]))))
         pr.append(("S4: `lm_proc` minus `none` is at least +15 points for Haiku and Luna", show(lambda m: f"{dd(m, 's_lm_proc', 's_none') * 100:+.1f}"),
-                   scs([(m, "s_lm_proc", "s_none") for m in (H, Lu)], lambda: "met" if both(lambda m: at_least(dd(m, "s_lm_proc", "s_none"), 0.15)) else "MISSED")))
+                   scs([(m, "s_lm_proc", "s_none") for m in (H, Lu)], lambda: who_missed([(nm, at_least(dd(m, "s_lm_proc", "s_none"), 0.15)) for nm, m in MODELS]))))
+
+        def s5():
+            first = any(at_least(dd(m, "s_nb12", "s_none"), 0.15) for m in (H, Lu))
+            above = [nm for nm, m in MODELS if not at_most(dd(m, "s_nb12", "s_lm_proc"), 0.0)]
+            bad = ([] if first else ["no model gains 15 points"]) + ([f"notebook above the answer key: {' and '.join(above)}"] if above else [])
+            return "met" if not bad else "MISSED (" + "; ".join(bad) + ")"
         pr.append(("S5: own notebook (12) minus `none` is at least +15 points for at least one model, and the notebook is not above `lm_proc` for either", show(lambda m: f"vs none {dd(m, 's_nb12', 's_none') * 100:+.1f}, vs lm_proc {dd(m, 's_nb12', 's_lm_proc') * 100:+.1f}"),
-                   scs([(m, "s_nb12", "s_none") for m in (H, Lu)] + [(m, "s_nb12", "s_lm_proc") for m in (H, Lu)],
-                       lambda: "met" if (any(at_least(dd(m, "s_nb12", "s_none"), 0.15) for m in (H, Lu)) and both(lambda m: at_most(dd(m, "s_nb12", "s_lm_proc"), 0.0))) else "MISSED")))
+                   scs([(m, "s_nb12", "s_none") for m in (H, Lu)] + [(m, "s_nb12", "s_lm_proc") for m in (H, Lu)], s5)))
         pr.append(("S6: `lm_names` is not above `lm_proc` for either model", show(lambda m: f"{dd(m, 's_lm_names', 's_lm_proc') * 100:+.1f}"),
-                   scs([(m, "s_lm_names", "s_lm_proc") for m in (H, Lu)], lambda: "met" if both(lambda m: at_most(dd(m, "s_lm_names", "s_lm_proc"), 0.0)) else "MISSED")))
+                   scs([(m, "s_lm_names", "s_lm_proc") for m in (H, Lu)], lambda: who_missed([(nm, at_most(dd(m, "s_lm_names", "s_lm_proc"), 0.0)) for nm, m in MODELS]))))
         bad_files = bad_cov(scov2, {SIL_HASH}, 40, 49)
         pr = void_if(bad_files, pr)
         st = [x[2] for x in pr]
