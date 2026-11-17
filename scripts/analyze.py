@@ -106,6 +106,8 @@ def main():
     ap.add_argument("--rep", nargs="*", default=["runs/rep_fixed"], help="exploratory replication of the registered Q1 comparison on the corrected simulator, run seeds 20-29 (PROTOCOL.md v1.6); never pooled with the registered rows")
     ap.add_argument("--hint", nargs="*", default=["runs/hint", "runs/hint_generic", "runs/prior"], help="exploratory controls of PROTOCOL.md v1.7: one-sentence hint, generic hint, zero-practice Fable notebook (run seeds 20-29, no practice)")
     ap.add_argument("--prior-notebooks", default="runs/prior_notebooks")
+    ap.add_argument("--writer", nargs="*", default=["runs/writer_sonnet"], help="exploratory second writer (PROTOCOL.md v1.8): Claude Sonnet 5.5 with its own notebook, run seeds 20-29 (stack) and 20-24 (bins, flasks)")
+    ap.add_argument("--borrowed-sonnet", nargs="*", default=["runs/borrowed_sonnet"], help="cheap models reading the Sonnet notebooks with no practice (PROTOCOL.md v1.8)")
     ap.add_argument("--meter", default="runs/spend")
     ap.add_argument("--out", default="results/RESULTS.md")
     ap.add_argument("--img", default="docs/img")
@@ -707,6 +709,101 @@ def main():
                    f"names the fix: stack {named.get('stack', 0)} of {n_notebooks.get('stack', 0)}, bins {named.get('bins', 0)} of {n_notebooks.get('bins', 0)}, flasks {named.get('flasks', 0)} of {n_notebooks.get('flasks', 0)}" + (f"; Haiku stack prior {f(ps_['a'], True)}" if ps_ else ""),
                    h3_state if kw_complete else "pending"))
         L += ["Predictions of PROTOCOL.md v1.7, scored by the generator (pending until every pair exists; after the cells have finished, scored when each cell has the registered floor of 24 of 30 pooled and 8 of 10 per-job pairs, inconclusive below it):", "", table(["prediction", "result", "status"], pr), ""]
+
+    # --- 6e: a second, mid-tier writer (v1.8; exploratory)
+    wr_rows = A.load(*ex(a.writer), complete_only=True) if ex(a.writer) else []
+    bs_rows = A.load(*ex(a.borrowed_sonnet), complete_only=True) if ex(a.borrowed_sonnet) else []
+    if wr_rows or bs_rows:
+        import sys as _sys
+        _sys.path.insert(0, str(ROOT / "scripts"))
+        from notebook_audit import FIX
+        from robot_play.runner import frontier_notebook
+        wm = "claude-sonnet-5-5"
+        wdir = ex(a.writer)[0] if ex(a.writer) else "runs/writer_sonnet"
+        wcov = A.coverage(*ex(a.writer)) if ex(a.writer) else []
+        bcov = A.coverage(*ex(a.borrowed_sonnet)) if ex(a.borrowed_sonnet) else []
+        planned_w = {"stack": 10, "bins": 5, "flasks": 5}
+        L += ["## 6e. Exploratory: does the notebook need a frontier writer? (a second writer, Claude Sonnet 5.5)", "",
+              "Registered before any episode ran (PROTOCOL.md v1.8). Sonnet 5.5 practises and writes its own notebook (`stack` run seeds 20 to 29, `bins` and `flasks` run seeds 20 to 24); Haiku and Luna then read that notebook with no practice of their own, on the same four held-out layouts as the corrected-simulator replication (section 6c), where they pair with the `none` and `notebook` arms. "
+              f"Writer run files started {len(wcov)}, complete {sum(int(c['complete']) for c in wcov)} (planned 20); borrowed run files started {len(bcov)}, complete {sum(int(c['complete']) for c in bcov)} (planned 40). Code hashes: " + ", ".join(sorted({f"`{c.get('code')}`" for c in wcov + bcov})) + ". Plain 95% intervals.", ""]
+        wt = []
+        for t in TASKS:
+            ev = [r for r in A.select(wr_rows, model=wm, condition="notebook", phase="eval", quirk=True) if r["task"] == t]
+            pa = [r for r in A.select(wr_rows, model=wm, condition="notebook", phase="practice", quirk=True) if r["task"] == t]
+            runs_ = sorted({r["run_seed"] for r in ev})
+            texts = {rs: frontier_notebook(str(wdir), wm, t, rs) for rs in runs_}
+            named_ = sum(1 for x in texts.values() if x and FIX[t](x))
+            wt.append((t, f"{len(runs_)} of {planned_w[t]}", f(mean(pa, "success"), True) if pa else "-", f(mean(ev, "success"), True) if ev else "-", f"{named_} of {len(runs_)}"))
+        L += ["Sonnet itself (its practice-episode success, its held-out success with its own notebook, and how many of its final notebooks name the fixing setting by the keyword rules of `results/notebook_audit.md`; a keyword check, not a judgement of quality):", "",
+              table(["job", "runs finished", "practice success", "held-out success, own notebook", "notebooks naming the fix"], wt), ""]
+        sn_named = {t: next((int(x.split(" of ")[0]) for x in [row[4]] ), 0) for t, row in zip(TASKS, wt)}
+        allr = rep_rows + bs_rows
+        sname = lambda c: "reads Sonnet's notebook" if c == "borrowed" else NAMES[c]
+        arms = ("none", "notebook", "borrowed")
+        keys = {}
+        for m in cheap:
+            ks = None
+            for c in arms:
+                kc = {(r["task"], r["run_seed"]) for r in A.select(allr, model=m, condition=c, phase="eval", quirk=True)}
+                ks = kc if ks is None else ks & kc
+            keys[m] = {k for k in (ks or set()) if k[1] in range(20, 30) and (k[0] == "stack" or k[1] < 25)}
+        tr = []
+        for m in cheap:
+            for tname, tl in (("all three jobs", TASKS), ("stack", ["stack"]), ("bins", ["bins"]), ("flasks", ["flasks"])):
+                cells = []
+                for c in arms:
+                    x = [r for r in A.select(allr, model=m, condition=c, phase="eval", quirk=True) if r["task"] in tl and (r["task"], r["run_seed"]) in keys[m]]
+                    cells.append(f"{f(mean(x, 'success'), True)} ({mean(x, 'calls_to_success'):.1f} calls)" if x else "-")
+                tr.append((m, tname, len({k for k in keys[m] if k[0] in tl}), *cells))
+        L += ["Held-out success (and calls to success) on exactly the runs that have all three arms:", "", table(["model", "jobs", "runs", "no memory", "own notebook", "Sonnet's notebook, no practice"], tr), ""]
+        cmp_rows, vd = [], {}
+        for m in cheap:
+            for tname, tl in (("all three jobs", None), ("stack", ["stack"]), ("bins", ["bins"]), ("flasks", ["flasks"])):
+                for x, y in (("borrowed", "none"), ("borrowed", "notebook")):
+                    d = A.paired_difference(allr, m, x, y, tasks=tl)
+                    if d.get("n_pairs"):
+                        cmp_rows.append((m, tname, f"{sname(x)} against {sname(y)}", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
+                        vd[(m, tname, x, y)] = d
+        L += ["Paired differences (task, run seed; every pair that exists, which can be more than the table above):", "", table(["model", "jobs", "comparison", "pairs", "first", "second", "difference"], cmp_rows), ""]
+        # S4: the runs where Haiku's own notebook failed
+        hm = "claude-haiku-5-5"
+        own = {}
+        for r in A.select(rep_rows, model=hm, condition="notebook", phase="eval", quirk=True):
+            own.setdefault((r["task"], r["run_seed"]), []).append(r["success"])
+        bor = {}
+        for r in A.select(bs_rows, model=hm, condition="borrowed", phase="eval", quirk=True):
+            bor.setdefault((r["task"], r["run_seed"]), []).append(r["success"])
+        failed = sorted(k for k, v in own.items() if sum(v) <= 1 and k in bor and len(bor[k]) == 4)
+        if failed:
+            L += ["Runs where Haiku's own notebook solved at most 1 of 4 held-out layouts, and what Haiku solved reading Sonnet's notebook for the same job and run seed:", "",
+                  table(["job", "run seed", "own notebook (of 4)", "Sonnet's notebook (of 4)"], [(t, rs, sum(own[(t, rs)]), sum(bor[(t, rs)])) for t, rs in failed]), ""]
+        final = (ROOT / "logs/borrowed_sonnet_done.txt").exists()
+        ph = vd.get((hm, "stack", "borrowed", "none"))
+        exp_pairs = {"stack": 10, "all three jobs": 20}
+        def S3(cells, fn):
+            got = [vd.get(c, {}).get("n_pairs", 0) for c in cells]
+            if all(g >= exp_pairs[c[1]] for g, c in zip(got, cells)):
+                return fn()
+            if not final:
+                return "pending"
+            return "inconclusive (below the registered floor)" if any(g < 16 for g in got) else fn() + " (scored with fewer than the planned pairs, above the floor)"
+        pr = []
+        pr.append(("S1: Haiku `stack` reading Sonnet's notebook solves at least 90% of the 40 held-out layouts",
+                   f"Haiku stack {f(ph['a'], True)}" if ph else "no data", S3([(hm, "stack", "borrowed", "none")], lambda: "met" if ph and ph["a"] >= 0.90 else "MISSED")))
+        pn_ = vd.get((hm, "all three jobs", "borrowed", "notebook"))
+        pr.append(("S2: pooled over the 20 runs, Haiku with Sonnet's notebook is within 5 points of Haiku's own notebook (difference at least -5)",
+                   f"borrowed minus own notebook {pn_['diff'] * 100:+.1f}" if pn_ else "no data", S3([(hm, "all three jobs", "borrowed", "notebook")], lambda: "met" if pn_ and pn_["diff"] >= -0.05 else "MISSED")))
+        n_stack = next((int(row[1].split(" of ")[0]) for row in wt if row[0] == "stack"), 0)
+        pr.append(("S3: Sonnet's `stack` notebooks name `grip_level firm` in at least 8 of 10 runs",
+                   f"{sn_named['stack']} of {n_stack}", ("met" if sn_named["stack"] >= 8 else "MISSED") if n_stack >= 10 else "pending"))
+        if failed:
+            mo = sum(sum(own[k]) for k in failed) / len(failed); mb = sum(sum(bor[k]) for k in failed) / len(failed)
+            s4 = f"{len(failed)} such run(s): own notebook {mo:.2f} of 4 on average, Sonnet's notebook {mb:.2f} of 4"
+            pr.append(("S4: where Haiku's own notebook solved at most 1 of 4, reading Sonnet's notebook solves strictly more on average", s4,
+                       ("met" if mb > mo else "MISSED") if (final or all(len(bor.get(k, [])) == 4 for k in own if sum(own[k]) <= 1)) else "pending"))
+        else:
+            pr.append(("S4: where Haiku's own notebook solved at most 1 of 4, reading Sonnet's notebook solves strictly more on average", "no such run in the replication so far", "not testable" if final else "pending"))
+        L += ["Predictions of PROTOCOL.md v1.8, scored by the generator (pending until every pair exists; below 16 of 20 runs per model inconclusive after the cells have finished):", "", table(["prediction", "result", "status"], pr), ""]
 
     # --- pose
     if pose:
