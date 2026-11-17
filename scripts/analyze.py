@@ -30,7 +30,8 @@ SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 COLORS = {"none": "#2a78d6", "notebook": "#eb6834", "replay": "#1baf7a"}          # dataviz skill categorical slots 1-3 (validated all-pairs)
 TASKS = ["stack", "bins", "flasks"]
 NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job",
-         "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes"}
+         "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes",
+         "hint": "reads a one-sentence hint naming the fix", "hint_generic": "reads a generic hint (names no setting)", "prior": "reads Fable's notebook written with no practice"}
 
 
 def f(x, pct=False):
@@ -103,6 +104,8 @@ def main():
     ap.add_argument("--fixhold", nargs="*", default=["runs/main_fixhold"], help="exploratory rerun of Haiku on stack with only the false-holding symptom fixed (PROTOCOL.md v1.5B); never pooled with the registered rows")
     ap.add_argument("--fixcollide", nargs="*", default=["runs/main_fixcollide"], help="exploratory rerun of Haiku on stack with the cause fixed too: move_to planned with the real finger opening (PROTOCOL.md v1.5C)")
     ap.add_argument("--rep", nargs="*", default=["runs/rep_fixed"], help="exploratory replication of the registered Q1 comparison on the corrected simulator, run seeds 20-29 (PROTOCOL.md v1.6); never pooled with the registered rows")
+    ap.add_argument("--hint", nargs="*", default=["runs/hint", "runs/hint_generic", "runs/prior"], help="exploratory controls of PROTOCOL.md v1.7: one-sentence hint, generic hint, zero-practice Fable notebook (run seeds 20-29, no practice)")
+    ap.add_argument("--prior-notebooks", default="runs/prior_notebooks")
     ap.add_argument("--meter", default="runs/spend")
     ap.add_argument("--out", default="results/RESULTS.md")
     ap.add_argument("--img", default="docs/img")
@@ -148,7 +151,7 @@ def main():
     L += ["Coverage. Only runs that finished their whole plan enter the confirmatory comparisons below. An abandoned attempt (provider failure, cut-off reply, failed notebook rewrite, budget stop) is redone on resume and its cost is kept:", "",
           table(["model", "tools", "memory", "scene", "runs started", "runs complete", "episodes finished/planned", "abandoned attempts"], cvr) if cvr else "No runs yet.", ""]
     by_dir = {}
-    extra_cov = A.coverage(*ex(a.fixhold + a.fixcollide + a.rep)) if ex(a.fixhold + a.fixcollide + a.rep) else []
+    extra_cov = A.coverage(*ex(a.fixhold + a.fixcollide + a.rep + a.hint)) if ex(a.fixhold + a.fixcollide + a.rep + a.hint) else []
     for c in cov + ext_cov + extra_cov:
         by_dir.setdefault(c["dir"], {}).setdefault(c.get("code") or "unknown", 0)
         by_dir[c["dir"]][c.get("code") or "unknown"] += 1
@@ -173,6 +176,9 @@ def main():
         planned += [("main", ["claude-haiku-5-5"], range(10), "runs/main_fixhold", {"tasks": ["stack"], "only": ("none", "notebook")}),
                     ("main", ["claude-haiku-5-5"], range(10), "runs/main_fixcollide", {"tasks": ["stack"], "only": ("none", "notebook")}),
                     ("main", cheap_m, range(20, 30), "runs/rep_fixed", {"only": ("none", "notebook")})]
+        import inspect as _inspect
+        if "source_dir" in _inspect.signature(build_specs).parameters:
+            planned += [(c, cheap_m, range(20, 30), f"runs/{c}", {"source_dir": a.prior_notebooks}) for c in ("hint", "hint_generic", "prior")] if all(Path(f"runs/{c}").exists() for c in ("hint", "hint_generic", "prior")) else []
         for cell, ms, seeds, d, kw in planned:
             kw = dict(kw)
             only = kw.pop("only", None)
@@ -619,6 +625,88 @@ def main():
         if dr:
             L += ["Disturbed held-out episodes on the same code (catch scenes, exploratory replication of the catch-scene recovery rows of section 5):", "",
                   table(["model", "memory", "disturbed episodes", "disturbance fired", "success, all assigned", "same layouts, no disturbance"], dr), ""]
+
+    # --- 6d: is it the experience, or one sentence? (v1.7; exploratory)
+    hp_rows = A.load(*ex(a.hint), complete_only=True) if ex(a.hint) else []
+    if hp_rows and rep_rows:
+        import sys as _sys
+        _sys.path.insert(0, str(ROOT / "scripts"))
+        from notebook_audit import FIX
+        allr = rep_rows + hp_rows
+        hcov = A.coverage(*ex(a.hint))
+        L += ["## 6d. Exploratory: is it the experience, or one sentence? (hint, generic hint and zero-practice notebook)", "",
+              "Registered before the cells existed (PROTOCOL.md v1.7). No practice in any of these arms; the memory slot holds (a) `hint`: one fixed sentence naming the fixing setting, (b) `hint_generic`: one fixed generic sentence that names no setting, (c) `prior`: a notebook Fable wrote with **zero practice** from the task text and tool descriptions only. "
+              "Compared with the `none` and `notebook` arms of the corrected-simulator replication (section 6c) on the same run seeds 20 to 29 and the same held-out layouts. The prompt labels differ between arms, so nothing here isolates content from label. "
+              f"Run files started {len(hcov)}, complete {sum(int(c['complete']) for c in hcov)} (planned 180); every file's hash: " + ", ".join(sorted({f"`{c.get('code')}`" for c in hcov})) + ". Plain 95% intervals.", ""]
+        arms = ("none", "notebook", "hint", "hint_generic", "prior")
+        keys = {}
+        for m in cheap:
+            ks = None
+            for c in arms:
+                kc = {(r["task"], r["run_seed"]) for r in A.select(allr, model=m, condition=c, phase="eval", quirk=True)}
+                ks = kc if ks is None else ks & kc
+            keys[m] = ks or set()
+        tr = []
+        for m in cheap:
+            for tname, tl in (("all three jobs", TASKS), ("stack", ["stack"]), ("bins", ["bins"]), ("flasks", ["flasks"])):
+                cells = []
+                for c in arms:
+                    x = [r for r in A.select(allr, model=m, condition=c, phase="eval", quirk=True) if r["task"] in tl and (r["task"], r["run_seed"]) in keys[m]]
+                    cells.append(f"{f(mean(x, 'success'), True)} ({mean(x, 'calls_to_success'):.1f} calls)" if x else "-")
+                tr.append((m, tname, len({k for k in keys[m] if k[0] in tl}), *cells))
+        L += ["Held-out success (and calls to success) on exactly the runs every arm of that model has:", "", table(["model", "jobs", "runs", "no memory", "own notebook", "hint", "generic hint", "Fable, no practice"], tr), ""]
+        cmp_rows, vd = [], {}
+        for m in cheap:
+            for tname, tl in (("all three jobs", None), ("stack", ["stack"]), ("bins", ["bins"]), ("flasks", ["flasks"])):
+                for x, y in (("hint", "notebook"), ("hint", "none"), ("hint_generic", "none"), ("hint_generic", "notebook"), ("prior", "none"), ("prior", "notebook")):
+                    d = A.paired_difference(allr, m, x, y, tasks=tl)
+                    if d.get("n_pairs"):
+                        cmp_rows.append((m, tname, f"{NAMES[x]} against {NAMES[y]}", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
+                        vd[(m, tname, x, y)] = d
+        L += ["Paired differences (task, run seed):", "", table(["model", "jobs", "comparison", "pairs", "first", "second", "difference"], cmp_rows), ""]
+        pn = []
+        pdir = Path(a.prior_notebooks)
+        named = {}
+        for t in TASKS:
+            fs = sorted(pdir.glob(f"{t}__s*.json")) if pdir.exists() else []
+            texts = [json.loads(fp.read_text()).get("text", "") for fp in fs]
+            named[t] = sum(1 for x in texts if FIX[t](x))
+            pn.append((t, len(texts), named[t]))
+        L += ["Do the zero-practice notebooks name the fixing setting? (the same keyword rules as `results/notebook_audit.md`, run on the 30 notebooks before any cheap model read them; a keyword check, not a judgement of quality):", "",
+              table(["job", "notebooks", "name the fixing setting"], pn), ""]
+        expected = {"all three jobs": 30, "stack": 10, "bins": 10, "flasks": 10}
+        floor = {"all three jobs": 24, "stack": 8, "bins": 8, "flasks": 8}
+        final = (ROOT / "logs/hint_prior_done.txt").exists()
+
+        def S2(cells, fn):
+            got = [vd.get(c, {}).get("n_pairs", 0) for c in cells]
+            if all(g >= expected[c[1]] for g, c in zip(got, cells)):
+                return fn()
+            if not final:
+                return "pending"
+            return "inconclusive (below the registered floor)" if any(g < floor[c[1]] for g, c in zip(got, cells)) else fn() + " (scored with fewer than the planned pairs, above the floor)"
+        pr = []
+        hn = [(m, "all three jobs", "hint", "notebook") for m in cheap]
+        h1 = {m: vd.get((m, "all three jobs", "hint", "notebook")) for m in cheap}
+        hs_ = vd.get(("claude-haiku-5-5", "stack", "hint", "none"))
+        pr.append(("H1: the hint is within 5 points of the model's own notebook (pooled, each model) and Haiku `stack` with the hint is at least 90%",
+                   "; ".join(f"{m}: hint minus notebook {h1[m]['diff'] * 100:+.1f}" for m in cheap if h1[m]) + (f"; Haiku stack hint {f(hs_['a'], True)}" if hs_ else ""),
+                   S2(hn + [("claude-haiku-5-5", "stack", "hint", "none")], lambda: "met" if all(h1[m] and abs(h1[m]["diff"]) <= 0.05 for m in cheap) and hs_ and hs_["a"] >= 0.90 else "MISSED")))
+        g2 = {m: vd.get((m, "all three jobs", "hint_generic", "none")) for m in cheap}
+        gs_ = vd.get(("claude-haiku-5-5", "stack", "hint_generic", "none"))
+        pr.append(("H2: the generic hint stays well below the notebook: Haiku `stack` at most 60% and a pooled gain over no memory under +10 points for each model",
+                   "; ".join(f"{m}: generic minus none {g2[m]['diff'] * 100:+.1f}" for m in cheap if g2[m]) + (f"; Haiku stack generic {f(gs_['a'], True)}" if gs_ else ""),
+                   S2([(m, "all three jobs", "hint_generic", "none") for m in cheap] + [("claude-haiku-5-5", "stack", "hint_generic", "none")],
+                      lambda: "met" if all(g2[m] and g2[m]["diff"] < 0.10 for m in cheap) and gs_ and gs_["a"] <= 0.60 else "MISSED")))
+        ps_ = vd.get(("claude-haiku-5-5", "stack", "prior", "none"))
+        ok_kw = named.get("stack", 0) >= 5 and named.get("bins", 99) <= 2 and named.get("flasks", 99) <= 3
+        n_notebooks = {t: n for t, n, _ in pn}
+        kw_complete = all(n_notebooks.get(t, 0) >= 10 for t in TASKS)
+        h3_state = S2([("claude-haiku-5-5", "stack", "prior", "none")], lambda: "met" if ok_kw and ps_ and ps_["a"] >= 0.60 else "MISSED")
+        pr.append(("H3: the zero-practice notebooks name `grip_level firm` for `stack` in at least 5 of 10, a release height of 0.14 or more for `bins` in at most 2 of 10 and a grasp height of 0.8 or more for `flasks` in at most 3 of 10, and Haiku `stack` with a prior notebook solves at least 60%",
+                   f"names the fix: stack {named.get('stack', 0)} of {n_notebooks.get('stack', 0)}, bins {named.get('bins', 0)} of {n_notebooks.get('bins', 0)}, flasks {named.get('flasks', 0)} of {n_notebooks.get('flasks', 0)}" + (f"; Haiku stack prior {f(ps_['a'], True)}" if ps_ else ""),
+                   h3_state if kw_complete else "pending"))
+        L += ["Predictions of PROTOCOL.md v1.7, scored by the generator (pending until every pair exists; after the cells have finished, scored when each cell has the registered floor of 24 of 30 pooled and 8 of 10 per-job pairs, inconclusive below it):", "", table(["prediction", "result", "status"], pr), ""]
 
     # --- pose
     if pose:
