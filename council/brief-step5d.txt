@@ -1,4 +1,4 @@
-Round 5d (17 Nov, about HHMM). Everything has run. State of the project since round 5c (council/reviews/step5c-mid-<you>.md; read only your own, not the other judge's):
+Round 5d (17 Nov, about 02:30). Everything has run. State of the project since round 5c (council/reviews/step5c-mid-<you>.md; read only your own, not the other judge's):
 (1) The registered matrix ended at 01:26 (scripts/run_night.sh, tag matrix-launch, hash 4d59e8f26cd2a9b6): Q1 and Q3 as registered, and Q4 in the no-catch control scenes is now final (RESULTS.md section 5). Pose finished too (section 7).
 (2) The five exploratory branches were merged into main (hash 088c639d7139a3af, 130 tests; results/code_versions.md says which code produced which folder). A merge accident briefly deleted the Panda model directory; it is described as deviation 5 in results/deviations.md, and its effect on the data (72 empty run files moved aside, none with an episode) is stated there. Please check that claim against runs/*.
 (3) The corrected-simulator replication (PROTOCOL.md v1.6, runs/rep_fixed, RESULTS.md section 6c) is complete, and its four predictions are scored by the generator.
