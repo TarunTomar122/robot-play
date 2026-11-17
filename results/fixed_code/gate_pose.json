@@ -1,0 +1,50 @@
+{
+ "table": {
+  "stack|catch|oracle": {
+   "n": 100,
+   "ok": 100,
+   "calls": 2400
+  },
+  "stack|catch|naive": {
+   "n": 100,
+   "ok": 17,
+   "calls": 2209
+  },
+  "stack|control|naive": {
+   "n": 100,
+   "ok": 100,
+   "calls": 2400
+  },
+  "bins|catch|oracle": {
+   "n": 100,
+   "ok": 100,
+   "calls": 4600
+  },
+  "bins|catch|naive": {
+   "n": 100,
+   "ok": 0,
+   "calls": 4100
+  },
+  "bins|control|naive": {
+   "n": 100,
+   "ok": 96,
+   "calls": 4588
+  },
+  "flasks|catch|oracle": {
+   "n": 100,
+   "ok": 100,
+   "calls": 2400
+  },
+  "flasks|catch|naive": {
+   "n": 100,
+   "ok": 0,
+   "calls": 800
+  },
+  "flasks|control|naive": {
+   "n": 100,
+   "ok": 100,
+   "calls": 2400
+  }
+ },
+ "crashes": []
+}

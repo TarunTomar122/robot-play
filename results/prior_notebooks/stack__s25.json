@@ -1,0 +1,14 @@
+{
+ "task": "stack",
+ "run_seed": 25,
+ "model": "claude-fable-5-2",
+ "text": "NOTEBOOK: stack red (bottom), green, blue (top)\n\nKnown from the task and tools only. Nothing here has been tested yet.\n\nGoal\n- cube_red stays where it is. Never pick or bump it.\n- cube_green goes on cube_red, then cube_blue on cube_green.\n- done() ends the episode and triggers judging. Call it only after verifying the tower.\n\nBudget: 20 calls. Ideal run is about 7:\n1. observe\n2. pick cube_green\n3. place on cube_red\n4. observe\n5. pick cube_blue\n6. place on cube_green\n7. observe, then done\nThat leaves about 12 calls for retries. Read the pick/place return values instead of spending extra observes.\n\nCheck on the first observe\n- Exact object and zone names, and cube sizes.\n- Is any cube already stacked, tilted, or held?\n- Is anything sitting on green or blue that blocks a pick?\n- Gripper opening compared with cube width.\n\nAfter each pick, read the return\n- Did the object rise roughly by the lift height? If not, the grasp failed.\n- Gripper opening after the lift: fully closed probably means nothing is held.\n- Tilt and any planning or descent error.\n- If it failed: observe, then retry changing one parameter (grip_level, grasp_height, or yaw_offset_deg). Which one helps is unknown.\n\nAfter each place, read the return\n- Final position should be centred over the cube below and one cube height higher; tilt near zero.\n- Confirm red has not moved, and that green has not moved after blue is placed.\n- If the cube fell off: observe, pick it again, and retry.\n\nUntested ideas (defaults are unknown quality)\n- Start with defaults. If placement is sloppy, try slow speed, a smaller release_height, or a longer settle_time.\n- Slow speed may matter most for blue, since the tower is taller by then.\n- move_to, open_gripper, close_gripper, and home are manual fallbacks; avoid them unless pick/place fail.\n\nBefore done\n- A final observe shows all three cubes in order, aligned, not tilted, and none held.",
+ "usage": {
+  "input": 4,
+  "output": 693,
+  "cache_read": 1059,
+  "cache_write": 0
+ },
+ "cost_usd": 0.02796380000000001,
+ "ts": 1794874992
+}

@@ -1,0 +1,105 @@
+{
+ "seeds_per_point": 30,
+ "tasks": {
+  "stack": {
+   "param": "green cube mass (kg)",
+   "points": [
+    {
+     "value": 0.05,
+     "naive": 1.0,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.1,
+     "naive": 1.0,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.15,
+     "naive": 1.0,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.2,
+     "naive": 0.9333333333333333,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.25,
+     "naive": 0.0,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.3,
+     "naive": 0.0,
+     "oracle": 1.0
+    }
+   ]
+  },
+  "bins": {
+   "param": "bin wall height (m)",
+   "points": [
+    {
+     "value": 0.015,
+     "naive": 1.0,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.04,
+     "naive": 0.8,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.07,
+     "naive": 0.8,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.1,
+     "naive": 0.0,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.12,
+     "naive": 0.0,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.15,
+     "naive": 0.0,
+     "oracle": 1.0
+    }
+   ]
+  },
+  "flasks": {
+   "param": "flask base height (m; 0 = plain cylinder)",
+   "points": [
+    {
+     "value": 0.0,
+     "naive": 1.0,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.02,
+     "naive": 1.0,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.04,
+     "naive": 1.0,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.06,
+     "naive": 0.0,
+     "oracle": 1.0
+    },
+    {
+     "value": 0.07,
+     "naive": 0.0,
+     "oracle": 1.0
+    }
+   ]
+  }
+ }
+}

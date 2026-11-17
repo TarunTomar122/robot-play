@@ -1,0 +1,94 @@
+{
+ "seeds": 30,
+ "base": 3000,
+ "table": {
+  "stack|slip|oracle": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 0
+  },
+  "stack|slip|oracle_retry": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 30
+  },
+  "stack|nudge|oracle": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 0
+  },
+  "stack|nudge|oracle_retry": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 27
+  },
+  "bins|slip|oracle": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 0
+  },
+  "bins|slip|oracle_retry": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 30
+  },
+  "bins|nudge|oracle": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 0
+  },
+  "bins|nudge|oracle_retry": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 27
+  },
+  "flasks|slip|oracle": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 0
+  },
+  "flasks|slip|oracle_retry": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 30
+  },
+  "flasks|nudge|oracle": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 0
+  },
+  "flasks|nudge|oracle_retry": {
+   "episodes": 30,
+   "fired": 30,
+   "success_when_fired": 0
+  }
+ },
+ "checks": {
+  "stack|slip": {
+   "fires_in_>=95%": true,
+   "breaks_no_reaction_script(<=30%)": true,
+   "recoverable_by_retry(>=80%)": true
+  },
+  "stack|nudge": {
+   "fires_in_>=95%": true,
+   "breaks_no_reaction_script(<=30%)": true,
+   "recoverable_by_retry(>=80%)": true
+  },
+  "bins|slip": {
+   "fires_in_>=95%": true,
+   "breaks_no_reaction_script(<=30%)": true,
+   "recoverable_by_retry(>=80%)": true
+  },
+  "bins|nudge": {
+   "fires_in_>=95%": true,
+   "breaks_no_reaction_script(<=30%)": true,
+   "recoverable_by_retry(>=80%)": true
+  },
+  "flasks|slip": {
+   "fires_in_>=95%": true,
+   "breaks_no_reaction_script(<=30%)": true,
+   "recoverable_by_retry(>=80%)": true
+  }
+ },
+ "crashes": []
+}
