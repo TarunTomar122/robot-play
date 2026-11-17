@@ -288,6 +288,12 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
                 for c, fn in texts.items():
                     for s in run_seeds:
                         specs.append(RunSpec(m, t, c, s, True, practice=0, borrowed_notebook=fn(t), **common))
+    elif cell == "wordsplit":                   # exploratory (v1.10): the generic sentence taken apart under the same neutral label, no practice
+        for m in models:
+            for t in tasks:
+                for c, text in SPLIT_TEXTS.items():
+                    for s in run_seeds:
+                        specs.append(RunSpec(m, t, c, s, True, practice=0, borrowed_notebook=text, **common))
     elif cell == "borrowed_other":              # the control for "borrowed": the notebook of a DIFFERENT task (stack reads the sort notebook, sort the flask one, flasks the stack one)
         shift = {"stack": "bins", "bins": "flasks", "flasks": "stack"}
         for m in models:
@@ -310,6 +316,15 @@ GENERIC_HINT = ("Defaults do not suit every object or surface. When a pick or pl
 
 INERT_TEXT = ("Every object in this scene can be handled with the tools you have, one after another. When a call fails or is refused, read the message and look at "
               "the scene again before you carry on, and call done only once the job really is finished.")          # v1.9: about as long as GENERIC_HINT, names no setting and gives no advice about settings
+
+
+# v1.10: GENERIC_HINT = frame + instruction + names. Each text below keeps the frame sentence and adds one of the other two parts, or neither.
+FRAME = "Defaults do not suit every object or surface."
+SPLIT_TEXTS = {
+    "lm_frame": FRAME + " When a pick or place fails or is refused, read the message before you carry on.",                                   # the frame only
+    "lm_names": FRAME + " The adjustable settings are grip_level, grasp_height, release_height and speed.",                                  # the frame and the four names, no instruction
+    "lm_instr": FRAME + " When a pick or place fails or is refused, read the message and change how you call it, one thing at a time, instead of repeating the same call.",   # the frame and the instruction, no names
+}
 
 
 def prior_notebook(source_dir: str, task: str, run_seed: int) -> str:
