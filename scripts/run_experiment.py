@@ -34,11 +34,12 @@ def main():
     ap.add_argument("--meter", default="runs/spend")
     ap.add_argument("--max-calls", type=int, default=None)
     ap.add_argument("--source-dir", default="runs/frontier_exp", help="borrowed cells: where the finished frontier-with-notebook runs are; prior cell: where the zero-practice notebooks are (runs/prior_notebooks)")
+    ap.add_argument("--source-model", default="claude-fable-5-2", help="borrowed cells: whose finished notebook runs to read (PROTOCOL.md v1.8 uses claude-sonnet-5-5)")
     ap.add_argument("--conditions", nargs="+", default=None, help="keep only these memory conditions")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
-    specs = build_specs(a.cell, a.models, parse_seeds(a.seeds), a.out, a.meter, a.tasks, a.max_calls, source_dir=a.source_dir)
+    specs = build_specs(a.cell, a.models, parse_seeds(a.seeds), a.out, a.meter, a.tasks, a.max_calls, source_dir=a.source_dir, source_model=a.source_model)
     if a.conditions:
         specs = [s for s in specs if s.condition in a.conditions]
     n_ep = sum(len(s.episodes()) for s in specs)
