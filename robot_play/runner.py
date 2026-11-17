@@ -300,6 +300,12 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
                 specs += [RunSpec(m, t, "none", s, True, practice=0, **common) for s in run_seeds]
                 for c, text in SPLIT2_TEXTS.items():
                     specs += [RunSpec(m, t, c, s, True, practice=0, borrowed_notebook=text, **common) for s in run_seeds]
+    elif cell in ("second_none", "second_split"):   # exploratory (v1.13): a second model (the cheap-model split repeated); stage 1 is the no-memory room check, stage 2 the four split arms
+        arms = {"second_none": {"none": ""}, "second_split": {c: SPLIT2_TEXTS[c] for c in ("lm_frame", "lm_names", "lm_instr_n", "lm_generic")}}[cell]
+        for m in models:
+            for t in tasks:
+                for c, text in arms.items():
+                    specs += [RunSpec(m, t, c, s, True, practice=0, borrowed_notebook=text, **common) for s in run_seeds]
     elif cell == "dose":                        # exploratory (v1.12): the model's own notebook after 1, 3, 6 (and, on run seeds 30 to 39, 12) practice episodes, held-out layouts of the usual four per run seed
         for m in models:
             for t in tasks:
