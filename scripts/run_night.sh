@@ -49,8 +49,9 @@ wait $pe; r_exp=$?
 
 # 3. pose-level ablation, only if its gate passed
 r_pose=0
+rm -f logs/pose_skipped.txt
 if grep -q "FAIL" results/gate_pose.md 2>/dev/null || [ ! -f results/gate_pose.md ]; then
-  echo "pose gate did not pass; pose cell skipped" > logs/pose.log
+  echo "pose gate did not pass; pose cell skipped" > logs/pose.log; touch logs/pose_skipped.txt; r_pose=4          # a skipped cell is not a finished night
 else
   run_cell pose --cell pose --models $CHEAP --seeds 0-2 --workers 10 --out runs/pose; r_pose=$?
 fi
