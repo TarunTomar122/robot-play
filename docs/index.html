@@ -78,8 +78,6 @@ section.sec:last-of-type { border-bottom: 1px solid var(--line); }
 details.sec > summary, details.sub > summary { list-style: none; cursor: pointer; display: flex; gap: 12px; align-items: baseline; }
 details > summary::-webkit-details-marker { display: none; }
 details.sec > summary { padding: 18px 0; scroll-margin-top: 56px; }
-details.sec > summary::before, details.sub > summary::before { content: ""; flex: none; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform 0.15s; position: relative; top: -2px; }
-details[open] > summary::before { transform: rotate(45deg); }
 details.sec > summary:hover h2, details.sub > summary:hover h3 { color: var(--link); }
 .num { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 650; min-width: 1.1em; }
 h2 { font-size: 1.3rem; line-height: 1.3; margin: 0; }
