@@ -35,3 +35,18 @@ def test_a_failed_validation_voids_every_prediction():
     pr = [("p1", "r1", "met"), ("p2", "r2", "MISSED")]
     assert all(x[2].startswith("void") for x in analyze.void_if([{"bad": 1}], pr))
     assert analyze.void_if([], pr) == pr
+
+
+def test_v1_15_reading_names_each_missed_prediction():
+    assert "M1 to M6 all met" in analyze.reading_mixed(["met"] * 6)
+    r = analyze.reading_mixed(["MISSED", "MISSED", "met", "met", "met", "met"])
+    assert "M1 missed" in r and "M2 missed" in r and "M3 missed" not in r and "all met" not in r
+    assert "M6 missed" in analyze.reading_mixed(["met"] * 5 + ["MISSED"])
+
+
+def test_pick_flags_count_squeeze_refusals_and_silent_failed_picks_separately():
+    from robot_play.analysis import pick_flags
+    log = [{"tool": "pick", "result": {"ok": False, "error": "squeeze limit exceeded on cube_blue: the fingers pressed with 5.2 N, it takes at most 3.5 N; the hand let go"}},
+           {"tool": "pick", "result": {"ok": False, "holding": None}}, {"tool": "pick", "result": {"ok": True}},
+           {"tool": "pick", "result": {"ok": False, "error": "unreachable"}}, {"tool": "place", "result": {"ok": False}}]
+    assert pick_flags(log) == {"squeezed": 1, "silent_pick": 1} and pick_flags(None) == {"squeezed": 0, "silent_pick": 0}

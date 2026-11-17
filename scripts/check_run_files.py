@@ -39,13 +39,13 @@ EXPECTED = {
     "borrowed_1": (58, 0, {"90bd12fc77ec6f43"}), "borrowed_3": (58, 0, {"90bd12fc77ec6f43"}), "borrowed_other": (58, 2, {"bdda918f09675319"}), "borrowed_sonnet": (40, 0, {"088c639d7139a3af"}),
     "main_fixhold": (20, 0, {"c694b1a45aaf30c5"}), "main_fixcollide": (20, 0, {"aef351c5c3033d54"}), "rep_fixed": (120, 0, {"8fdcf6b2491b68a3"}),
     "hint": (60, 0, {"088c639d7139a3af"}), "hint_generic": (60, 0, {"088c639d7139a3af"}), "prior": (60, 0, {"088c639d7139a3af"}), "writer_sonnet": (20, 0, {"088c639d7139a3af"}),
-    "labelmatch": (180, 0, {"58b19ca1be3740fe"}), "wordsplit": (30, 0, {"0346eddace878d63"}), "wordsplit2": (80, 0, {"c44187af32043997"}), "dose": (70, 0, {"33db266fef842900"}), "second": (50, 0, {"216aab61b6c8b09e"}), "budget": (240, 0, {"a047eaf9c4a9c258"}),
+    "labelmatch": (180, 0, {"58b19ca1be3740fe"}), "wordsplit": (30, 0, {"0346eddace878d63"}), "wordsplit2": (80, 0, {"c44187af32043997"}), "dose": (70, 0, {"33db266fef842900"}), "second": (50, 0, {"216aab61b6c8b09e"}), "budget": (240, 0, {"a047eaf9c4a9c258"}), "mixed": (140, 0, {"6119571baae3816f"}),
 }
 # folder: (lowest, highest) run seed its files may carry (the registered seed plan of each cell; the dose folder holds seeds 20 to 39, its 12-episode runs only 30 to 39)
 RUN_SEEDS = {
     "main": (0, 9), "main_ext": (10, 19), "control": (0, 9), "frontier": (0, 0), "frontier_exp": (0, 9), "pose": (0, 2), "borrowed": (0, 9), "borrowed_1": (0, 9), "borrowed_3": (0, 9),
     "borrowed_other": (0, 9), "borrowed_sonnet": (20, 29), "main_fixhold": (0, 9), "main_fixcollide": (0, 9), "rep_fixed": (20, 29), "hint": (20, 29), "hint_generic": (20, 29),
-    "prior": (20, 29), "writer_sonnet": (20, 29), "labelmatch": (20, 29), "wordsplit": (20, 29), "wordsplit2": (30, 39), "dose": (20, 39), "second": (30, 39), "budget": (30, 39),
+    "prior": (20, 29), "writer_sonnet": (20, 29), "labelmatch": (20, 29), "wordsplit": (20, 29), "wordsplit2": (30, 39), "dose": (20, 39), "second": (30, 39), "budget": (30, 39), "mixed": (40, 49),
 }
 # folder: first 16 hex digits of the SHA-256 of the sorted run-file names joined by newlines (an identity manifest: a substituted, renamed or missing file changes it even when the count stays the same)
 MANIFEST = {
@@ -73,6 +73,7 @@ MANIFEST = {
     "dose": "990117792c716c71",
     "second": "966d4b5015069afe",
     "budget": "136b994d8cac360b",
+    "mixed": "4a5116b123e2ab99",
 }
 IMPORT_ERROR = None
 try:

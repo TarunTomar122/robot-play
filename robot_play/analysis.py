@@ -74,6 +74,20 @@ def episode_flags(log: list[dict]) -> dict:
     return {"false_hold": fh, "short_move": sm}
 
 
+def pick_flags(log: list[dict]) -> dict:
+    """Pick outcomes in one episode's call log (v1.15, the two-sided job). squeezed: pick or close_gripper refusals with a squeeze-limit message (the hand pressed too hard on a
+    fragile object); silent_pick: picks that answered ok false with no error text (the object slipped out: the silent failure of the heavy cube)."""
+    sq = sp = 0
+    for c in log or []:
+        res = c.get("result") or {}
+        if c.get("tool") in ("pick", "close_gripper"):
+            if "squeeze limit" in str(res.get("error", "")):
+                sq += 1
+            elif c.get("tool") == "pick" and res.get("ok") is False and not res.get("error"):
+                sp += 1
+    return {"squeezed": sq, "silent_pick": sp}
+
+
 def load(*dirs: str | Path, complete_only: bool = False) -> list[dict]:
     """One flat row per finished episode (the long tool-call log is dropped). With complete_only, runs that did not finish their whole plan are left
     out, so a paired comparison never mixes runs that stopped early with runs that did not (the incomplete runs are listed by `coverage`)."""
@@ -87,6 +101,7 @@ def load(*dirs: str | Path, complete_only: bool = False) -> list[dict]:
                 res = r["result"]
                 row = {k: r.get(k) for k in KEEP}
                 row.update(episode_flags(r.get("log")))
+                row.update(pick_flags(r.get("log")))
                 row.update(success=int(res["success"]), calls=res["calls"], sim_time_s=res["sim_time_s"], claimed_done=int(res["claimed_done"]),
                            false_claim=int(res["false_success_claim"]), fired=int(res["disturbance_fired"]),
                            tokens_in=r["usage"]["input"] + r["usage"]["cache_read"] + r["usage"]["cache_write"], tokens_out=r["usage"]["output"])

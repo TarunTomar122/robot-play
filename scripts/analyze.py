@@ -35,6 +35,7 @@ WS2_HASH = "c44187af32043997"       # code hash of tag code-wordsplit2 (PROTOCOL
 DOSE_HASH = "33db266fef842900"      # code hash of tag code-dose (PROTOCOL.md v1.12)
 SEC_HASH = "216aab61b6c8b09e"       # code hash of tag code-second (PROTOCOL.md v1.13)
 BUD_HASH = "a047eaf9c4a9c258"       # code hash of tag code-budget (PROTOCOL.md v1.14)
+MIX_HASH = "6119571baae3816f"       # code hash of tag code-mixed (PROTOCOL.md v1.15)
 NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job",
          "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes",
          "hint": "reads a one-sentence hint naming the fix", "hint_generic": "reads a generic tip (lists the four adjustable settings, names no fix)", "prior": "reads Fable's notebook written with no practice"}
@@ -85,6 +86,20 @@ def mean(rows, key):
 def registered_solved(r):
     """PROTOCOL.md v1.14: an episode that never calls `done` within the stated budget is a failure, whatever the simulator says at the end."""
     return int(bool(r["success"]) and bool(r["claimed_done"]))
+
+
+def reading_mixed(st):
+    """Registered reading of PROTOCOL.md v1.15 from the statuses of M1 to M6 (each starts with 'met', 'MISSED' or 'not read')."""
+    ok = [x.startswith("met") for x in st]
+    if all(ok):
+        return "M1 to M6 all met: where no single setting works, a note that states the fix is worthless or harmful and only a stated procedure (or practice that finds it) carries the benefit, which is the two-sided version of the main finding."
+    names = {0: "M1 missed: a model recovers from a wrong rule by reading the error, so a rule is not harmful for it",
+             1: "M2 missed: no room for that model (its M3 to M5 are reported but not read)",
+             2: "M3 missed: even the answer key does not teach a procedure through one sentence",
+             3: "M4 missed: practice does not discover a two-sided rule at this dose, or the notebook beat the answer key (see the table, the upper-bound reading is void in the second case)",
+             4: "M5 missed: the sentence has a cost on ordinary cubes (size in the table)",
+             5: "M6 missed: the names list is as good as the procedure here"}
+    return "; ".join(names[i] for i, o in enumerate(ok) if not o) + "."
 
 
 def reading_budget(st):
@@ -174,6 +189,7 @@ def main():
     ap.add_argument("--dose", nargs="*", default=["runs/dose"], help="exploratory practice-dose cell (PROTOCOL.md v1.12): Haiku, stack, own notebook after 1, 3, 6 (and 12 on run seeds 30-39) practice episodes")
     ap.add_argument("--second", nargs="*", default=["runs/second"], help="exploratory second model (PROTOCOL.md v1.13): Claude Sonnet 5.5 on stack, run seeds 30-39, room check then four split arms")
     ap.add_argument("--budget", nargs="*", default=["runs/budget"], help="exploratory stated-budget cell (PROTOCOL.md v1.14): Haiku and Luna, three jobs, run seeds 30-39, 12 calls stated to the model")
+    ap.add_argument("--mixed", nargs="*", default=["runs/mixed"], help="exploratory two-sided job (PROTOCOL.md v1.15): Haiku and Luna, job mixed, run seeds 40-49, six arms plus a control scene")
     ap.add_argument("--writer", nargs="*", default=["runs/writer_sonnet"], help="exploratory second writer (PROTOCOL.md v1.8): Claude Sonnet 5.5 with its own notebook, run seeds 20-29 (stack) and 20-24 (bins, flasks)")
     ap.add_argument("--borrowed-sonnet", nargs="*", default=["runs/borrowed_sonnet"], help="cheap models reading the Sonnet notebooks with no practice (PROTOCOL.md v1.8)")
     ap.add_argument("--meter", default="runs/spend")
@@ -1268,6 +1284,82 @@ def main():
                                     "The registered reading: B1, B2 and B3 all met, a list of settings is enough where the catch is a choice among named values and not where the model has to find a number, so the notebook's value is the stored value; B1 missed, the list does not match the notebook even on `stack` at this budget; B2 or B3 missed for a model, the notebook's efficiency advantage is not confirmed for that job and model (each reported separately).", "",
                                     table(["prediction", "result", "status"], pr), "", reading, "",
                                     f"Validation of the included files: {len(bcov3)} run files, every one with code hash `{BUD_HASH}` and a run seed from 30 to 39: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
+
+    # --- 6m: the two-sided job (v1.15; exploratory)
+    mix_rows = [r for r in (A.load(*ex(a.mixed), complete_only=True) if ex(a.mixed) else []) if 40 <= r["run_seed"] <= 49 and r["task"] == "mixed"]
+    if mix_rows:
+        import re as _re
+        mcov = A.coverage(*ex(a.mixed))
+        kofm = lambda r: int(_re.search(r"__p(\d+)__s", r["run"]).group(1))
+        rows_m = [dict(r, condition="nb12" if r["condition"] == "notebook" else r["condition"]) for r in mix_rows if r["condition"] != "notebook" or kofm(r) == 12]
+        MN = {"none": "no memory", "lm_names": "the frame and the four names", "lm_firm": "constant rule: firm for every cube", "lm_proc": "answer key: try, read, switch", "nb12": "own notebook, 12 practice episodes"}
+        mm = [m for m in ("claude-haiku-5-5", "gpt-6-luna") if any(r["model"] == m for r in rows_m)]
+        L += ["## 6m. Exploratory: a job where no single setting works (the `mixed` job)", "",
+              "Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.15, branch `two-sided`, tag `code-mixed`). The job is `stack` with two odd cubes: in every layout one of `cube_green` and `cube_blue` is heavy and slippery (it needs `grip_level firm`) and the other is fragile (a firm grip makes the hand let go with a squeeze-limit message); which is which is drawn from the layout seed and never shown. "
+              "The scripted gate (`results/gate_mixed.md`, 100 layouts, no model): every fixed pick setting solves 0 or 1 of 100 catch layouts and all 100 control layouts; a player that reads each result and switches grips solves 96 of 100. Haiku 5.5 and Luna, run seeds 40 to 49, four held-out episodes per run, 20 calls. "
+              f"Run files started {len(mcov)}, complete {sum(int(c['complete']) for c in mcov)} (planned 140). Unadjusted 95% intervals by the project's interval rule, paired by run seed, no multiplicity correction, never pooled with registered rows.", ""]
+        pred_at_6m = len(L)
+        mrows = []
+        for m in mm:
+            for quirk in (True, False):
+                for c in ("none", "lm_names", "lm_firm", "lm_proc", "nb12"):
+                    x = A.select(rows_m, model=m, condition=c, phase="eval", quirk=quirk)
+                    if x:
+                        suc = [r for r in x if r["success"]]
+                        mrows.append((m, "catch (one heavy, one fragile)" if quirk else "control (two ordinary cubes)", MN[c], len(x), f"{len(suc)} ({len(suc) / len(x) * 100:.0f}%)",
+                                      f"{np.mean([r['calls'] for r in suc]):.1f}" if suc else "-", f"{sum(1 for r in x if r['squeezed'] > 0)} ({sum(1 for r in x if r['squeezed'] > 0) / len(x) * 100:.0f}%)",
+                                      f"{sum(1 for r in x if r['silent_pick'] > 0)} ({sum(1 for r in x if r['silent_pick'] > 0) / len(x) * 100:.0f}%)"))
+        L += ["Columns: held-out episodes; solved (the simulator's verdict); calls used by the solved episodes; episodes with at least one squeeze-limit refusal (the hand pressed too hard on the fragile cube); episodes with at least one silent failed pick (a cube slipped out of the grip with no error message).", "",
+              table(["model", "scene", "what the model has", "episodes", "solved", "calls of the solved", "with a squeeze refusal", "with a silent failed pick"], mrows), ""]
+        cmp_m, vm = [], {}
+        for m in mm:
+            for x_, y_, qk in (("lm_firm", "none", True), ("lm_names", "none", True), ("lm_proc", "none", True), ("nb12", "none", True), ("nb12", "lm_proc", True), ("lm_names", "lm_proc", True), ("lm_proc", "none", False)):
+                d = A.paired_difference(rows_m, m, x_, y_, quirk=qk)
+                if d.get("n_pairs"):
+                    cmp_m.append((m, "catch" if qk else "control", f"{MN[x_]} against {MN[y_]}", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
+                    vm[(m, x_, y_, qk)] = d
+        L += ["Paired differences (run seed, per model):", "", table(["model", "scene", "comparison", "pairs", "first", "second", "difference"], cmp_m), ""]
+        finalm = (ROOT / "logs/mixed_done.txt").exists() or (len(mcov) == 140 and all(c["complete"] for c in mcov))
+        need_m = [(x_, y_, qk) for x_, y_, qk in (("lm_firm", "none", True), ("lm_names", "none", True), ("lm_proc", "none", True), ("nb12", "none", True), ("nb12", "lm_proc", True), ("lm_names", "lm_proc", True), ("lm_proc", "none", False))]
+        ready_m = all(vm.get((m, x_, y_, qk), {}).get("n_pairs", 0) >= 10 for m in ("claude-haiku-5-5", "gpt-6-luna") for x_, y_, qk in need_m)
+
+        def scm(keys, fn):
+            n = min([vm.get(k, {}).get("n_pairs", 0) for k in keys] or [0])
+            if n >= 10 and (ready_m or finalm):
+                return fn()
+            if not finalm:
+                return "pending"
+            return "inconclusive (below the registered floor)" if n < 8 else fn() + " (scored with fewer than the planned pairs, above the floor)"
+        H, Lu = "claude-haiku-5-5", "gpt-6-luna"
+        rate = lambda m, c, qk=True: (lambda x: (sum(r["success"] for r in x) / len(x)) if x else float("nan"))(A.select(rows_m, model=m, condition=c, phase="eval", quirk=qk))
+        both = lambda fn: all(fn(m) for m in (H, Lu))
+        dd = lambda m, x_, y_, qk=True: vm.get((m, x_, y_, qk), {}).get("diff", float("nan"))
+        show = lambda fn: " / ".join(f"{nm} {fn(m)}" for nm, m in (("Haiku", H), ("Luna", Lu)))
+        pr = []
+        pr.append(("M1: `lm_firm` solves at most 25% of the catch layouts for Haiku and Luna", show(lambda m: f"{rate(m, 'lm_firm') * 100:.0f}%"),
+                   scm([(m, "lm_firm", "none", True) for m in (H, Lu)], lambda: "met" if both(lambda m: at_most(rate(m, "lm_firm"), 0.25)) else "MISSED")))
+        pr.append(("M2: `none` solves less than 60% of the catch layouts for Haiku and Luna (room check)", show(lambda m: f"{rate(m, 'none') * 100:.0f}%"),
+                   scm([(m, "lm_firm", "none", True) for m in (H, Lu)], lambda: "met" if both(lambda m: not at_least(rate(m, "none"), 0.60)) else "MISSED")))
+        pr.append(("M3: `lm_proc` minus `none` is at least +20 points for Haiku and Luna", show(lambda m: f"{dd(m, 'lm_proc', 'none') * 100:+.1f}"),
+                   scm([(m, "lm_proc", "none", True) for m in (H, Lu)], lambda: "met" if both(lambda m: at_least(dd(m, "lm_proc", "none"), 0.20)) else "MISSED")))
+        pr.append(("M4: own notebook (12) minus `none` is at least +15 points for at least one model, and the notebook is not above `lm_proc` for either", show(lambda m: f"vs none {dd(m, 'nb12', 'none') * 100:+.1f}, vs lm_proc {dd(m, 'nb12', 'lm_proc') * 100:+.1f}"),
+                   scm([(m, "nb12", "none", True) for m in (H, Lu)] + [(m, "nb12", "lm_proc", True) for m in (H, Lu)],
+                       lambda: "met" if (any(at_least(dd(m, "nb12", "none"), 0.15) for m in (H, Lu)) and both(lambda m: at_most(dd(m, "nb12", "lm_proc"), 0.0))) else "MISSED")))
+        pr.append(("M5: in the control scene `lm_proc` solves at least 80% for both models and is within 10 points of `none`", show(lambda m: f"{rate(m, 'lm_proc', False) * 100:.0f}% (difference {dd(m, 'lm_proc', 'none', False) * 100:+.1f})"),
+                   scm([(m, "lm_proc", "none", False) for m in (H, Lu)], lambda: "met" if both(lambda m: at_least(rate(m, "lm_proc", False), 0.80) and at_most(abs(dd(m, "lm_proc", "none", False)), 0.10)) else "MISSED")))
+        pr.append(("M6: `lm_names` is not above `lm_proc` for either model", show(lambda m: f"{dd(m, 'lm_names', 'lm_proc') * 100:+.1f}"),
+                   scm([(m, "lm_names", "lm_proc", True) for m in (H, Lu)], lambda: "met" if both(lambda m: at_most(dd(m, "lm_names", "lm_proc"), 0.0)) else "MISSED")))
+        bad_files = bad_cov(mcov, {MIX_HASH}, 40, 49)
+        pr = void_if(bad_files, pr)
+        st = [x[2] for x in pr]
+        if finalm and not bad_files and all(x.startswith(("met", "MISSED")) for x in st):
+            reading = "Registered reading of the outcome: " + reading_mixed(st)
+        else:
+            reading = "Registered reading: scored when the cell has finished."
+        L[pred_at_6m:pred_at_6m] = ["**Predictions of PROTOCOL.md v1.15, scored by the generator first** (pending until every pair exists; below 8 of 10 pairs inconclusive once the cell has finished). Written after the scripted gate and after v1.12 to v1.14, so not blind to the earlier findings. "
+                                    "If M2 is missed for a model there is no room for it: M3 to M5 are then reported but not read for that model.", "",
+                                    table(["prediction", "result", "status"], pr), "", reading, "",
+                                    f"Validation of the included files: {len(mcov)} run files, every one with code hash `{MIX_HASH}` and a run seed from 40 to 49: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
 
     # --- 6l: solved within k calls, every arm (descriptive; round 5g)
     wk_src = {"none": [r for r in rep_rows if r["condition"] == "none"], "notebook": [r for r in rep_rows if r["condition"] == "notebook"],
