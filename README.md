@@ -98,7 +98,7 @@ The model has 20 tool calls per episode, so wasting calls on discovering a catch
 
 ## How we know the jobs are fair
 
-A badly made job would give meaningless results. So before any AI is allowed near them, the jobs pass these checks. All of them are played through the same wrapper the AI uses, with the same 20-call budget. The tables below are from the registered code. I am rerunning them on the corrected code, and will replace this sentence with the result.
+A badly made job would give meaningless results. So before any AI is allowed near them, the jobs pass these checks. All of them are played through the same wrapper the AI uses, with the same 20-call budget. The tables below are from the registered code. I reran all five checks on the corrected code and they pass with no crashed runs, with identical tables except one mean-calls figure in the pose gate ([results/fixed_code/](results/fixed_code/README.md)).
 
 **1. A script that knows the answer always wins, and one that does not always loses** (100 random layouts per row, `python scripts/gate.py`).
 

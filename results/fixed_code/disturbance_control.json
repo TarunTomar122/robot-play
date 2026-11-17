@@ -1,65 +1,65 @@
 {
- "seeds": 30,
+ "seeds": 50,
  "base": 3000,
  "table": {
   "stack|slip|oracle": {
-   "episodes": 30,
-   "fired": 30,
+   "episodes": 50,
+   "fired": 50,
    "success_when_fired": 0
   },
   "stack|slip|oracle_retry": {
-   "episodes": 30,
-   "fired": 30,
-   "success_when_fired": 30
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 50
   },
   "stack|nudge|oracle": {
-   "episodes": 30,
-   "fired": 30,
+   "episodes": 50,
+   "fired": 50,
    "success_when_fired": 0
   },
   "stack|nudge|oracle_retry": {
-   "episodes": 30,
-   "fired": 30,
-   "success_when_fired": 27
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 47
   },
   "bins|slip|oracle": {
-   "episodes": 30,
-   "fired": 30,
+   "episodes": 50,
+   "fired": 50,
    "success_when_fired": 0
   },
   "bins|slip|oracle_retry": {
-   "episodes": 30,
-   "fired": 30,
-   "success_when_fired": 30
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 50
   },
   "bins|nudge|oracle": {
-   "episodes": 30,
-   "fired": 30,
+   "episodes": 50,
+   "fired": 50,
    "success_when_fired": 0
   },
   "bins|nudge|oracle_retry": {
-   "episodes": 30,
-   "fired": 30,
-   "success_when_fired": 27
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 47
   },
   "flasks|slip|oracle": {
-   "episodes": 30,
-   "fired": 30,
+   "episodes": 50,
+   "fired": 50,
    "success_when_fired": 0
   },
   "flasks|slip|oracle_retry": {
-   "episodes": 30,
-   "fired": 30,
-   "success_when_fired": 30
+   "episodes": 50,
+   "fired": 50,
+   "success_when_fired": 50
   },
   "flasks|nudge|oracle": {
-   "episodes": 30,
-   "fired": 30,
+   "episodes": 50,
+   "fired": 50,
    "success_when_fired": 0
   },
   "flasks|nudge|oracle_retry": {
-   "episodes": 30,
-   "fired": 30,
+   "episodes": 50,
+   "fired": 50,
    "success_when_fired": 0
   }
  },
