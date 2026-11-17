@@ -87,7 +87,8 @@ def registered_text(cond, task):
     if runner is None:
         return None
     fixed = {"hint_generic": runner.GENERIC_HINT, "lm_inert": runner.INERT_TEXT, "lm_generic": runner.GENERIC_HINT, "lm_frame": runner.SPLIT_TEXTS["lm_frame"],
-             "lm_names": runner.SPLIT_TEXTS["lm_names"], "lm_instr": runner.SPLIT_TEXTS["lm_instr"], "lm_instr_n": runner.SPLIT2_TEXTS["lm_instr_n"], "lm_names2": runner.SPLIT2_TEXTS["lm_names2"]}
+             "lm_names": runner.SPLIT_TEXTS["lm_names"], "lm_instr": runner.SPLIT_TEXTS["lm_instr"], "lm_instr_n": runner.SPLIT2_TEXTS["lm_instr_n"], "lm_names2": runner.SPLIT2_TEXTS["lm_names2"],
+             "lm_firm": runner.MIXED_TEXTS["lm_firm"], "lm_proc": runner.MIXED_TEXTS["lm_proc"]}
     if cond in ("hint", "lm_specific"):
         return runner.HINTS.get(task)
     return fixed.get(cond)

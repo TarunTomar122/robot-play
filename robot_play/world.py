@@ -28,6 +28,7 @@ class ObjectSpec:
     com_z: float | None = None     # centre of mass height above the object's base (None = centre)
     yaw: float = 0.0
     base: tuple | None = None          # (radius, height) of a wide base under a cylinder's neck
+    crush_n: float | None = None       # the most each finger may press on it [N]; a harder squeeze makes the hand let go (a fragile object)
 
 
 @dataclass
@@ -241,6 +242,19 @@ class PandaWorld:
                 if self.model.body(other).name in ("left_finger", "right_finger"):
                     fingers.add(other)
         return len(fingers)
+
+    def finger_normal_force(self, name: str) -> float:
+        """The larger of the two fingers' summed contact normal forces on the named object [N]; 0 when no finger touches it."""
+        gid = self.obj_geoms[name]
+        per, f6 = {}, np.zeros(6)
+        for i in range(self.data.ncon):
+            c = self.data.contact[i]
+            if gid in (c.geom1, c.geom2):
+                nm = self.model.body(self._geom_body(c.geom2 if c.geom1 == gid else c.geom1)).name
+                if nm in ("left_finger", "right_finger"):
+                    mujoco.mj_contactForce(self.model, self.data, i, f6)
+                    per[nm] = per.get(nm, 0.0) + abs(float(f6[0]))
+        return max(per.values()) if per else 0.0
 
     def finger_force_contacts(self, name: str) -> int:
         """Number of fingertip-pad contacts currently touching the named object."""

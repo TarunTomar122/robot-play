@@ -68,6 +68,27 @@ def _build_stack(rng, quirk: bool, mass: float | None = None, mu: float | None =
     return SceneSpec(objects=objs), {}, {}
 
 
+FRAGILE_N = 3.5            # each finger may press at most this hard on the fragile cube [N]: 'normal' presses with about 2.6 N, 'firm' with about 4.9 N
+
+
+def _build_mixed(rng, quirk: bool):
+    """Stack with two odd cubes. In every layout one of cube_green and cube_blue is heavy and slippery (it needs a firm grip) and the other is fragile (it takes
+    at most FRAGILE_N per finger, so a firm grip makes the hand let go). Which is which is drawn from the seed and is never shown. The control scene has two ordinary cubes."""
+    pts = _sample_xy(rng, 3, min_sep=0.14)
+    heavy_is_green = bool(rng.integers(2))
+    heavy = dict(mass=0.25, friction=(0.5, 0.001, 0.0001))
+    light = dict(mass=0.05, friction=(0.9, 0.001, 0.0001))
+    kinds = {"cube_green": (heavy if heavy_is_green else light) if quirk else light, "cube_blue": (light if heavy_is_green else heavy) if quirk else light}
+    frag = {"cube_green": None if (heavy_is_green or not quirk) else FRAGILE_N, "cube_blue": None if (not heavy_is_green or not quirk) else FRAGILE_N}
+    objs = [
+        ObjectSpec("cube_red", "box", (.02, .02, .02), tuple(pts[0]), (.9, .15, .15, 1), mass=0.05),
+        ObjectSpec("cube_green", "box", (.02, .02, .02), tuple(pts[1]), (.15, .75, .2, 1), crush_n=frag["cube_green"], **kinds["cube_green"]),
+        ObjectSpec("cube_blue", "box", (.02, .02, .02), tuple(pts[2]), (.15, .25, .9, 1), crush_n=frag["cube_blue"], **kinds["cube_blue"]),
+    ]
+    meta = {"heavy": ("cube_green" if heavy_is_green else "cube_blue") if quirk else None, "fragile": (("cube_blue" if heavy_is_green else "cube_green") if quirk else None)}
+    return SceneSpec(objects=objs), {}, meta
+
+
 def _check_stack(env):
     w = env.w
     names = ("cube_red", "cube_green", "cube_blue")
@@ -163,6 +184,8 @@ def _check_flasks(env):
 TASKS = {
     "stack": Task("stack", "Stack the three cubes into one tower. cube_red is the bottom and stays where it is, cube_green goes on top of it, "
                   "then cube_blue on top of cube_green. Call done() when the tower is finished.", _build_stack, _check_stack),
+    "mixed": Task("mixed", "Stack the three cubes into one tower. cube_red is the bottom and stays where it is, cube_green goes on top of it, "
+                  "then cube_blue on top of cube_green. Call done() when the tower is finished.", _build_mixed, _check_stack),
     "bins": Task("bins", "Sort the cubes: put both red cubes (cube_red1, cube_red2) into bin_red and both blue cubes (cube_blue1, cube_blue2) "
                  "into bin_blue, so that every cube ends up resting inside the bin of its colour. Call done() when finished.", _build_bins, _check_bins),
     "flasks": Task("flasks", "Move flask_a upright onto ring_a and flask_b upright onto ring_b, centred in each ring and standing on the floor. "
