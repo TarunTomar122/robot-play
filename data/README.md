@@ -1,6 +1,6 @@
 # Raw run files
 
-`robot-play-runs.tar.xz` (7.7 MB) holds every run file behind every number in `results/RESULTS.md`: one `.jsonl` file per run (a header line with the plan and the code hash, then one line per finished episode with the full tool-call log, the memory, the usage and the verdict), grouped in the folders named in [results/code_versions.md](../results/code_versions.md), plus the spend ledger (`runs/spend/ledger.jsonl`) and the zero-practice notebooks (`runs/prior_notebooks`). Pilot and smoke-test folders that no table uses are left out. The only edit is that local file-system paths inside a few zero-cost crash messages (the three-minute model-directory outage of 17 Nov, deviation 5) were replaced by `<local>`.
+`robot-play-runs.tar.xz` (8.1 MB) holds every run file behind every number in `results/RESULTS.md`: one `.jsonl` file per run (a header line with the plan and the code hash, then one line per finished episode with the full tool-call log, the memory, the usage and the verdict), grouped in the folders named in [results/code_versions.md](../results/code_versions.md), plus the spend ledger (`runs/spend/ledger.jsonl`) and the zero-practice notebooks (`runs/prior_notebooks`). Pilot and smoke-test folders that no table uses are left out. The only edit is that local file-system paths inside a few zero-cost crash messages (the three-minute model-directory outage of 17 Nov, deviation 5) were replaced by `<local>`.
 
 Regenerate the report from the files, with no network and no money:
 
@@ -11,4 +11,4 @@ cd /tmp/rp && /path/to/robot-play/.venv/bin/python /path/to/robot-play/scripts/a
 /path/to/robot-play/.venv/bin/python /path/to/robot-play/scripts/check_run_files.py runs/*
 ```
 
-The regenerated `RESULTS.md` is identical to `results/RESULTS.md` (checked on 17 Nov, 02:25: `diff` is empty). SHA-256 of the archive: `e928ca800c6d74d5297dd0f25b05c348fbd4d8b20b4d843836b0be5dacc79279`.
+The regenerated `RESULTS.md` is identical to `results/RESULTS.md` (checked on 17 Nov, 03:05: `diff` is empty). SHA-256 of the archive: `88bf244e4e7397811b739db98cefc675a4322a2ea996e8e81049c9e8c610c9a8`.

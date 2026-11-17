@@ -101,7 +101,7 @@ Runs with practice or a borrowed notebook that did not finish their whole plan a
 
 Planned cells that did not start (exploratory cells included; the borrowed cells are planned only where the Fable notebook they read finished): none (every planned run file exists).
 
-Spend meter (pessimistic pricing): {"anthropic": {"spent": 72.052985, "reserved": 0.0, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 26.026229, "reserved": 0.0, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 0. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
+Spend meter (pessimistic pricing): {"anthropic": {"spent": 72.506062, "reserved": 0.0, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 26.958573, "reserved": 0.0, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 0. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
 
 ## 2. Q1: does experience raise held-out success?
 
@@ -696,6 +696,95 @@ Paired differences (task, run seed; every pair that exists, which can be more th
 | gpt-6-luna | bins | reads Sonnet's notebook against keeps a notebook | 5 | 100% | 100% | +0.0 pp (95% CI -12.3 to +12.3) |
 | gpt-6-luna | flasks | reads Sonnet's notebook against starts fresh | 5 | 100% | 85% | +15.0 pp (95% CI -3.3 to +33.3) |
 | gpt-6-luna | flasks | reads Sonnet's notebook against keeps a notebook | 5 | 100% | 100% | +0.0 pp (95% CI -12.3 to +12.3) |
+
+## 6f. Exploratory: is it the words or the label? (a label-matched text control)
+
+Registered before any episode ran (PROTOCOL.md v1.9). No practice; the memory slot has **one neutral label** ("NOTES FOR THIS TASK") over (a) an inert sentence of about the generic sentence's length that names no setting, (b) the generic sentence of section 6d (it lists `grip_level`, `grasp_height`, `release_height` and `speed`), (c) the naming sentence of section 6d. Same layouts as the replication and section 6d (run seeds 20 to 29), so every arm pairs. Run files started 180, complete 180 (planned 180). Plain 95% intervals.
+
+**Predictions of PROTOCOL.md v1.9, scored by the generator first** (pending until every pair exists; below 80% of the planned pairs inconclusive after the cell has finished). The registered reading: if L1 and L4 hold, the generic sentence's effect comes from the settings it lists and not from the label or from text of that length; if L1 fails (inert at 80% or more), much of it is an attention effect of any note; if L2 fails while the operator-labelled generic hint reached 90%, the authority of the label mattered.
+
+| prediction | result | status |
+|---|---|---|
+| L1: Haiku `stack` with the inert text solves at most 65% | Haiku stack inert 40% | met |
+| L2: Haiku `stack` with the generic text under the neutral label solves at least 80% | Haiku stack generic 92% | met |
+| L3: Haiku `stack` with the naming text under the neutral label solves at least 90% | Haiku stack naming 100% | met |
+| L4: Haiku `stack`, generic minus inert is at least +20 points | generic minus inert +52.5 | met |
+
+Validation of the included files: 180 run files, every one with code hash `58b19ca1be3740fe` and a run seed from 20 to 29: yes.
+
+Held-out success (and calls to success) on exactly the runs every arm of that model has:
+
+| model | jobs | runs | no memory | inert, neutral label | generic, neutral label | generic, operator label | naming, neutral label | naming, operator label |
+|---|---|---|---|---|---|---|---|---|
+| claude-haiku-5-5 | all three jobs | 30 | 78% (15.3 calls) | 75% (16.1 calls) | 92% (12.9 calls) | 91% (13.9 calls) | 100% (7.5 calls) | 100% (7.5 calls) |
+| claude-haiku-5-5 | stack | 10 | 50% (16.4 calls) | 40% (18.3 calls) | 92% (8.4 calls) | 90% (11.6 calls) | 100% (6.1 calls) | 100% (6.0 calls) |
+| claude-haiku-5-5 | bins | 10 | 90% (19.0 calls) | 98% (18.9 calls) | 100% (18.9 calls) | 90% (19.1 calls) | 100% (10.1 calls) | 100% (10.3 calls) |
+| claude-haiku-5-5 | flasks | 10 | 95% (10.6 calls) | 88% (11.1 calls) | 85% (11.5 calls) | 92% (11.0 calls) | 100% (6.2 calls) | 100% (6.3 calls) |
+| gpt-6-luna | all three jobs | 30 | 91% (12.0 calls) | 86% (13.4 calls) | 94% (11.2 calls) | 93% (11.6 calls) | 100% (7.4 calls) | 100% (7.4 calls) |
+| gpt-6-luna | stack | 10 | 98% (8.0 calls) | 100% (9.2 calls) | 100% (7.6 calls) | 100% (7.7 calls) | 100% (6.1 calls) | 100% (6.2 calls) |
+| gpt-6-luna | bins | 10 | 92% (15.2 calls) | 72% (16.9 calls) | 90% (15.1 calls) | 92% (15.2 calls) | 100% (10.0 calls) | 100% (10.0 calls) |
+| gpt-6-luna | flasks | 10 | 82% (12.8 calls) | 85% (14.2 calls) | 92% (10.8 calls) | 88% (11.9 calls) | 100% (6.0 calls) | 100% (6.0 calls) |
+
+Paired differences (task, run seed):
+
+| model | jobs | comparison | pairs | first | second | difference |
+|---|---|---|---|---|---|---|
+| claude-haiku-5-5 | all three jobs | reads an inert sentence under the neutral label against starts fresh | 30 | 75% | 78% | -3.3 pp (95% CI -14.0 to +7.3) |
+| claude-haiku-5-5 | all three jobs | reads the generic sentence under the neutral label against reads an inert sentence under the neutral label | 30 | 92% | 75% | +17.5 pp (95% CI +7.8 to +27.2) |
+| claude-haiku-5-5 | all three jobs | reads the generic sentence under the neutral label against starts fresh | 30 | 92% | 78% | +14.2 pp (95% CI +4.8 to +23.5) |
+| claude-haiku-5-5 | all three jobs | reads the naming sentence under the neutral label against reads the generic sentence under the neutral label | 30 | 100% | 92% | +7.5 pp (95% CI +1.1 to +13.9) |
+| claude-haiku-5-5 | all three jobs | reads the naming sentence under the neutral label against starts fresh | 30 | 100% | 78% | +21.7 pp (95% CI +14.1 to +29.2) |
+| claude-haiku-5-5 | all three jobs | reads the generic sentence under the neutral label against reads a generic tip (lists the four adjustable settings, names no fix) | 30 | 92% | 91% | +1.7 pp (95% CI -7.4 to +10.8) |
+| claude-haiku-5-5 | all three jobs | reads the naming sentence under the neutral label against reads a one-sentence hint naming the fix | 30 | 100% | 100% | +0.0 pp (95% CI -2.3 to +2.3) |
+| claude-haiku-5-5 | stack | reads an inert sentence under the neutral label against starts fresh | 10 | 40% | 50% | -10.0 pp (95% CI -38.2 to +18.2) |
+| claude-haiku-5-5 | stack | reads the generic sentence under the neutral label against reads an inert sentence under the neutral label | 10 | 92% | 40% | +52.5 pp (95% CI +32.8 to +72.2) |
+| claude-haiku-5-5 | stack | reads the generic sentence under the neutral label against starts fresh | 10 | 92% | 50% | +42.5 pp (95% CI +21.8 to +63.2) |
+| claude-haiku-5-5 | stack | reads the naming sentence under the neutral label against reads the generic sentence under the neutral label | 10 | 100% | 92% | +7.5 pp (95% CI -2.5 to +17.5) |
+| claude-haiku-5-5 | stack | reads the naming sentence under the neutral label against starts fresh | 10 | 100% | 50% | +50.0 pp (95% CI +31.1 to +68.9) |
+| claude-haiku-5-5 | stack | reads the generic sentence under the neutral label against reads a generic tip (lists the four adjustable settings, names no fix) | 10 | 92% | 90% | +2.5 pp (95% CI -10.7 to +15.7) |
+| claude-haiku-5-5 | stack | reads the naming sentence under the neutral label against reads a one-sentence hint naming the fix | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| claude-haiku-5-5 | bins | reads an inert sentence under the neutral label against starts fresh | 10 | 98% | 90% | +7.5 pp (95% CI -4.2 to +19.2) |
+| claude-haiku-5-5 | bins | reads the generic sentence under the neutral label against reads an inert sentence under the neutral label | 10 | 100% | 98% | +2.5 pp (95% CI -5.4 to +10.4) |
+| claude-haiku-5-5 | bins | reads the generic sentence under the neutral label against starts fresh | 10 | 100% | 90% | +10.0 pp (95% CI -0.8 to +20.8) |
+| claude-haiku-5-5 | bins | reads the naming sentence under the neutral label against reads the generic sentence under the neutral label | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| claude-haiku-5-5 | bins | reads the naming sentence under the neutral label against starts fresh | 10 | 100% | 90% | +10.0 pp (95% CI -0.8 to +20.8) |
+| claude-haiku-5-5 | bins | reads the generic sentence under the neutral label against reads a generic tip (lists the four adjustable settings, names no fix) | 10 | 100% | 90% | +10.0 pp (95% CI -2.5 to +22.5) |
+| claude-haiku-5-5 | bins | reads the naming sentence under the neutral label against reads a one-sentence hint naming the fix | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| claude-haiku-5-5 | flasks | reads an inert sentence under the neutral label against starts fresh | 10 | 88% | 95% | -7.5 pp (95% CI -24.5 to +9.5) |
+| claude-haiku-5-5 | flasks | reads the generic sentence under the neutral label against reads an inert sentence under the neutral label | 10 | 85% | 88% | -2.5 pp (95% CI -27.0 to +22.0) |
+| claude-haiku-5-5 | flasks | reads the generic sentence under the neutral label against starts fresh | 10 | 85% | 95% | -10.0 pp (95% CI -31.0 to +11.0) |
+| claude-haiku-5-5 | flasks | reads the naming sentence under the neutral label against reads the generic sentence under the neutral label | 10 | 100% | 85% | +15.0 pp (95% CI -4.2 to +34.2) |
+| claude-haiku-5-5 | flasks | reads the naming sentence under the neutral label against starts fresh | 10 | 100% | 95% | +5.0 pp (95% CI -4.1 to +14.1) |
+| claude-haiku-5-5 | flasks | reads the generic sentence under the neutral label against reads a generic tip (lists the four adjustable settings, names no fix) | 10 | 85% | 92% | -7.5 pp (95% CI -31.4 to +16.4) |
+| claude-haiku-5-5 | flasks | reads the naming sentence under the neutral label against reads a one-sentence hint naming the fix | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| gpt-6-luna | all three jobs | reads an inert sentence under the neutral label against starts fresh | 30 | 86% | 91% | -5.0 pp (95% CI -13.3 to +3.3) |
+| gpt-6-luna | all three jobs | reads the generic sentence under the neutral label against reads an inert sentence under the neutral label | 30 | 94% | 86% | +8.3 pp (95% CI -0.9 to +17.6) |
+| gpt-6-luna | all three jobs | reads the generic sentence under the neutral label against starts fresh | 30 | 94% | 91% | +3.3 pp (95% CI -3.5 to +10.2) |
+| gpt-6-luna | all three jobs | reads the naming sentence under the neutral label against reads the generic sentence under the neutral label | 30 | 100% | 94% | +5.8 pp (95% CI +1.2 to +10.5) |
+| gpt-6-luna | all three jobs | reads the naming sentence under the neutral label against starts fresh | 30 | 100% | 91% | +9.2 pp (95% CI +3.6 to +14.7) |
+| gpt-6-luna | all three jobs | reads the generic sentence under the neutral label against reads a generic tip (lists the four adjustable settings, names no fix) | 30 | 94% | 93% | +0.8 pp (95% CI -6.5 to +8.2) |
+| gpt-6-luna | all three jobs | reads the naming sentence under the neutral label against reads a one-sentence hint naming the fix | 30 | 100% | 100% | +0.0 pp (95% CI -2.3 to +2.3) |
+| gpt-6-luna | stack | reads an inert sentence under the neutral label against starts fresh | 10 | 100% | 98% | +2.5 pp (95% CI -5.4 to +10.4) |
+| gpt-6-luna | stack | reads the generic sentence under the neutral label against reads an inert sentence under the neutral label | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| gpt-6-luna | stack | reads the generic sentence under the neutral label against starts fresh | 10 | 100% | 98% | +2.5 pp (95% CI -5.4 to +10.4) |
+| gpt-6-luna | stack | reads the naming sentence under the neutral label against reads the generic sentence under the neutral label | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| gpt-6-luna | stack | reads the naming sentence under the neutral label against starts fresh | 10 | 100% | 98% | +2.5 pp (95% CI -5.4 to +10.4) |
+| gpt-6-luna | stack | reads the generic sentence under the neutral label against reads a generic tip (lists the four adjustable settings, names no fix) | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| gpt-6-luna | stack | reads the naming sentence under the neutral label against reads a one-sentence hint naming the fix | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| gpt-6-luna | bins | reads an inert sentence under the neutral label against starts fresh | 10 | 72% | 92% | -20.0 pp (95% CI -40.3 to +0.3) |
+| gpt-6-luna | bins | reads the generic sentence under the neutral label against reads an inert sentence under the neutral label | 10 | 90% | 72% | +17.5 pp (95% CI -9.2 to +44.2) |
+| gpt-6-luna | bins | reads the generic sentence under the neutral label against starts fresh | 10 | 90% | 92% | -2.5 pp (95% CI -15.7 to +10.7) |
+| gpt-6-luna | bins | reads the naming sentence under the neutral label against reads the generic sentence under the neutral label | 10 | 100% | 90% | +10.0 pp (95% CI -2.5 to +22.5) |
+| gpt-6-luna | bins | reads the naming sentence under the neutral label against starts fresh | 10 | 100% | 92% | +7.5 pp (95% CI -2.5 to +17.5) |
+| gpt-6-luna | bins | reads the generic sentence under the neutral label against reads a generic tip (lists the four adjustable settings, names no fix) | 10 | 90% | 92% | -2.5 pp (95% CI -20.3 to +15.3) |
+| gpt-6-luna | bins | reads the naming sentence under the neutral label against reads a one-sentence hint naming the fix | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| gpt-6-luna | flasks | reads an inert sentence under the neutral label against starts fresh | 10 | 85% | 82% | +2.5 pp (95% CI -15.3 to +20.3) |
+| gpt-6-luna | flasks | reads the generic sentence under the neutral label against reads an inert sentence under the neutral label | 10 | 92% | 85% | +7.5 pp (95% CI -7.2 to +22.2) |
+| gpt-6-luna | flasks | reads the generic sentence under the neutral label against starts fresh | 10 | 92% | 82% | +10.0 pp (95% CI -5.1 to +25.1) |
+| gpt-6-luna | flasks | reads the naming sentence under the neutral label against reads the generic sentence under the neutral label | 10 | 100% | 92% | +7.5 pp (95% CI -2.5 to +17.5) |
+| gpt-6-luna | flasks | reads the naming sentence under the neutral label against starts fresh | 10 | 100% | 82% | +17.5 pp (95% CI +4.8 to +30.2) |
+| gpt-6-luna | flasks | reads the generic sentence under the neutral label against reads a generic tip (lists the four adjustable settings, names no fix) | 10 | 92% | 88% | +5.0 pp (95% CI -11.4 to +21.4) |
+| gpt-6-luna | flasks | reads the naming sentence under the neutral label against reads a one-sentence hint naming the fix | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
 
 ## 7. Skill-level against pose-level tools
 
