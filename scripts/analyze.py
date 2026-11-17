@@ -31,7 +31,7 @@ COLORS = {"none": "#2a78d6", "notebook": "#eb6834", "replay": "#1baf7a"}        
 TASKS = ["stack", "bins", "flasks"]
 NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job",
          "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes",
-         "hint": "reads a one-sentence hint naming the fix", "hint_generic": "reads a generic hint (names no setting)", "prior": "reads Fable's notebook written with no practice"}
+         "hint": "reads a one-sentence hint naming the fix", "hint_generic": "reads a generic tip (lists the four adjustable settings, names no fix)", "prior": "reads Fable's notebook written with no practice"}
 
 
 def f(x, pct=False):
@@ -637,7 +637,7 @@ def main():
         allr = rep_rows + hp_rows
         hcov = A.coverage(*ex(a.hint))
         L += ["## 6d. Exploratory: is it the experience, or one sentence? (hint, generic hint and zero-practice notebook)", "",
-              "Registered before the cells existed (PROTOCOL.md v1.7). No practice in any of these arms; the memory slot holds (a) `hint`: one fixed sentence naming the fixing setting, (b) `hint_generic`: one fixed generic sentence that names no setting, (c) `prior`: a notebook Fable wrote with **zero practice** from the task text and tool descriptions only. "
+              "Registered before the cells existed (PROTOCOL.md v1.7). No practice in any of these arms; the memory slot holds (a) `hint`: one fixed sentence naming the fixing setting, (b) `hint_generic`: one fixed generic sentence that lists the adjustable settings (`grip_level`, `grasp_height`, `release_height`, `speed`, which include each job's fixing setting) and says to change them one at a time after a failure, but never says which one or to what value (it is **not** a placebo: it is a shortlist plus permission to vary), (c) `prior`: a notebook Fable wrote with **zero practice** from the task text and tool descriptions only. "
               "Compared with the `none` and `notebook` arms of the corrected-simulator replication (section 6c) on the same run seeds 20 to 29 and the same held-out layouts. The prompt labels differ between arms, so nothing here isolates content from label. "
               f"Run files started {len(hcov)}, complete {sum(int(c['complete']) for c in hcov)} (planned 180); every file's hash: " + ", ".join(sorted({f"`{c.get('code')}`" for c in hcov})) + ". Plain 95% intervals.", ""]
         arms = ("none", "notebook", "hint", "hint_generic", "prior")
@@ -656,6 +656,7 @@ def main():
                     x = [r for r in A.select(allr, model=m, condition=c, phase="eval", quirk=True) if r["task"] in tl and (r["task"], r["run_seed"]) in keys[m]]
                     cells.append(f"{f(mean(x, 'success'), True)} ({mean(x, 'calls_to_success'):.1f} calls)" if x else "-")
                 tr.append((m, tname, len({k for k in keys[m] if k[0] in tl}), *cells))
+        pred_at_6d = len(L)
         L += ["Held-out success (and calls to success) on exactly the runs every arm of that model has:", "", table(["model", "jobs", "runs", "no memory", "own notebook", "hint", "generic hint", "Fable, no practice"], tr), ""]
         cmp_rows, vd = [], {}
         for m in cheap:
@@ -708,7 +709,9 @@ def main():
         pr.append(("H3: the zero-practice notebooks name `grip_level firm` for `stack` in at least 5 of 10, a release height of 0.14 or more for `bins` in at most 2 of 10 and a grasp height of 0.8 or more for `flasks` in at most 3 of 10, and Haiku `stack` with a prior notebook solves at least 60%",
                    f"names the fix: stack {named.get('stack', 0)} of {n_notebooks.get('stack', 0)}, bins {named.get('bins', 0)} of {n_notebooks.get('bins', 0)}, flasks {named.get('flasks', 0)} of {n_notebooks.get('flasks', 0)}" + (f"; Haiku stack prior {f(ps_['a'], True)}" if ps_ else ""),
                    h3_state if kw_complete else "pending"))
-        L += ["Predictions of PROTOCOL.md v1.7, scored by the generator (pending until every pair exists; after the cells have finished, scored when each cell has the registered floor of 24 of 30 pooled and 8 of 10 per-job pairs, inconclusive below it):", "", table(["prediction", "result", "status"], pr), ""]
+        L[pred_at_6d:pred_at_6d] = ["**Predictions of PROTOCOL.md v1.7, scored by the generator first, as the protocol requires** (pending until every pair exists; after the cells have finished, scored when each cell has the registered floor of 24 of 30 pooled and 8 of 10 per-job pairs, inconclusive below it). The registered reading: if H2 fails the headline is weakened, and if H3 fails because the notebooks name the fix, practice is the wrong cost to count.", "", table(["prediction", "result", "status"], pr), ""]
+        bad_files = [c for c in hcov if c.get("code") != "088c639d7139a3af" or not all(20 <= int(x) <= 29 for x in [c.get("run_seed", 20)])]
+        L.insert(pred_at_6d + 4, f"Validation of the included files: {len(hcov)} run files, every one with code hash `088c639d7139a3af` and a run seed from 20 to 29: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.\n")
 
     # --- 6e: a second, mid-tier writer (v1.8; exploratory)
     wr_rows = A.load(*ex(a.writer), complete_only=True) if ex(a.writer) else []
@@ -755,6 +758,7 @@ def main():
                     x = [r for r in A.select(allr, model=m, condition=c, phase="eval", quirk=True) if r["task"] in tl and (r["task"], r["run_seed"]) in keys[m]]
                     cells.append(f"{f(mean(x, 'success'), True)} ({mean(x, 'calls_to_success'):.1f} calls)" if x else "-")
                 tr.append((m, tname, len({k for k in keys[m] if k[0] in tl}), *cells))
+        pred_at_6e = len(L)
         L += ["Held-out success (and calls to success) on exactly the runs that have all three arms:", "", table(["model", "jobs", "runs", "no memory", "own notebook", "Sonnet's notebook, no practice"], tr), ""]
         cmp_rows, vd = [], {}
         for m in cheap:
@@ -786,7 +790,7 @@ def main():
                 return fn()
             if not final:
                 return "pending"
-            return "inconclusive (below the registered floor)" if any(g < 16 for g in got) else fn() + " (scored with fewer than the planned pairs, above the floor)"
+            return "inconclusive (below the registered floor)" if any(g < 0.8 * exp_pairs[c[1]] for g, c in zip(got, cells)) else fn() + " (scored with fewer than the planned pairs, above the floor)"
         pr = []
         pr.append(("S1: Haiku `stack` reading Sonnet's notebook solves at least 90% of the 40 held-out layouts",
                    f"Haiku stack {f(ph['a'], True)}" if ph else "no data", S3([(hm, "stack", "borrowed", "none")], lambda: "met" if ph and ph["a"] >= 0.90 else "MISSED")))
@@ -803,7 +807,9 @@ def main():
                        ("met" if mb > mo else "MISSED") if (final or all(len(bor.get(k, [])) == 4 for k in own if sum(own[k]) <= 1)) else "pending"))
         else:
             pr.append(("S4: where Haiku's own notebook solved at most 1 of 4, reading Sonnet's notebook solves strictly more on average", "no such run in the replication so far", "not testable" if final else "pending"))
-        L += ["Predictions of PROTOCOL.md v1.8, scored by the generator (pending until every pair exists; below 16 of 20 runs per model inconclusive after the cells have finished):", "", table(["prediction", "result", "status"], pr), ""]
+        L[pred_at_6e:pred_at_6e] = ["**Predictions of PROTOCOL.md v1.8, scored by the generator first** (pending until every pair exists; below 80% of the planned pairs inconclusive after the cells have finished). Note: v1.8 was registered at 01:35, after the hint cell (which showed the naming hint at 100% on `stack`) had finished, so S1 and S2 were close to certain when written.", "", table(["prediction", "result", "status"], pr), ""]
+        bad_files = [c for c in wcov + bcov if c.get("code") != "088c639d7139a3af" or not all(20 <= int(x) <= 29 for x in [c.get("run_seed", 20)])]
+        L.insert(pred_at_6e + 4, f"Validation of the included files: {len(wcov) + len(bcov)} run files, every one with code hash `088c639d7139a3af` and a run seed from 20 to 29: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.\n")
 
     # --- pose
     if pose:

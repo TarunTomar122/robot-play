@@ -554,7 +554,17 @@ Disturbed held-out episodes on the same code (catch scenes, exploratory replicat
 
 ## 6d. Exploratory: is it the experience, or one sentence? (hint, generic hint and zero-practice notebook)
 
-Registered before the cells existed (PROTOCOL.md v1.7). No practice in any of these arms; the memory slot holds (a) `hint`: one fixed sentence naming the fixing setting, (b) `hint_generic`: one fixed generic sentence that names no setting, (c) `prior`: a notebook Fable wrote with **zero practice** from the task text and tool descriptions only. Compared with the `none` and `notebook` arms of the corrected-simulator replication (section 6c) on the same run seeds 20 to 29 and the same held-out layouts. The prompt labels differ between arms, so nothing here isolates content from label. Run files started 180, complete 180 (planned 180); every file's hash: `088c639d7139a3af`. Plain 95% intervals.
+Registered before the cells existed (PROTOCOL.md v1.7). No practice in any of these arms; the memory slot holds (a) `hint`: one fixed sentence naming the fixing setting, (b) `hint_generic`: one fixed generic sentence that lists the adjustable settings (`grip_level`, `grasp_height`, `release_height`, `speed`, which include each job's fixing setting) and says to change them one at a time after a failure, but never says which one or to what value (it is **not** a placebo: it is a shortlist plus permission to vary), (c) `prior`: a notebook Fable wrote with **zero practice** from the task text and tool descriptions only. Compared with the `none` and `notebook` arms of the corrected-simulator replication (section 6c) on the same run seeds 20 to 29 and the same held-out layouts. The prompt labels differ between arms, so nothing here isolates content from label. Run files started 180, complete 180 (planned 180); every file's hash: `088c639d7139a3af`. Plain 95% intervals.
+
+**Predictions of PROTOCOL.md v1.7, scored by the generator first, as the protocol requires** (pending until every pair exists; after the cells have finished, scored when each cell has the registered floor of 24 of 30 pooled and 8 of 10 per-job pairs, inconclusive below it). The registered reading: if H2 fails the headline is weakened, and if H3 fails because the notebooks name the fix, practice is the wrong cost to count.
+
+| prediction | result | status |
+|---|---|---|
+| H1: the hint is within 5 points of the model's own notebook (pooled, each model) and Haiku `stack` with the hint is at least 90% | claude-haiku-5-5: hint minus notebook +0.0; gpt-6-luna: hint minus notebook +0.0; Haiku stack hint 100% | met |
+| H2: the generic hint stays well below the notebook: Haiku `stack` at most 60% and a pooled gain over no memory under +10 points for each model | claude-haiku-5-5: generic minus none +12.5; gpt-6-luna: generic minus none +2.5; Haiku stack generic 90% | MISSED |
+| H3: the zero-practice notebooks name `grip_level firm` for `stack` in at least 5 of 10, a release height of 0.14 or more for `bins` in at most 2 of 10 and a grasp height of 0.8 or more for `flasks` in at most 3 of 10, and Haiku `stack` with a prior notebook solves at least 60% | names the fix: stack 0 of 10, bins 0 of 10, flasks 0 of 10; Haiku stack prior 65% | MISSED |
+
+Validation of the included files: 180 run files, every one with code hash `088c639d7139a3af` and a run seed from 20 to 29: yes.
 
 Held-out success (and calls to success) on exactly the runs every arm of that model has:
 
@@ -575,50 +585,50 @@ Paired differences (task, run seed):
 |---|---|---|---|---|---|---|
 | claude-haiku-5-5 | all three jobs | reads a one-sentence hint naming the fix against keeps a notebook | 30 | 100% | 100% | +0.0 pp (95% CI -2.3 to +2.3) |
 | claude-haiku-5-5 | all three jobs | reads a one-sentence hint naming the fix against starts fresh | 30 | 100% | 78% | +21.7 pp (95% CI +14.1 to +29.2) |
-| claude-haiku-5-5 | all three jobs | reads a generic hint (names no setting) against starts fresh | 30 | 91% | 78% | +12.5 pp (95% CI +3.4 to +21.6) |
-| claude-haiku-5-5 | all three jobs | reads a generic hint (names no setting) against keeps a notebook | 30 | 91% | 100% | -9.2 pp (95% CI -14.7 to -3.6) |
+| claude-haiku-5-5 | all three jobs | reads a generic tip (lists the four adjustable settings, names no fix) against starts fresh | 30 | 91% | 78% | +12.5 pp (95% CI +3.4 to +21.6) |
+| claude-haiku-5-5 | all three jobs | reads a generic tip (lists the four adjustable settings, names no fix) against keeps a notebook | 30 | 91% | 100% | -9.2 pp (95% CI -14.7 to -3.6) |
 | claude-haiku-5-5 | all three jobs | reads Fable's notebook written with no practice against starts fresh | 30 | 87% | 78% | +8.3 pp (95% CI -1.3 to +17.9) |
 | claude-haiku-5-5 | all three jobs | reads Fable's notebook written with no practice against keeps a notebook | 30 | 87% | 100% | -13.3 pp (95% CI -19.7 to -7.0) |
 | claude-haiku-5-5 | stack | reads a one-sentence hint naming the fix against keeps a notebook | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
 | claude-haiku-5-5 | stack | reads a one-sentence hint naming the fix against starts fresh | 10 | 100% | 50% | +50.0 pp (95% CI +31.1 to +68.9) |
-| claude-haiku-5-5 | stack | reads a generic hint (names no setting) against starts fresh | 10 | 90% | 50% | +40.0 pp (95% CI +15.9 to +64.1) |
-| claude-haiku-5-5 | stack | reads a generic hint (names no setting) against keeps a notebook | 10 | 90% | 100% | -10.0 pp (95% CI -20.8 to +0.8) |
+| claude-haiku-5-5 | stack | reads a generic tip (lists the four adjustable settings, names no fix) against starts fresh | 10 | 90% | 50% | +40.0 pp (95% CI +15.9 to +64.1) |
+| claude-haiku-5-5 | stack | reads a generic tip (lists the four adjustable settings, names no fix) against keeps a notebook | 10 | 90% | 100% | -10.0 pp (95% CI -20.8 to +0.8) |
 | claude-haiku-5-5 | stack | reads Fable's notebook written with no practice against starts fresh | 10 | 65% | 50% | +15.0 pp (95% CI -7.6 to +37.6) |
 | claude-haiku-5-5 | stack | reads Fable's notebook written with no practice against keeps a notebook | 10 | 65% | 100% | -35.0 pp (95% CI -52.3 to -17.7) |
 | claude-haiku-5-5 | bins | reads a one-sentence hint naming the fix against keeps a notebook | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
 | claude-haiku-5-5 | bins | reads a one-sentence hint naming the fix against starts fresh | 10 | 100% | 90% | +10.0 pp (95% CI -0.8 to +20.8) |
-| claude-haiku-5-5 | bins | reads a generic hint (names no setting) against starts fresh | 10 | 90% | 90% | +0.0 pp (95% CI -13.9 to +13.9) |
-| claude-haiku-5-5 | bins | reads a generic hint (names no setting) against keeps a notebook | 10 | 90% | 100% | -10.0 pp (95% CI -22.5 to +2.5) |
+| claude-haiku-5-5 | bins | reads a generic tip (lists the four adjustable settings, names no fix) against starts fresh | 10 | 90% | 90% | +0.0 pp (95% CI -13.9 to +13.9) |
+| claude-haiku-5-5 | bins | reads a generic tip (lists the four adjustable settings, names no fix) against keeps a notebook | 10 | 90% | 100% | -10.0 pp (95% CI -22.5 to +2.5) |
 | claude-haiku-5-5 | bins | reads Fable's notebook written with no practice against starts fresh | 10 | 98% | 90% | +7.5 pp (95% CI -4.6 to +19.6) |
 | claude-haiku-5-5 | bins | reads Fable's notebook written with no practice against keeps a notebook | 10 | 98% | 100% | -2.5 pp (95% CI -10.4 to +5.4) |
 | claude-haiku-5-5 | flasks | reads a one-sentence hint naming the fix against keeps a notebook | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
 | claude-haiku-5-5 | flasks | reads a one-sentence hint naming the fix against starts fresh | 10 | 100% | 95% | +5.0 pp (95% CI -4.1 to +14.1) |
-| claude-haiku-5-5 | flasks | reads a generic hint (names no setting) against starts fresh | 10 | 92% | 95% | -2.5 pp (95% CI -15.7 to +10.7) |
-| claude-haiku-5-5 | flasks | reads a generic hint (names no setting) against keeps a notebook | 10 | 92% | 100% | -7.5 pp (95% CI -17.5 to +2.5) |
+| claude-haiku-5-5 | flasks | reads a generic tip (lists the four adjustable settings, names no fix) against starts fresh | 10 | 92% | 95% | -2.5 pp (95% CI -15.7 to +10.7) |
+| claude-haiku-5-5 | flasks | reads a generic tip (lists the four adjustable settings, names no fix) against keeps a notebook | 10 | 92% | 100% | -7.5 pp (95% CI -17.5 to +2.5) |
 | claude-haiku-5-5 | flasks | reads Fable's notebook written with no practice against starts fresh | 10 | 98% | 95% | +2.5 pp (95% CI -7.7 to +12.7) |
 | claude-haiku-5-5 | flasks | reads Fable's notebook written with no practice against keeps a notebook | 10 | 98% | 100% | -2.5 pp (95% CI -10.4 to +5.4) |
 | gpt-6-luna | all three jobs | reads a one-sentence hint naming the fix against keeps a notebook | 30 | 100% | 100% | +0.0 pp (95% CI -2.3 to +2.3) |
 | gpt-6-luna | all three jobs | reads a one-sentence hint naming the fix against starts fresh | 30 | 100% | 91% | +9.2 pp (95% CI +3.6 to +14.7) |
-| gpt-6-luna | all three jobs | reads a generic hint (names no setting) against starts fresh | 30 | 93% | 91% | +2.5 pp (95% CI -4.5 to +9.5) |
-| gpt-6-luna | all three jobs | reads a generic hint (names no setting) against keeps a notebook | 30 | 93% | 100% | -6.7 pp (95% CI -11.6 to -1.8) |
+| gpt-6-luna | all three jobs | reads a generic tip (lists the four adjustable settings, names no fix) against starts fresh | 30 | 93% | 91% | +2.5 pp (95% CI -4.5 to +9.5) |
+| gpt-6-luna | all three jobs | reads a generic tip (lists the four adjustable settings, names no fix) against keeps a notebook | 30 | 93% | 100% | -6.7 pp (95% CI -11.6 to -1.8) |
 | gpt-6-luna | all three jobs | reads Fable's notebook written with no practice against starts fresh | 30 | 89% | 91% | -1.7 pp (95% CI -9.4 to +6.1) |
 | gpt-6-luna | all three jobs | reads Fable's notebook written with no practice against keeps a notebook | 30 | 89% | 100% | -10.8 pp (95% CI -16.7 to -5.0) |
 | gpt-6-luna | stack | reads a one-sentence hint naming the fix against keeps a notebook | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
 | gpt-6-luna | stack | reads a one-sentence hint naming the fix against starts fresh | 10 | 100% | 98% | +2.5 pp (95% CI -5.4 to +10.4) |
-| gpt-6-luna | stack | reads a generic hint (names no setting) against starts fresh | 10 | 100% | 98% | +2.5 pp (95% CI -5.4 to +10.4) |
-| gpt-6-luna | stack | reads a generic hint (names no setting) against keeps a notebook | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| gpt-6-luna | stack | reads a generic tip (lists the four adjustable settings, names no fix) against starts fresh | 10 | 100% | 98% | +2.5 pp (95% CI -5.4 to +10.4) |
+| gpt-6-luna | stack | reads a generic tip (lists the four adjustable settings, names no fix) against keeps a notebook | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
 | gpt-6-luna | stack | reads Fable's notebook written with no practice against starts fresh | 10 | 98% | 98% | +0.0 pp (95% CI -9.1 to +9.1) |
 | gpt-6-luna | stack | reads Fable's notebook written with no practice against keeps a notebook | 10 | 98% | 100% | -2.5 pp (95% CI -10.4 to +5.4) |
 | gpt-6-luna | bins | reads a one-sentence hint naming the fix against keeps a notebook | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
 | gpt-6-luna | bins | reads a one-sentence hint naming the fix against starts fresh | 10 | 100% | 92% | +7.5 pp (95% CI -2.5 to +17.5) |
-| gpt-6-luna | bins | reads a generic hint (names no setting) against starts fresh | 10 | 92% | 92% | +0.0 pp (95% CI -14.6 to +14.6) |
-| gpt-6-luna | bins | reads a generic hint (names no setting) against keeps a notebook | 10 | 92% | 100% | -7.5 pp (95% CI -17.5 to +2.5) |
+| gpt-6-luna | bins | reads a generic tip (lists the four adjustable settings, names no fix) against starts fresh | 10 | 92% | 92% | +0.0 pp (95% CI -14.6 to +14.6) |
+| gpt-6-luna | bins | reads a generic tip (lists the four adjustable settings, names no fix) against keeps a notebook | 10 | 92% | 100% | -7.5 pp (95% CI -17.5 to +2.5) |
 | gpt-6-luna | bins | reads Fable's notebook written with no practice against starts fresh | 10 | 92% | 92% | +0.0 pp (95% CI -12.6 to +12.6) |
 | gpt-6-luna | bins | reads Fable's notebook written with no practice against keeps a notebook | 10 | 92% | 100% | -7.5 pp (95% CI -17.5 to +2.5) |
 | gpt-6-luna | flasks | reads a one-sentence hint naming the fix against keeps a notebook | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
 | gpt-6-luna | flasks | reads a one-sentence hint naming the fix against starts fresh | 10 | 100% | 82% | +17.5 pp (95% CI +4.8 to +30.2) |
-| gpt-6-luna | flasks | reads a generic hint (names no setting) against starts fresh | 10 | 88% | 82% | +5.0 pp (95% CI -10.9 to +20.9) |
-| gpt-6-luna | flasks | reads a generic hint (names no setting) against keeps a notebook | 10 | 88% | 100% | -12.5 pp (95% CI -25.1 to +0.1) |
+| gpt-6-luna | flasks | reads a generic tip (lists the four adjustable settings, names no fix) against starts fresh | 10 | 88% | 82% | +5.0 pp (95% CI -10.9 to +20.9) |
+| gpt-6-luna | flasks | reads a generic tip (lists the four adjustable settings, names no fix) against keeps a notebook | 10 | 88% | 100% | -12.5 pp (95% CI -25.1 to +0.1) |
 | gpt-6-luna | flasks | reads Fable's notebook written with no practice against starts fresh | 10 | 78% | 82% | -5.0 pp (95% CI -22.5 to +12.5) |
 | gpt-6-luna | flasks | reads Fable's notebook written with no practice against keeps a notebook | 10 | 78% | 100% | -22.5 pp (95% CI -36.2 to -8.8) |
 
@@ -629,14 +639,6 @@ Do the zero-practice notebooks name the fixing setting? (the same keyword rules 
 | stack | 10 | 0 |
 | bins | 10 | 0 |
 | flasks | 10 | 0 |
-
-Predictions of PROTOCOL.md v1.7, scored by the generator (pending until every pair exists; after the cells have finished, scored when each cell has the registered floor of 24 of 30 pooled and 8 of 10 per-job pairs, inconclusive below it):
-
-| prediction | result | status |
-|---|---|---|
-| H1: the hint is within 5 points of the model's own notebook (pooled, each model) and Haiku `stack` with the hint is at least 90% | claude-haiku-5-5: hint minus notebook +0.0; gpt-6-luna: hint minus notebook +0.0; Haiku stack hint 100% | met |
-| H2: the generic hint stays well below the notebook: Haiku `stack` at most 60% and a pooled gain over no memory under +10 points for each model | claude-haiku-5-5: generic minus none +12.5; gpt-6-luna: generic minus none +2.5; Haiku stack generic 90% | MISSED |
-| H3: the zero-practice notebooks name `grip_level firm` for `stack` in at least 5 of 10, a release height of 0.14 or more for `bins` in at most 2 of 10 and a grasp height of 0.8 or more for `flasks` in at most 3 of 10, and Haiku `stack` with a prior notebook solves at least 60% | names the fix: stack 0 of 10, bins 0 of 10, flasks 0 of 10; Haiku stack prior 65% | MISSED |
 
 ## 6e. Exploratory: does the notebook need a frontier writer? (a second writer, Claude Sonnet 5.5)
 
@@ -649,6 +651,17 @@ Sonnet itself (its practice-episode success, its held-out success with its own n
 | stack | 10 of 10 | 93% | 100% | 9 of 10 |
 | bins | 5 of 5 | 100% | 100% | 5 of 5 |
 | flasks | 5 of 5 | 98% | 100% | 5 of 5 |
+
+**Predictions of PROTOCOL.md v1.8, scored by the generator first** (pending until every pair exists; below 80% of the planned pairs inconclusive after the cells have finished). Note: v1.8 was registered at 01:35, after the hint cell (which showed the naming hint at 100% on `stack`) had finished, so S1 and S2 were close to certain when written.
+
+| prediction | result | status |
+|---|---|---|
+| S1: Haiku `stack` reading Sonnet's notebook solves at least 90% of the 40 held-out layouts | Haiku stack 100% | met |
+| S2: pooled over the 20 runs, Haiku with Sonnet's notebook is within 5 points of Haiku's own notebook (difference at least -5) | borrowed minus own notebook +0.0 | met |
+| S3: Sonnet's `stack` notebooks name `grip_level firm` in at least 8 of 10 runs | 9 of 10 | met |
+| S4: where Haiku's own notebook solved at most 1 of 4, reading Sonnet's notebook solves strictly more on average | no such run in the replication so far | not testable |
+
+Validation of the included files: 60 run files, every one with code hash `088c639d7139a3af` and a run seed from 20 to 29: yes.
 
 Held-out success (and calls to success) on exactly the runs that have all three arms:
 
@@ -683,15 +696,6 @@ Paired differences (task, run seed; every pair that exists, which can be more th
 | gpt-6-luna | bins | reads Sonnet's notebook against keeps a notebook | 5 | 100% | 100% | +0.0 pp (95% CI -12.3 to +12.3) |
 | gpt-6-luna | flasks | reads Sonnet's notebook against starts fresh | 5 | 100% | 85% | +15.0 pp (95% CI -3.3 to +33.3) |
 | gpt-6-luna | flasks | reads Sonnet's notebook against keeps a notebook | 5 | 100% | 100% | +0.0 pp (95% CI -12.3 to +12.3) |
-
-Predictions of PROTOCOL.md v1.8, scored by the generator (pending until every pair exists; below 16 of 20 runs per model inconclusive after the cells have finished):
-
-| prediction | result | status |
-|---|---|---|
-| S1: Haiku `stack` reading Sonnet's notebook solves at least 90% of the 40 held-out layouts | Haiku stack 100% | met |
-| S2: pooled over the 20 runs, Haiku with Sonnet's notebook is within 5 points of Haiku's own notebook (difference at least -5) | borrowed minus own notebook +0.0 | met |
-| S3: Sonnet's `stack` notebooks name `grip_level firm` in at least 8 of 10 runs | 9 of 10 | met |
-| S4: where Haiku's own notebook solved at most 1 of 4, reading Sonnet's notebook solves strictly more on average | no such run in the replication so far | not testable |
 
 ## 7. Skill-level against pose-level tools
 
@@ -755,7 +759,7 @@ Over all held-out catch-scene episodes of the registered conditions (no memory, 
 
 **Deviation 4 (22:54): a tool-state artefact in the frozen simulator, found by the Fable judge in round 5a.** In the skills cells a model can still call `move_to` and `close_gripper` by hand. `close_gripper` attaches an object to the hand whenever both fingertips touch it, including when the fingertips rest on top of it, so it can answer `holding` with the hand nearly closed (under 3 cm); `pick` then says `already holding` and `place` says `not holding anything`, and a `move_to` can answer ok while stopping short. In the Haiku `stack` no-memory held-out episodes 9 of 40 (run seeds 0 to 9) and 13 of 40 (run seeds 10 to 19) contain such a false `holding` (8 and 9 of them failed), against none in the notebook and replay arms. The effect does not depend on it (28 of 40 fresh episodes never tried `grip_level firm` and 25 of those failed), but its size does: if every failed false-hold episode had succeeded the Haiku `stack` gap would be about +48 points instead of +68. The report counts these episodes per model, job, condition and phase and prints Q1 with those episodes dropped from every arm and counted as successes in every arm (section 2a of `results/RESULTS.md`). The code is frozen until the matrix ends; the fix (attach only when the finger width matches the object, and report a stop short) comes after it and is a different code hash, so it will be a labelled follow-up and not part of these numbers.
 
-**Deviation 5 (17 Nov, 01:26 to 01:35): a merge briefly deleted the Panda model directory; 72 empty run files were moved aside.** When the five exploratory branches were merged into `main` after the matrix ended, the `q5-borrowed` branch turned out to carry a symlink named `third_party` (a self-referencing link I had created in a worktree and committed by accident). Git replaced the ignored `third_party/` checkout of the Panda model with it, so for about three minutes (01:26 to 01:29) every worker that started failed to find the model; the test suite also failed (63 of 130) until I removed the link and restored the model from another worktree at the same pinned revision (the asset hash `dc07ba44218e72a9` is identical to the one in the other worktrees, and all 130 tests pass again). **What it cost the data:** runs that started in those minutes crashed before playing an episode but had already written their header line, with a code hash computed over a missing model directory (`c3e93e48a41a5f32` in `runs/rep_fixed`, `1eb779dc895dd674` in `runs/prior`); the runner correctly refused to resume them (`config_mismatch`). All 72 such files held **zero episodes**; they are kept in `logs/quarantine_outage_0126/` (not in the repository) and those runs were redone from scratch. No episode from before or after the outage was changed, and a scan of every `runs/*` folder shows only the expected code hashes (table in `results/code_versions.md`). The stray symlink is removed on `main`; it is still in the history of the pushed `q5-borrowed` branch and the three `code-borrowed-*` tags.
+**Deviation 5 (17 Nov, 01:26 to 01:35): a merge briefly deleted the Panda model directory; 72 empty run files were moved aside.** When the five exploratory branches were merged into `main` after the matrix ended, the `q5-borrowed` branch turned out to carry a symlink named `third_party` (a self-referencing link I had created in a worktree and committed by accident). Git replaced the ignored `third_party/` checkout of the Panda model with it, so for about three minutes (01:26 to 01:29) every worker that started failed to find the model; the test suite also failed (63 of 130) until I removed the link and restored the model from another worktree at the same pinned revision (the asset hash `dc07ba44218e72a9` is identical to the one in the other worktrees, and all 130 tests pass again). **What it cost the data:** runs that started in those minutes crashed before playing an episode but had already written their header line, with a code hash computed over a missing model directory (`c3e93e48a41a5f32` in `runs/rep_fixed`, `1eb779dc895dd674` in `runs/prior`); the runner correctly refused to resume them (`config_mismatch`). All 72 such files held **zero episodes**; they are kept in `logs/quarantine_outage_0126/` (not in the repository) and those runs were redone from scratch. **A second group was kept:** 14 files (8 in `runs/rep_fixed`, 6 in `runs/prior`) carry a zero-cost abort record from the same minutes but had the right header, so the runner resumed them in place; in 11 of them nothing had been played yet and in three `prior` runs (a stateless arm, a fixed borrowed notebook) 1 or 2 episodes had been played before the crash and were kept. They carry the correct code hash, every later episode follows the plan in order (`scripts/check_run_files.py`), and the abort record is visible in the file. No episode from before or after the outage was changed, and a scan of every `runs/*` folder shows only the expected code hashes (table in `results/code_versions.md`). The stray symlink is removed on `main`; it is still in the history of the pushed `q5-borrowed` branch and the three `code-borrowed-*` tags.
 
 **Deviation 6 (17 Nov, 02:10): orphaned workers wrote duplicate episodes into 8 replication files; those runs were redone.** When I restarted the corrected-simulator replication with more workers at 01:26 and 01:32, I stopped the runner process but not the worker processes it had spawned, so a few workers of the old pool kept finishing the runs they already held while the new runner started the same runs again. The result was **8 of the 120 replication run files** (all `none` arm, `bins`: Haiku run seeds 25 to 28, Luna run seeds 24 to 27) with repeated episodes of the same layouts (21 to 37 episodes in a 20-episode plan). The no-memory arm has no state shared across episodes, so no memory could have forked, but a repeated layout is counted twice. A check of every run file in every folder for repeated or out-of-order (phase, index) pairs found only these 8; the 8 files are kept in `logs/quarantine_duplicates/` (not in the repository) and those runs were played again from scratch with no other process running. The numbers in section 6c and everything compared with `rep_fixed` come from the rerun. Lesson: a runner must be stopped together with its workers (kill the process group, not the parent), and `scripts/check_run_files.py` (added with this note) checks every run file for repeated or out-of-order episodes; it reports all folders clean after the rerun.
 
