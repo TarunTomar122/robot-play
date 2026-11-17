@@ -964,80 +964,80 @@ Registered before any episode ran, and pushed to GitHub before the first one sta
 | prediction | result | status |
 |---|---|---|
 | B1: Haiku `stack`, own notebook (12) minus the names list is at most +10 points | +5.0 | met |
-| B2: `flasks`, notebook (12) minus the names list is at least +30 points for Haiku and for Luna | Haiku +15.0 / Luna +40.0 | MISSED (Haiku only) |
-| B3: `bins`, notebook (12) minus the names list is at least +30 points for Haiku and for Luna | Haiku +32.5 / Luna +50.0 | met |
+| B2: `flasks`, notebook (12) minus the names list is at least +30 points for Haiku and for Luna | Haiku +22.5 / Luna +42.5 | MISSED (Haiku only) |
+| B3: `bins`, notebook (12) minus the names list is at least +30 points for Haiku and for Luna | Haiku +20.0 / Luna +55.0 | MISSED (Haiku only) |
 
-Registered reading of the outcome: B2 (`flasks`) missed (Haiku only): the notebook's efficiency advantage is not confirmed for that job and model.
+Registered reading of the outcome: B2 (`flasks`) missed (Haiku only): the notebook's efficiency advantage is not confirmed for that job and model; B3 (`bins`) missed (Haiku only): the notebook's efficiency advantage is not confirmed for that job and model.
 
 Validation of the included files: 240 run files, every one with code hash `a047eaf9c4a9c258` and a run seed from 30 to 39: yes.
 
-Held-out episodes solved within the stated 12 calls (calls used by the successes; solved within 10; episodes that never called `done`):
+**Solved** is the registered rule: the simulator's verdict is success **and** the model called `done` within the stated 12 calls. The simulator's own verdict without the `done` condition is shown separately (it is a different outcome: the job was physically finished but the model never said so within the budget). Columns: held-out episodes solved; calls used by those; solved within 10 calls; the simulator's verdict alone; episodes that never called `done`:
 
-| model | job | what the model has | episodes | solved within 12 | calls of the successes | within 10 | never called `done` |
-|---|---|---|---|---|---|---|---|
-| claude-haiku-5-5 | stack | no memory | 40 | 8 (20%) | 8.6 | 6 | 33 |
-| claude-haiku-5-5 | stack | the frame and the four names | 40 | 35 (88%) | 7.5 | 33 | 6 |
-| claude-haiku-5-5 | stack | own notebook, 1 practice episode | 40 | 20 (50%) | 7.5 | 15 | 18 |
-| claude-haiku-5-5 | stack | own notebook, 12 practice episodes | 40 | 37 (92%) | 6.7 | 36 | 1 |
-| claude-haiku-5-5 | bins | no memory | 40 | 1 (2%) | 12.0 | 0 | 40 |
-| claude-haiku-5-5 | bins | the frame and the four names | 40 | 0 (0%) | - | 0 | 40 |
-| claude-haiku-5-5 | bins | own notebook, 1 practice episode | 40 | 3 (8%) | 11.0 | 1 | 36 |
-| claude-haiku-5-5 | bins | own notebook, 12 practice episodes | 40 | 13 (32%) | 11.0 | 5 | 30 |
-| claude-haiku-5-5 | flasks | no memory | 40 | 37 (92%) | 8.6 | 30 | 7 |
-| claude-haiku-5-5 | flasks | the frame and the four names | 40 | 34 (85%) | 8.9 | 26 | 6 |
-| claude-haiku-5-5 | flasks | own notebook, 1 practice episode | 40 | 39 (98%) | 7.1 | 36 | 1 |
-| claude-haiku-5-5 | flasks | own notebook, 12 practice episodes | 40 | 40 (100%) | 6.3 | 40 | 0 |
-| gpt-6-luna | stack | no memory | 40 | 39 (98%) | 7.2 | 39 | 0 |
-| gpt-6-luna | stack | the frame and the four names | 40 | 40 (100%) | 7.0 | 40 | 0 |
-| gpt-6-luna | stack | own notebook, 1 practice episode | 40 | 40 (100%) | 6.0 | 40 | 0 |
-| gpt-6-luna | stack | own notebook, 12 practice episodes | 40 | 40 (100%) | 6.0 | 40 | 0 |
-| gpt-6-luna | bins | no memory | 40 | 18 (45%) | 11.4 | 0 | 20 |
-| gpt-6-luna | bins | the frame and the four names | 40 | 19 (48%) | 11.3 | 0 | 17 |
-| gpt-6-luna | bins | own notebook, 1 practice episode | 40 | 33 (82%) | 10.2 | 28 | 7 |
-| gpt-6-luna | bins | own notebook, 12 practice episodes | 40 | 39 (98%) | 10.2 | 33 | 2 |
-| gpt-6-luna | flasks | no memory | 40 | 17 (42%) | 10.1 | 10 | 5 |
-| gpt-6-luna | flasks | the frame and the four names | 40 | 24 (60%) | 9.1 | 20 | 5 |
-| gpt-6-luna | flasks | own notebook, 1 practice episode | 40 | 37 (92%) | 7.8 | 31 | 1 |
-| gpt-6-luna | flasks | own notebook, 12 practice episodes | 40 | 40 (100%) | 6.0 | 40 | 0 |
+| model | job | what the model has | episodes | solved (registered rule) | calls of the solved | solved within 10 | simulator verdict alone | never called `done` |
+|---|---|---|---|---|---|---|---|---|
+| claude-haiku-5-5 | stack | no memory | 40 | 6 (15%) | 7.5 | 6 | 8 (20%) | 33 |
+| claude-haiku-5-5 | stack | the frame and the four names | 40 | 34 (85%) | 7.4 | 33 | 35 (88%) | 6 |
+| claude-haiku-5-5 | stack | own notebook, 1 practice episode | 40 | 17 (42%) | 6.8 | 15 | 20 (50%) | 18 |
+| claude-haiku-5-5 | stack | own notebook, 12 practice episodes | 40 | 36 (90%) | 6.5 | 36 | 37 (92%) | 1 |
+| claude-haiku-5-5 | bins | no memory | 40 | 0 (0%) | - | 0 | 1 (2%) | 40 |
+| claude-haiku-5-5 | bins | the frame and the four names | 40 | 0 (0%) | - | 0 | 0 (0%) | 40 |
+| claude-haiku-5-5 | bins | own notebook, 1 practice episode | 40 | 2 (5%) | 10.5 | 1 | 3 (8%) | 36 |
+| claude-haiku-5-5 | bins | own notebook, 12 practice episodes | 40 | 8 (20%) | 10.4 | 5 | 13 (32%) | 30 |
+| claude-haiku-5-5 | flasks | no memory | 40 | 33 (82%) | 8.2 | 30 | 37 (92%) | 7 |
+| claude-haiku-5-5 | flasks | the frame and the four names | 40 | 31 (78%) | 8.6 | 26 | 34 (85%) | 6 |
+| claude-haiku-5-5 | flasks | own notebook, 1 practice episode | 40 | 38 (95%) | 6.9 | 36 | 39 (98%) | 1 |
+| claude-haiku-5-5 | flasks | own notebook, 12 practice episodes | 40 | 40 (100%) | 6.3 | 40 | 40 (100%) | 0 |
+| gpt-6-luna | stack | no memory | 40 | 39 (98%) | 7.2 | 39 | 39 (98%) | 0 |
+| gpt-6-luna | stack | the frame and the four names | 40 | 40 (100%) | 7.0 | 40 | 40 (100%) | 0 |
+| gpt-6-luna | stack | own notebook, 1 practice episode | 40 | 40 (100%) | 6.0 | 40 | 40 (100%) | 0 |
+| gpt-6-luna | stack | own notebook, 12 practice episodes | 40 | 40 (100%) | 6.0 | 40 | 40 (100%) | 0 |
+| gpt-6-luna | bins | no memory | 40 | 12 (30%) | 11.2 | 0 | 18 (45%) | 20 |
+| gpt-6-luna | bins | the frame and the four names | 40 | 16 (40%) | 11.1 | 0 | 19 (48%) | 17 |
+| gpt-6-luna | bins | own notebook, 1 practice episode | 40 | 32 (80%) | 10.2 | 28 | 33 (82%) | 7 |
+| gpt-6-luna | bins | own notebook, 12 practice episodes | 40 | 38 (95%) | 10.2 | 33 | 39 (98%) | 2 |
+| gpt-6-luna | flasks | no memory | 40 | 15 (38%) | 9.8 | 10 | 17 (42%) | 5 |
+| gpt-6-luna | flasks | the frame and the four names | 40 | 23 (57%) | 9.0 | 20 | 24 (60%) | 5 |
+| gpt-6-luna | flasks | own notebook, 1 practice episode | 40 | 37 (92%) | 7.8 | 31 | 37 (92%) | 1 |
+| gpt-6-luna | flasks | own notebook, 12 practice episodes | 40 | 40 (100%) | 6.0 | 40 | 40 (100%) | 0 |
 
 Paired differences (run seed, per model and job):
 
 | model | job | comparison | pairs | first | second | difference |
 |---|---|---|---|---|---|---|
-| claude-haiku-5-5 | stack | own notebook, 12 practice episodes against the frame and the four names | 10 | 92% | 88% | +5.0 pp (95% CI -11.4 to +21.4) |
-| claude-haiku-5-5 | stack | the frame and the four names against no memory | 10 | 88% | 20% | +67.5 pp (95% CI +45.1 to +89.9) |
-| claude-haiku-5-5 | stack | own notebook, 1 practice episode against no memory | 10 | 50% | 20% | +30.0 pp (95% CI -4.6 to +64.6) |
-| claude-haiku-5-5 | stack | own notebook, 12 practice episodes against no memory | 10 | 92% | 20% | +72.5 pp (95% CI +48.0 to +97.0) |
-| claude-haiku-5-5 | stack | own notebook, 12 practice episodes against own notebook, 1 practice episode | 10 | 92% | 50% | +42.5 pp (95% CI +15.8 to +69.2) |
-| claude-haiku-5-5 | bins | own notebook, 12 practice episodes against the frame and the four names | 10 | 32% | 0% | +32.5 pp (95% CI +0.9 to +64.1) |
-| claude-haiku-5-5 | bins | the frame and the four names against no memory | 10 | 0% | 2% | -2.5 pp (95% CI -10.4 to +5.4) |
-| claude-haiku-5-5 | bins | own notebook, 1 practice episode against no memory | 10 | 8% | 2% | +5.0 pp (95% CI -13.5 to +23.5) |
-| claude-haiku-5-5 | bins | own notebook, 12 practice episodes against no memory | 10 | 32% | 2% | +30.0 pp (95% CI -3.5 to +63.5) |
-| claude-haiku-5-5 | bins | own notebook, 12 practice episodes against own notebook, 1 practice episode | 10 | 32% | 8% | +25.0 pp (95% CI -14.5 to +64.5) |
-| claude-haiku-5-5 | flasks | own notebook, 12 practice episodes against the frame and the four names | 10 | 100% | 85% | +15.0 pp (95% CI +2.5 to +27.5) |
-| claude-haiku-5-5 | flasks | the frame and the four names against no memory | 10 | 85% | 92% | -7.5 pp (95% CI -21.8 to +6.8) |
-| claude-haiku-5-5 | flasks | own notebook, 1 practice episode against no memory | 10 | 98% | 92% | +5.0 pp (95% CI -6.3 to +16.3) |
-| claude-haiku-5-5 | flasks | own notebook, 12 practice episodes against no memory | 10 | 100% | 92% | +7.5 pp (95% CI -2.5 to +17.5) |
-| claude-haiku-5-5 | flasks | own notebook, 12 practice episodes against own notebook, 1 practice episode | 10 | 100% | 98% | +2.5 pp (95% CI -5.4 to +10.4) |
+| claude-haiku-5-5 | stack | own notebook, 12 practice episodes against the frame and the four names | 10 | 90% | 85% | +5.0 pp (95% CI -17.0 to +27.0) |
+| claude-haiku-5-5 | stack | the frame and the four names against no memory | 10 | 85% | 15% | +70.0 pp (95% CI +53.6 to +86.4) |
+| claude-haiku-5-5 | stack | own notebook, 1 practice episode against no memory | 10 | 42% | 15% | +27.5 pp (95% CI -9.7 to +64.7) |
+| claude-haiku-5-5 | stack | own notebook, 12 practice episodes against no memory | 10 | 90% | 15% | +75.0 pp (95% CI +47.0 to +103.0) |
+| claude-haiku-5-5 | stack | own notebook, 12 practice episodes against own notebook, 1 practice episode | 10 | 90% | 42% | +47.5 pp (95% CI +16.6 to +78.4) |
+| claude-haiku-5-5 | bins | own notebook, 12 practice episodes against the frame and the four names | 10 | 20% | 0% | +20.0 pp (95% CI -10.2 to +50.2) |
+| claude-haiku-5-5 | bins | the frame and the four names against no memory | 10 | 0% | 0% | +0.0 pp (95% CI -6.5 to +6.5) |
+| claude-haiku-5-5 | bins | own notebook, 1 practice episode against no memory | 10 | 5% | 0% | +5.0 pp (95% CI -6.3 to +16.3) |
+| claude-haiku-5-5 | bins | own notebook, 12 practice episodes against no memory | 10 | 20% | 0% | +20.0 pp (95% CI -10.2 to +50.2) |
+| claude-haiku-5-5 | bins | own notebook, 12 practice episodes against own notebook, 1 practice episode | 10 | 20% | 5% | +15.0 pp (95% CI -18.9 to +48.9) |
+| claude-haiku-5-5 | flasks | own notebook, 12 practice episodes against the frame and the four names | 10 | 100% | 78% | +22.5 pp (95% CI +2.8 to +42.2) |
+| claude-haiku-5-5 | flasks | the frame and the four names against no memory | 10 | 78% | 82% | -5.0 pp (95% CI -25.3 to +15.3) |
+| claude-haiku-5-5 | flasks | own notebook, 1 practice episode against no memory | 10 | 95% | 82% | +12.5 pp (95% CI -11.7 to +36.7) |
+| claude-haiku-5-5 | flasks | own notebook, 12 practice episodes against no memory | 10 | 100% | 82% | +17.5 pp (95% CI -1.4 to +36.4) |
+| claude-haiku-5-5 | flasks | own notebook, 12 practice episodes against own notebook, 1 practice episode | 10 | 100% | 95% | +5.0 pp (95% CI -6.3 to +16.3) |
 | gpt-6-luna | stack | own notebook, 12 practice episodes against the frame and the four names | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
 | gpt-6-luna | stack | the frame and the four names against no memory | 10 | 100% | 98% | +2.5 pp (95% CI -5.4 to +10.4) |
 | gpt-6-luna | stack | own notebook, 1 practice episode against no memory | 10 | 100% | 98% | +2.5 pp (95% CI -5.4 to +10.4) |
 | gpt-6-luna | stack | own notebook, 12 practice episodes against no memory | 10 | 100% | 98% | +2.5 pp (95% CI -5.4 to +10.4) |
 | gpt-6-luna | stack | own notebook, 12 practice episodes against own notebook, 1 practice episode | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
-| gpt-6-luna | bins | own notebook, 12 practice episodes against the frame and the four names | 10 | 98% | 48% | +50.0 pp (95% CI +26.2 to +73.8) |
-| gpt-6-luna | bins | the frame and the four names against no memory | 10 | 48% | 45% | +2.5 pp (95% CI -29.5 to +34.5) |
-| gpt-6-luna | bins | own notebook, 1 practice episode against no memory | 10 | 82% | 45% | +37.5 pp (95% CI +8.0 to +67.0) |
-| gpt-6-luna | bins | own notebook, 12 practice episodes against no memory | 10 | 98% | 45% | +52.5 pp (95% CI +31.1 to +73.9) |
-| gpt-6-luna | bins | own notebook, 12 practice episodes against own notebook, 1 practice episode | 10 | 98% | 82% | +15.0 pp (95% CI -7.6 to +37.6) |
-| gpt-6-luna | flasks | own notebook, 12 practice episodes against the frame and the four names | 10 | 100% | 60% | +40.0 pp (95% CI +24.5 to +55.5) |
-| gpt-6-luna | flasks | the frame and the four names against no memory | 10 | 60% | 42% | +17.5 pp (95% CI -3.6 to +38.6) |
-| gpt-6-luna | flasks | own notebook, 1 practice episode against no memory | 10 | 92% | 42% | +50.0 pp (95% CI +31.1 to +68.9) |
-| gpt-6-luna | flasks | own notebook, 12 practice episodes against no memory | 10 | 100% | 42% | +57.5 pp (95% CI +41.8 to +73.2) |
+| gpt-6-luna | bins | own notebook, 12 practice episodes against the frame and the four names | 10 | 95% | 40% | +55.0 pp (95% CI +30.0 to +80.0) |
+| gpt-6-luna | bins | the frame and the four names against no memory | 10 | 40% | 30% | +10.0 pp (95% CI -22.9 to +42.9) |
+| gpt-6-luna | bins | own notebook, 1 practice episode against no memory | 10 | 80% | 30% | +50.0 pp (95% CI +22.0 to +78.0) |
+| gpt-6-luna | bins | own notebook, 12 practice episodes against no memory | 10 | 95% | 30% | +65.0 pp (95% CI +45.8 to +84.2) |
+| gpt-6-luna | bins | own notebook, 12 practice episodes against own notebook, 1 practice episode | 10 | 95% | 80% | +15.0 pp (95% CI -6.0 to +36.0) |
+| gpt-6-luna | flasks | own notebook, 12 practice episodes against the frame and the four names | 10 | 100% | 57% | +42.5 pp (95% CI +25.5 to +59.5) |
+| gpt-6-luna | flasks | the frame and the four names against no memory | 10 | 57% | 38% | +20.0 pp (95% CI -3.5 to +43.5) |
+| gpt-6-luna | flasks | own notebook, 1 practice episode against no memory | 10 | 92% | 38% | +55.0 pp (95% CI +34.7 to +75.3) |
+| gpt-6-luna | flasks | own notebook, 12 practice episodes against no memory | 10 | 100% | 38% | +62.5 pp (95% CI +47.1 to +77.9) |
 | gpt-6-luna | flasks | own notebook, 12 practice episodes against own notebook, 1 practice episode | 10 | 100% | 92% | +7.5 pp (95% CI -4.6 to +20.0) |
 
 ## 6l. Exploratory: solved within k calls, every arm of the replication (run seeds 20 to 29)
 
-Descriptive and **not registered**: it was added after round 5g of the review showed that the 20-call success rate hides differences in efficiency. An episode counts as solved within k calls when it succeeded and its logged call count (including `observe`) is at most k; the model was told 20 calls, not k, so this scores the same episodes against a tighter budget than the model saw. Section 6k (when present) repeats the question with the budget stated to the model. Held-out episodes only, 40 per cell (10 runs of 4 layouts, the same layouts in every arm of a model and job).
+Descriptive and **not registered**: it was added after round 5g of the review showed that the 20-call success rate hides differences in efficiency. An episode counts as solved within k calls when it succeeded and its logged call count (including `observe`) is at most k; the model was told 20 calls, not k, so this scores the same episodes against a tighter budget than the model saw. An episode that never calls `done` uses the whole 20-call budget, so for k below 20 "solved within k" also implies that `done` was called. Section 6k (when present) repeats the question with the budget stated to the model. Held-out episodes only, 40 per cell (10 runs of 4 layouts, the same layouts in every arm of a model and job).
 
 | model | job | what the model has | episodes | within 8 calls | within 10 | within 12 | within 20 (the success rate) |
 |---|---|---|---|---|---|---|---|

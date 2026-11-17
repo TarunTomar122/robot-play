@@ -1170,7 +1170,7 @@ def main():
         import re as _re
         bcov3 = A.coverage(*ex(a.budget))
         kofb = lambda r: int(_re.search(r"__p(\d+)__s", r["run"]).group(1))
-        relb = lambda rows, cond: [dict(r, condition=cond) for r in rows]
+        relb = lambda rows, cond: [dict(r, condition=cond, phys_success=int(r["success"]), success=int(bool(r["success"]) and bool(r["claimed_done"]))) for r in rows]          # registered rule (v1.14): an episode that never calls `done` in time is a failure; the simulator's own verdict is kept as phys_success
         rows_b = (relb([r for r in bud_rows if r["condition"] == "none"], "b_none") + relb([r for r in bud_rows if r["condition"] == "lm_names"], "b_names")
                   + relb([r for r in bud_rows if r["condition"] == "notebook" and kofb(r) == 1], "b_nb1") + relb([r for r in bud_rows if r["condition"] == "notebook" and kofb(r) == 12], "b_nb12"))
         BN = {"b_none": "no memory", "b_names": "the frame and the four names", "b_nb1": "own notebook, 1 practice episode", "b_nb12": "own notebook, 12 practice episodes"}
@@ -1188,9 +1188,10 @@ def main():
                     x = [r for r in A.select(rows_b, model=m, condition=c, phase="eval", quirk=True) if r["task"] == t]
                     if x:
                         suc = [r for r in x if r["success"]]
-                        trows.append((m, t, BN[c], len(x), f"{len(suc)} ({len(suc) / len(x) * 100:.0f}%)", f"{np.mean([r['calls'] for r in suc]):.1f}" if suc else "-", f"{sum(1 for r in suc if r['calls'] <= 10)}", f"{sum(1 for r in x if r['phase'] == 'eval' and not r.get('claimed_done'))}"))
-        L += ["Held-out episodes solved within the stated 12 calls (calls used by the successes; solved within 10; episodes that never called `done`):", "",
-              table(["model", "job", "what the model has", "episodes", "solved within 12", "calls of the successes", "within 10", "never called `done`"], trows), ""]
+                        ph = sum(1 for r in x if r["phys_success"])
+                        trows.append((m, t, BN[c], len(x), f"{len(suc)} ({len(suc) / len(x) * 100:.0f}%)", f"{np.mean([r['calls'] for r in suc]):.1f}" if suc else "-", f"{sum(1 for r in suc if r['calls'] <= 10)}", f"{ph} ({ph / len(x) * 100:.0f}%)", f"{sum(1 for r in x if not r.get('claimed_done'))}"))
+        L += ["**Solved** is the registered rule: the simulator's verdict is success **and** the model called `done` within the stated 12 calls. The simulator's own verdict without the `done` condition is shown separately (it is a different outcome: the job was physically finished but the model never said so within the budget). Columns: held-out episodes solved; calls used by those; solved within 10 calls; the simulator's verdict alone; episodes that never called `done`:", "",
+              table(["model", "job", "what the model has", "episodes", "solved (registered rule)", "calls of the solved", "solved within 10", "simulator verdict alone", "never called `done`"], trows), ""]
         cmp_b, vb = [], {}
         for m in mods:
             for t in jobs:
@@ -1202,9 +1203,11 @@ def main():
         L += ["Paired differences (run seed, per model and job):", "", table(["model", "job", "comparison", "pairs", "first", "second", "difference"], cmp_b), ""]
         finalb = (ROOT / "logs/budget_done.txt").exists() or (len(bcov3) == 240 and all(c["complete"] for c in bcov3))
 
+        ready_b = all(vb.get((m, t, x_, y_), {}).get("n_pairs", 0) >= 10 for m in ("claude-haiku-5-5", "gpt-6-luna") for t in jobs for x_, y_ in (("b_nb12", "b_names"), ("b_names", "b_none"), ("b_nb1", "b_none"), ("b_nb12", "b_none")))          # every model, job and arm must be complete before any prediction is scored
+
         def scb(keys, fn):
             n = min([vb.get(k, {}).get("n_pairs", 0) for k in keys] or [0])
-            if n >= 10:
+            if n >= 10 and (ready_b or finalb):
                 return fn()
             if not finalb:
                 return "pending"
@@ -1257,7 +1260,7 @@ def main():
                         cnt = {k: sum(1 for r in x if r["success"] and r["calls"] <= k) for k in (8, 10, 12, 20)}
                         wrows.append((m, t, WKN[c], len(x), *[f"{cnt[k]} ({cnt[k] / len(x) * 100:.0f}%)" for k in (8, 10, 12, 20)]))
         L += ["## 6l. Exploratory: solved within k calls, every arm of the replication (run seeds 20 to 29)", "",
-              "Descriptive and **not registered**: it was added after round 5g of the review showed that the 20-call success rate hides differences in efficiency. An episode counts as solved within k calls when it succeeded and its logged call count (including `observe`) is at most k; the model was told 20 calls, not k, so this scores the same episodes against a tighter budget than the model saw. Section 6k (when present) repeats the question with the budget stated to the model. "
+              "Descriptive and **not registered**: it was added after round 5g of the review showed that the 20-call success rate hides differences in efficiency. An episode counts as solved within k calls when it succeeded and its logged call count (including `observe`) is at most k; the model was told 20 calls, not k, so this scores the same episodes against a tighter budget than the model saw. An episode that never calls `done` uses the whole 20-call budget, so for k below 20 \"solved within k\" also implies that `done` was called. Section 6k (when present) repeats the question with the budget stated to the model. "
               "Held-out episodes only, 40 per cell (10 runs of 4 layouts, the same layouts in every arm of a model and job).", "",
               table(["model", "job", "what the model has", "episodes", "within 8 calls", "within 10", "within 12", "within 20 (the success rate)"], wrows), ""]
 
@@ -1293,7 +1296,8 @@ def main():
         L += ["Paired differences (run seed):", "", table(["comparison", "pairs", "first", "second", "difference"], cmp_rows), ""]
         none_rate = mean(nn, "success") if nn else float("nan")
         gate = bool(nn) and len({r["run_seed"] for r in nn}) >= 10 and at_most(none_rate, 0.75)
-        final4 = (ROOT / "logs/second_done.txt").exists() or all(vd4.get((c, "none"), {}).get("n_pairs", 0) >= 10 for c in order[1:])
+        gate_failed = bool(nn) and len({r["run_seed"] for r in nn}) >= 10 and not at_most(none_rate, 0.75)          # registered: stage 2 must not have run, and nothing below is scored
+        final4 = (ROOT / "logs/second_done.txt").exists() or gate_failed or all(vd4.get((c, "none"), {}).get("n_pairs", 0) >= 10 for c in order[1:])
 
         def sc4(keys, fn):
             n = min([vd4.get(k, {}).get("n_pairs", 0) for k in keys] or [0])
@@ -1312,8 +1316,12 @@ def main():
               ("Q4: `lm_names` minus `lm_instr_n` is at least +10 points (reported either way)", f"{q4['diff'] * 100:+.1f}" if q4 else "no data", sc4(allk + [("lm_names", "lm_instr_n")], lambda: "met" if at_least(q4["diff"], 0.10) else "MISSED"))]
         bad_files = bad_cov(scov, {SEC_HASH}, 30, 39)
         pr = void_if(bad_files, pr)
+        if gate_failed:
+            pr = [pr[0]] + [(a_, b_, "void (the room gate failed)") for a_, b_, _ in pr[1:]]
         st = [x[2] for x in pr]
-        if final4 and not bad_files and all(x.startswith(("met", "MISSED")) for x in st):
+        if gate_failed:
+            reading = "Registered reading of the outcome: the gate failed, so there was no room for a second model and nothing below is scored; the ceiling is reported."
+        elif final4 and not bad_files and all(x.startswith(("met", "MISSED")) for x in st):
             m = [x.startswith("met") for x in st]
             reading = ("the gate failed, so there was no room and no reading." if not m[0] else
                        "the Haiku pattern also holds for a second, more capable model (the list reproduces the generic sentence, the frame alone does little)." if (m[1] and m[2] and m[3]) else
