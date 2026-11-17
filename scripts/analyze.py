@@ -29,6 +29,7 @@ FRONTIER_FLOOR = 0.5               # a frontier first try below this is not a ta
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 COLORS = {"none": "#2a78d6", "notebook": "#eb6834", "replay": "#1baf7a"}          # dataviz skill categorical slots 1-3 (validated all-pairs)
 TASKS = ["stack", "bins", "flasks"]
+LM_HASH = "58b19ca1be3740fe"        # code hash of tag code-labelmatch (PROTOCOL.md v1.9)
 NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job",
          "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes",
          "hint": "reads a one-sentence hint naming the fix", "hint_generic": "reads a generic tip (lists the four adjustable settings, names no fix)", "prior": "reads Fable's notebook written with no practice"}
@@ -60,6 +61,11 @@ def table(head, rows):
 def mean_over(d, keys):
     v = [d[k] for k in keys if k in d]
     return f"${np.mean(v):.2f}" if v else "n/a"
+
+
+def void_if(bad, pr):
+    """Registered rule: a prediction table is void when any included file fails validation (hash or run seed)."""
+    return [(a_, b_, "void (a file failed validation)") for a_, b_, _ in pr] if bad else pr
 
 
 def mean(rows, key):
@@ -106,6 +112,7 @@ def main():
     ap.add_argument("--rep", nargs="*", default=["runs/rep_fixed"], help="exploratory replication of the registered Q1 comparison on the corrected simulator, run seeds 20-29 (PROTOCOL.md v1.6); never pooled with the registered rows")
     ap.add_argument("--hint", nargs="*", default=["runs/hint", "runs/hint_generic", "runs/prior"], help="exploratory controls of PROTOCOL.md v1.7: one-sentence hint, generic hint, zero-practice Fable notebook (run seeds 20-29, no practice)")
     ap.add_argument("--prior-notebooks", default="runs/prior_notebooks")
+    ap.add_argument("--labelmatch", nargs="*", default=["runs/labelmatch"], help="exploratory label-matched text control (PROTOCOL.md v1.9): one neutral label over an inert, a generic and a naming sentence, run seeds 20-29, no practice")
     ap.add_argument("--writer", nargs="*", default=["runs/writer_sonnet"], help="exploratory second writer (PROTOCOL.md v1.8): Claude Sonnet 5.5 with its own notebook, run seeds 20-29 (stack) and 20-24 (bins, flasks)")
     ap.add_argument("--borrowed-sonnet", nargs="*", default=["runs/borrowed_sonnet"], help="cheap models reading the Sonnet notebooks with no practice (PROTOCOL.md v1.8)")
     ap.add_argument("--meter", default="runs/spend")
@@ -551,7 +558,7 @@ def main():
               table(["simulator", "memory", "disturbed episodes", "solved"], dist_rows), ""]
 
     # --- 6c: the registered Q1 comparison replicated on the corrected simulator (v1.6; exploratory)
-    rep_rows = A.load(*ex(a.rep), complete_only=True) if ex(a.rep) else []
+    rep_rows = [r for r in (A.load(*ex(a.rep), complete_only=True) if ex(a.rep) else []) if 20 <= r["run_seed"] <= 29]          # planned run seeds only
     if rep_rows:
         rcov = A.coverage(*ex(a.rep))
         L += ["## 6c. Exploratory: the registered Q1 comparison replicated on the corrected simulator, fresh layouts", "",
@@ -614,7 +621,7 @@ def main():
         if hall and hall["diff"] < 0.05:
             against.append("pooled Haiku gain below +5 points")
         L += ["Note on the two corrected simulators: the three-simulator comparison of section 6b used the code with hash `aef351c5c3033d54` (tag `code-fixcollide`); this replication uses `8fdcf6b2491b68a3` (tag `code-fixed`), which adds only the layout sampler restart on top of it (a change that touches one flasks layout, not used here), so for the played layouts the two behave alike.", "",
-              "Predictions of PROTOCOL.md v1.6, scored by the generator:", "", table(["prediction", "result", "status"], pr), "",
+              "Predictions of PROTOCOL.md v1.6, scored by the generator:", "", table(["prediction", "result", "status"], void_if(bad_files, pr)), "",
               ("Pending or inconclusive: the pre-stated conditions against the claim (Haiku `stack` no memory at 85% or more, or a pooled Haiku gain below +5 points) are judged under the same rule as the predictions (all pairs, or the registered floor once the cell has finished)." if S([("claude-haiku-5-5", "stack"), ("claude-haiku-5-5", "all three jobs")], lambda: "") in ("pending",) or S([("claude-haiku-5-5", "stack"), ("claude-haiku-5-5", "all three jobs")], lambda: "").startswith("inconclusive") else
                ("**The registered headline did not replicate on the corrected simulator** (" + "; ".join(against) + ")." if against else "The pre-stated condition against the claim (Haiku `stack` no memory at 85% or more, or a pooled Haiku gain below +5 points) did not occur.")),
               "The four predictions were written after the registered and three-simulator results were known, so they are predictions about a replication, not independent forecasts; the condition against the claim leaves a middle zone (a pooled Haiku gain between +5 and +10 points) in which the replication is neither confirmed nor refuted, and the report says so if it lands there.", ""]
@@ -629,7 +636,7 @@ def main():
                   table(["model", "memory", "disturbed episodes", "disturbance fired", "success, all assigned", "same layouts, no disturbance"], dr), ""]
 
     # --- 6d: is it the experience, or one sentence? (v1.7; exploratory)
-    hp_rows = A.load(*ex(a.hint), complete_only=True) if ex(a.hint) else []
+    hp_rows = [r for r in (A.load(*ex(a.hint), complete_only=True) if ex(a.hint) else []) if 20 <= r["run_seed"] <= 29]
     if hp_rows and rep_rows:
         import sys as _sys
         _sys.path.insert(0, str(ROOT / "scripts"))
@@ -709,13 +716,14 @@ def main():
         pr.append(("H3: the zero-practice notebooks name `grip_level firm` for `stack` in at least 5 of 10, a release height of 0.14 or more for `bins` in at most 2 of 10 and a grasp height of 0.8 or more for `flasks` in at most 3 of 10, and Haiku `stack` with a prior notebook solves at least 60%",
                    f"names the fix: stack {named.get('stack', 0)} of {n_notebooks.get('stack', 0)}, bins {named.get('bins', 0)} of {n_notebooks.get('bins', 0)}, flasks {named.get('flasks', 0)} of {n_notebooks.get('flasks', 0)}" + (f"; Haiku stack prior {f(ps_['a'], True)}" if ps_ else ""),
                    h3_state if kw_complete else "pending"))
-        L[pred_at_6d:pred_at_6d] = ["**Predictions of PROTOCOL.md v1.7, scored by the generator first, as the protocol requires** (pending until every pair exists; after the cells have finished, scored when each cell has the registered floor of 24 of 30 pooled and 8 of 10 per-job pairs, inconclusive below it). The registered reading: if H2 fails the headline is weakened, and if H3 fails because the notebooks name the fix, practice is the wrong cost to count.", "", table(["prediction", "result", "status"], pr), ""]
         bad_files = [c for c in hcov if c.get("code") != "088c639d7139a3af" or not all(20 <= int(x) <= 29 for x in [c.get("run_seed", 20)])]
+        pr = void_if(bad_files, pr)
+        L[pred_at_6d:pred_at_6d] = ["**Predictions of PROTOCOL.md v1.7, scored by the generator first, as the protocol requires** (pending until every pair exists; after the cells have finished, scored when each cell has the registered floor of 24 of 30 pooled and 8 of 10 per-job pairs, inconclusive below it). The registered reading: if H2 fails the headline is weakened, and if H3 fails because the notebooks name the fix, practice is the wrong cost to count.", "", table(["prediction", "result", "status"], pr), ""]
         L.insert(pred_at_6d + 4, f"Validation of the included files: {len(hcov)} run files, every one with code hash `088c639d7139a3af` and a run seed from 20 to 29: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.\n")
 
     # --- 6e: a second, mid-tier writer (v1.8; exploratory)
-    wr_rows = A.load(*ex(a.writer), complete_only=True) if ex(a.writer) else []
-    bs_rows = A.load(*ex(a.borrowed_sonnet), complete_only=True) if ex(a.borrowed_sonnet) else []
+    wr_rows = [r for r in (A.load(*ex(a.writer), complete_only=True) if ex(a.writer) else []) if 20 <= r["run_seed"] <= (29 if r["task"] == "stack" else 24)]
+    bs_rows = [r for r in (A.load(*ex(a.borrowed_sonnet), complete_only=True) if ex(a.borrowed_sonnet) else []) if 20 <= r["run_seed"] <= (29 if r["task"] == "stack" else 24)]
     if wr_rows or bs_rows:
         import sys as _sys
         _sys.path.insert(0, str(ROOT / "scripts"))
@@ -807,9 +815,71 @@ def main():
                        ("met" if mb > mo else "MISSED") if (final or all(len(bor.get(k, [])) == 4 for k in own if sum(own[k]) <= 1)) else "pending"))
         else:
             pr.append(("S4: where Haiku's own notebook solved at most 1 of 4, reading Sonnet's notebook solves strictly more on average", "no such run in the replication so far", "not testable" if final else "pending"))
-        L[pred_at_6e:pred_at_6e] = ["**Predictions of PROTOCOL.md v1.8, scored by the generator first** (pending until every pair exists; below 80% of the planned pairs inconclusive after the cells have finished). Note: v1.8 was registered at 01:35, after the hint cell (which showed the naming hint at 100% on `stack`) had finished, so S1 and S2 were close to certain when written.", "", table(["prediction", "result", "status"], pr), ""]
         bad_files = [c for c in wcov + bcov if c.get("code") != "088c639d7139a3af" or not all(20 <= int(x) <= 29 for x in [c.get("run_seed", 20)])]
+        pr = void_if(bad_files, pr)
+        L[pred_at_6e:pred_at_6e] = ["**Predictions of PROTOCOL.md v1.8, scored by the generator first** (pending until every pair exists; below 80% of the planned pairs inconclusive after the cells have finished). Note: v1.8 was registered at 01:35, after the hint cell (which showed the naming hint at 100% on `stack`) had finished, so S1 and S2 were close to certain when written.", "", table(["prediction", "result", "status"], pr), ""]
         L.insert(pred_at_6e + 4, f"Validation of the included files: {len(wcov) + len(bcov)} run files, every one with code hash `088c639d7139a3af` and a run seed from 20 to 29: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.\n")
+
+    # --- 6f: a label-matched text control (v1.9; exploratory)
+    lm_rows = [r for r in (A.load(*ex(a.labelmatch), complete_only=True) if ex(a.labelmatch) else []) if 20 <= r["run_seed"] <= 29]
+    if lm_rows and rep_rows:
+        lcov = A.coverage(*ex(a.labelmatch))
+        allr = rep_rows + [r for r in hp_rows if r["condition"] in ("hint", "hint_generic")] + lm_rows
+        LN = {"lm_inert": "reads an inert sentence under the neutral label", "lm_generic": "reads the generic sentence under the neutral label", "lm_specific": "reads the naming sentence under the neutral label"}
+        NAMES.update(LN)
+        L += ["## 6f. Exploratory: is it the words or the label? (a label-matched text control)", "",
+              "Registered before any episode ran (PROTOCOL.md v1.9). No practice; the memory slot has **one neutral label** (\"NOTES FOR THIS TASK\") over (a) an inert sentence of about the generic sentence's length that names no setting, (b) the generic sentence of section 6d (it lists `grip_level`, `grasp_height`, `release_height` and `speed`), (c) the naming sentence of section 6d. "
+              "Same layouts as the replication and section 6d (run seeds 20 to 29), so every arm pairs. "
+              f"Run files started {len(lcov)}, complete {sum(int(c['complete']) for c in lcov)} (planned 180). Plain 95% intervals.", ""]
+        pred_at_6f = len(L)
+        arms = ("none", "lm_inert", "lm_generic", "hint_generic", "lm_specific", "hint")
+        keys = {}
+        for m in cheap:
+            ks = None
+            for c in arms:
+                kc = {(r["task"], r["run_seed"]) for r in A.select(allr, model=m, condition=c, phase="eval", quirk=True)}
+                ks = kc if ks is None else ks & kc
+            keys[m] = ks or set()
+        tr = []
+        for m in cheap:
+            for tname, tl in (("all three jobs", TASKS), ("stack", ["stack"]), ("bins", ["bins"]), ("flasks", ["flasks"])):
+                cells = []
+                for c in arms:
+                    x = [r for r in A.select(allr, model=m, condition=c, phase="eval", quirk=True) if r["task"] in tl and (r["task"], r["run_seed"]) in keys[m]]
+                    cells.append(f"{f(mean(x, 'success'), True)} ({mean(x, 'calls_to_success'):.1f} calls)" if x else "-")
+                tr.append((m, tname, len({k for k in keys[m] if k[0] in tl}), *cells))
+        L += ["Held-out success (and calls to success) on exactly the runs every arm of that model has:", "",
+              table(["model", "jobs", "runs", "no memory", "inert, neutral label", "generic, neutral label", "generic, operator label", "naming, neutral label", "naming, operator label"], tr), ""]
+        cmp_rows, vd = [], {}
+        for m in cheap:
+            for tname, tl in (("all three jobs", None), ("stack", ["stack"]), ("bins", ["bins"]), ("flasks", ["flasks"])):
+                for x, y in (("lm_inert", "none"), ("lm_generic", "lm_inert"), ("lm_generic", "none"), ("lm_specific", "lm_generic"), ("lm_specific", "none"), ("lm_generic", "hint_generic"), ("lm_specific", "hint")):
+                    d = A.paired_difference(allr, m, x, y, tasks=tl)
+                    if d.get("n_pairs"):
+                        cmp_rows.append((m, tname, f"{NAMES[x]} against {NAMES[y]}", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
+                        vd[(m, tname, x, y)] = d
+        L += ["Paired differences (task, run seed):", "", table(["model", "jobs", "comparison", "pairs", "first", "second", "difference"], cmp_rows), ""]
+        hm = "claude-haiku-5-5"
+        final = (ROOT / "logs/labelmatch_done.txt").exists()
+
+        def S4(cells, fn):
+            got = [vd.get(c, {}).get("n_pairs", 0) for c in cells]
+            if all(g >= 10 for g in got):
+                return fn()
+            if not final:
+                return "pending"
+            return "inconclusive (below the registered floor)" if any(g < 8 for g in got) else fn() + " (scored with fewer than the planned pairs, above the floor)"
+        pr = []
+        li, lg, ls_, gi = (vd.get((hm, "stack", "lm_inert", "none")), vd.get((hm, "stack", "lm_generic", "none")), vd.get((hm, "stack", "lm_specific", "none")), vd.get((hm, "stack", "lm_generic", "lm_inert")))
+        pr.append(("L1: Haiku `stack` with the inert text solves at most 65%", f"Haiku stack inert {f(li['a'], True)}" if li else "no data", S4([(hm, "stack", "lm_inert", "none")], lambda: "met" if li["a"] <= 0.65 else "MISSED")))
+        pr.append(("L2: Haiku `stack` with the generic text under the neutral label solves at least 80%", f"Haiku stack generic {f(lg['a'], True)}" if lg else "no data", S4([(hm, "stack", "lm_generic", "none")], lambda: "met" if lg["a"] >= 0.80 else "MISSED")))
+        pr.append(("L3: Haiku `stack` with the naming text under the neutral label solves at least 90%", f"Haiku stack naming {f(ls_['a'], True)}" if ls_ else "no data", S4([(hm, "stack", "lm_specific", "none")], lambda: "met" if ls_["a"] >= 0.90 else "MISSED")))
+        pr.append(("L4: Haiku `stack`, generic minus inert is at least +20 points", f"generic minus inert {gi['diff'] * 100:+.1f}" if gi else "no data", S4([(hm, "stack", "lm_generic", "lm_inert")], lambda: "met" if gi["diff"] >= 0.20 else "MISSED")))
+        bad_files = [c for c in lcov if c.get("code") != LM_HASH or not 20 <= int(c.get("run_seed", 20)) <= 29]
+        pr = void_if(bad_files, pr)
+        L[pred_at_6f:pred_at_6f] = ["**Predictions of PROTOCOL.md v1.9, scored by the generator first** (pending until every pair exists; below 80% of the planned pairs inconclusive after the cell has finished). The registered reading: if L1 and L4 hold, the generic sentence's effect comes from the settings it lists and not from the label or from text of that length; if L1 fails (inert at 80% or more), much of it is an attention effect of any note; if L2 fails while the operator-labelled generic hint reached 90%, the authority of the label mattered.", "",
+                                    table(["prediction", "result", "status"], pr), "",
+                                    f"Validation of the included files: {len(lcov)} run files, every one with code hash `{LM_HASH}` and a run seed from 20 to 29: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
 
     # --- pose
     if pose:
