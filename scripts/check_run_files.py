@@ -91,7 +91,7 @@ def registered_text(cond, task):
     fixed = {"hint_generic": runner.GENERIC_HINT, "lm_inert": runner.INERT_TEXT, "lm_generic": runner.GENERIC_HINT, "lm_frame": runner.SPLIT_TEXTS["lm_frame"],
              "lm_names": runner.SPLIT_TEXTS["lm_names"], "lm_instr": runner.SPLIT_TEXTS["lm_instr"], "lm_instr_n": runner.SPLIT2_TEXTS["lm_instr_n"], "lm_names2": runner.SPLIT2_TEXTS["lm_names2"],
              "lm_firm": runner.MIXED_TEXTS["lm_firm"], "lm_proc": runner.MIXED_TEXTS["lm_proc"]}
-    if task == "mixed_silent" and cond in getattr(runner, "SILENT_TEXTS", {}):
+    if task == "mixed_silent" and cond in runner.SILENT_TEXTS:
         return runner.SILENT_TEXTS[cond]
     if cond in ("hint", "lm_specific"):
         return runner.HINTS.get(task)
