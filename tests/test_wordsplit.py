@@ -53,3 +53,12 @@ def test_v1_12_dose_cell_plans_own_notebooks_after_1_3_6_and_on_fresh_seeds_12_p
     assert got == [(20, 1), (20, 3), (20, 6), (30, 1), (30, 3), (30, 6), (30, 12)]
     assert all(s.condition == "notebook" and s.borrowed_notebook == "" for s in specs)
     assert len({s.key for s in specs}) == len(specs)
+
+
+def test_v1_13_second_model_cells_split_the_arms_into_a_room_check_and_four_text_arms():
+    none = build_specs("second_none", ["claude-sonnet-5-5"], [30, 31], "runs/x", tasks=["stack"])
+    split = build_specs("second_split", ["claude-sonnet-5-5"], [30, 31], "runs/x", tasks=["stack"])
+    assert {s.condition for s in none} == {"none"} and len(none) == 2 and all(s.borrowed_notebook == "" and s.practice == 0 for s in none)
+    assert {s.condition for s in split} == {"lm_frame", "lm_names", "lm_instr_n", "lm_generic"} and len(split) == 8
+    from robot_play.runner import SPLIT2_TEXTS
+    assert all(s.borrowed_notebook == SPLIT2_TEXTS[s.condition] for s in split)
