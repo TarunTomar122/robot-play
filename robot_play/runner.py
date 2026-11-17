@@ -294,6 +294,12 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
                 for c, text in SPLIT_TEXTS.items():
                     for s in run_seeds:
                         specs.append(RunSpec(m, t, c, s, True, practice=0, borrowed_notebook=text, **common))
+    elif cell == "wordsplit2":                  # exploratory (v1.11): the split of v1.10 repeated on fresh layouts (run seeds 30 to 39) with two nested wordings added and a no-memory arm
+        for m in models:
+            for t in tasks:
+                specs += [RunSpec(m, t, "none", s, True, practice=0, **common) for s in run_seeds]
+                for c, text in SPLIT2_TEXTS.items():
+                    specs += [RunSpec(m, t, c, s, True, practice=0, borrowed_notebook=text, **common) for s in run_seeds]
     elif cell == "borrowed_other":              # the control for "borrowed": the notebook of a DIFFERENT task (stack reads the sort notebook, sort the flask one, flasks the stack one)
         shift = {"stack": "bins", "bins": "flasks", "flasks": "stack"}
         for m in models:
@@ -324,6 +330,19 @@ SPLIT_TEXTS = {
     "lm_frame": FRAME + " When a pick or place fails or is refused, read the message before you carry on.",                                   # the frame only
     "lm_names": FRAME + " The adjustable settings are grip_level, grasp_height, release_height and speed.",                                  # the frame and the four names, no instruction
     "lm_instr": FRAME + " When a pick or place fails or is refused, read the message and change how you call it, one thing at a time, instead of repeating the same call.",   # the frame and the instruction, no names
+}
+
+
+# v1.11: every text of v1.9 and v1.10 once more (same wording), plus two nested wordings: generic minus the names (so it keeps the word "settings"), and generic minus the instruction
+# (so it keeps "read the message" and the failure frame).
+SPLIT2_TEXTS = {
+    "lm_inert": INERT_TEXT,
+    "lm_frame": SPLIT_TEXTS["lm_frame"],
+    "lm_names": SPLIT_TEXTS["lm_names"],
+    "lm_instr": SPLIT_TEXTS["lm_instr"],
+    "lm_instr_n": FRAME + " When a pick or place fails or is refused, read the message and change the settings one at a time instead of repeating the same call.",
+    "lm_names2": FRAME + " When a pick or place fails or is refused, read the message. The adjustable settings are grip_level, grasp_height, release_height and speed.",
+    "lm_generic": GENERIC_HINT,
 }
 
 

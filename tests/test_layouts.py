@@ -19,3 +19,10 @@ def test_the_retry_changes_only_layouts_that_used_to_crash():
     a = _sample_xy(np.random.default_rng(10_000), 4, x=(0.40, 0.56), y=(-0.28, 0.28), min_sep=0.14)
     b = _sample_xy(np.random.default_rng(10_000), 4, x=(0.40, 0.56), y=(-0.28, 0.28), min_sep=0.14)
     assert all(np.allclose(p, q) for p, q in zip(a, b))                                     # deterministic
+
+
+def test_the_stack_layouts_of_run_seeds_30_to_39_can_be_sampled():
+    for rs in range(30, 40):
+        for seed in eval_seeds(rs):
+            for quirk in (True, False):
+                TASKS["stack"].build(np.random.default_rng(seed), quirk)

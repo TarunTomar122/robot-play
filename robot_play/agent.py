@@ -91,7 +91,7 @@ class Memory:
                     "and the notes may be incomplete or wrong):\n" + self.notebook)
         if self.condition in ("hint", "hint_generic") and self.notebook:                         # exploratory v1.7: one fixed sentence, no practice
             return ("\n\nA HINT from an experienced operator of this same task (object positions change between attempts):\n" + self.notebook)
-        if self.condition in ("lm_inert", "lm_generic", "lm_specific", "lm_frame", "lm_names", "lm_instr") and self.notebook:        # exploratory v1.9 and v1.10: the same neutral label for different texts, no practice
+        if self.condition in ("lm_inert", "lm_generic", "lm_specific", "lm_frame", "lm_names", "lm_instr", "lm_instr_n", "lm_names2") and self.notebook:        # exploratory v1.9 to v1.11: the same neutral label for different texts, no practice
             return "\n\nNOTES FOR THIS TASK (object positions change between attempts):\n" + self.notebook
         if self.condition == "prior" and self.notebook:                                         # exploratory v1.7: a notebook written by a stronger model that had NOT practised
             return ("\n\nA NOTEBOOK written by a more capable assistant that had read about this task but not yet attempted it (it may be incomplete or wrong; "

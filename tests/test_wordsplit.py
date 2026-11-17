@@ -32,3 +32,16 @@ def test_the_cell_builds_three_arms_per_job_and_seed_without_practice():
     assert len(specs) == len(stack)
     assert {s.condition for s in stack} == set(SPLIT_TEXTS) and len(stack) == 3 * 2
     assert all(s.practice == 0 and s.borrowed_notebook == SPLIT_TEXTS[s.condition] for s in stack)
+
+
+def test_v1_11_cell_has_a_no_memory_arm_and_seven_texts_per_seed_and_the_nested_texts_are_nested():
+    from robot_play.runner import SPLIT2_TEXTS
+    specs = build_specs("wordsplit2", ["claude-haiku-5-5"], [30, 31], "runs/x", tasks=["stack"])
+    assert len(specs) == (1 + len(SPLIT2_TEXTS)) * 2 and {s.condition for s in specs} == {"none", *SPLIT2_TEXTS}
+    assert all(s.practice == 0 and (s.borrowed_notebook == "" if s.condition == "none" else s.borrowed_notebook == SPLIT2_TEXTS[s.condition]) for s in specs)
+    assert SPLIT2_TEXTS["lm_generic"] == GENERIC_HINT
+    nested_instr, nested_names = SPLIT2_TEXTS["lm_instr_n"], SPLIT2_TEXTS["lm_names2"]
+    assert GENERIC_HINT.startswith(FRAME) and "change the settings one at a time instead of repeating the same call" in nested_instr
+    assert not any(n in nested_instr for n in NAMES) and all(n in nested_names for n in NAMES) and "change" not in nested_names and "read the message" in nested_names
+    for c in ("lm_instr_n", "lm_names2"):
+        assert Memory(c, notebook=SPLIT2_TEXTS[c]).prompt_block().startswith("\n\nNOTES FOR THIS TASK")
