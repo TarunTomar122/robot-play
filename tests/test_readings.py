@@ -64,3 +64,11 @@ def test_v1_16_reading_skips_a_model_with_no_room_and_names_each_miss():
     assert "S2 missed for Luna" in r and "S4 missed for Haiku" in r and "S1 missed" not in r and "all met" not in r
     r2 = analyze.reading_silent(["met", "met", "MISSED (Luna)", "MISSED (Luna)", "met", "MISSED (Luna)"])
     assert "S3 missed for Luna" in r2 and "S4 missed" not in r2 and "S6 missed" not in r2
+
+
+def test_v1_17_reading_covers_each_registered_combination():
+    assert "writer instruction" in analyze.reading_hyp(["met", "met", "met", "met"])
+    assert "untested or wrong" in analyze.reading_hyp(["MISSED", "MISSED", "met", "met"])
+    assert "do not form the hypothesis" in analyze.reading_hyp(["MISSED", "MISSED", "MISSED", "met"])
+    assert "does not cover" in analyze.reading_hyp(["met", "MISSED", "met", "met"]) and "does not cover" in analyze.reading_hyp(["MISSED", "met", "met", "met"])
+    assert "H4 missed: Luna" in analyze.reading_hyp(["met", "met", "met", "MISSED (Luna)"])

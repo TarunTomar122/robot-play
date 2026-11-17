@@ -37,6 +37,7 @@ SEC_HASH = "216aab61b6c8b09e"       # code hash of tag code-second (PROTOCOL.md 
 BUD_HASH = "a047eaf9c4a9c258"       # code hash of tag code-budget (PROTOCOL.md v1.14)
 MIX_HASH = "6119571baae3816f"       # code hash of tag code-mixed (PROTOCOL.md v1.15)
 SIL_HASH = "f2f91f6508ec38c7"       # code hash of tag code-silent (PROTOCOL.md v1.16)
+HYP_HASH = "30176d67142362d9"       # code hash of tag code-hyp (PROTOCOL.md v1.17)
 NAMES = {"none": "starts fresh", "notebook": "keeps a notebook", "replay": "sees its last success", "borrowed": "reads Fable's notebook", "borrowed_other": "reads Fable's notebook for another job",
          "borrowed_1": "reads Fable's notebook after 1 practice episode", "borrowed_3": "reads Fable's notebook after 3 practice episodes",
          "hint": "reads a one-sentence hint naming the fix", "hint_generic": "reads a generic tip (lists the four adjustable settings, names no fix)", "prior": "reads Fable's notebook written with no practice"}
@@ -140,6 +141,24 @@ def reading_silent(st):
     if st[4].startswith("MISSED"):
         parts.append("S5 missed (" + st[4].split("(", 1)[1].rstrip(")") + "): practice does not turn a verdict-only post-mortem into a rule at this dose, or the notebook beat the answer key (then the upper-bound reading is void)")
     return ("; ".join(parts) + ".") if parts else "Every miss is a model with no room (see S3); nothing else is read."
+
+
+def reading_hyp(st):
+    """Registered reading of PROTOCOL.md v1.17 from the statuses of H1 to H4 (each starts with 'met' or 'MISSED')."""
+    ok = [x.startswith("met") for x in st]
+    if ok[0] and ok[1]:
+        out = "H1 and H2 met: the failure of v1.16 was the writer instruction, practice works once the writer may guess."
+    elif ok[2]:
+        out = "H1 missed and H3 met: the models write the guess and it does not help (untested or wrong guesses)."
+    else:
+        out = "H1 missed and H3 missed: the models do not form the hypothesis even when allowed to guess."
+    if not (ok[0] and ok[1]) and not ok[0] and ok[1]:
+        out = "H1 missed but H2 met: the guessing notebook beats no memory without beating the fact-only notebook by 20 points (the registered text does not cover this combination)."
+    if ok[0] and not ok[1]:
+        out = "H1 met but H2 missed: the guessing notebook beats the fact-only one without beating no memory by 15 points (the registered text does not cover this combination)."
+    if not ok[3]:
+        out += " H4 missed: " + " ".join(_missed_names(st[3])) + " guessing notebook matches the answer key."
+    return out
 
 
 def reading_budget(st):
@@ -262,6 +281,7 @@ def main():
     ap.add_argument("--budget", nargs="*", default=["runs/budget"], help="exploratory stated-budget cell (PROTOCOL.md v1.14): Haiku and Luna, three jobs, run seeds 30-39, 12 calls stated to the model")
     ap.add_argument("--mixed", nargs="*", default=["runs/mixed"], help="exploratory two-sided job (PROTOCOL.md v1.15): Haiku and Luna, job mixed, run seeds 40-49, six arms plus a control scene")
     ap.add_argument("--silent", nargs="*", default=["runs/mixed_silent"], help="exploratory two-sided job with silent damage (PROTOCOL.md v1.16): Haiku and Luna, job mixed_silent, run seeds 40-49, five arms")
+    ap.add_argument("--hyp", nargs="*", default=["runs/mixed_hyp"], help="exploratory guess-allowed notebook writer (PROTOCOL.md v1.17): Haiku and Luna, job mixed_silent, run seeds 40-49")
     ap.add_argument("--writer", nargs="*", default=["runs/writer_sonnet"], help="exploratory second writer (PROTOCOL.md v1.8): Claude Sonnet 5.5 with its own notebook, run seeds 20-29 (stack) and 20-24 (bins, flasks)")
     ap.add_argument("--borrowed-sonnet", nargs="*", default=["runs/borrowed_sonnet"], help="cheap models reading the Sonnet notebooks with no practice (PROTOCOL.md v1.8)")
     ap.add_argument("--meter", default="runs/spend")
@@ -1526,6 +1546,89 @@ def main():
                                     "If S3 is missed for a model there is no room for it: S4 to S6 are then reported but not read for that model.", "",
                                     table(["prediction", "result", "status"], pr), "", reading, "",
                                     f"Validation of the included files: {len(scov2)} run files, every one with code hash `{SIL_HASH}` and a run seed from 40 to 49: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
+
+    # --- 6o: may the notebook writer guess? (v1.17; exploratory)
+    hyp_rows = [r for r in (A.load(*ex(a.hyp), complete_only=True) if ex(a.hyp) else []) if 40 <= r["run_seed"] <= 49 and r["task"] == "mixed_silent"]
+    if hyp_rows:
+        import importlib.util as _ilu
+        import re as _re
+        hcov = A.coverage(*ex(a.hyp))
+        silent_all = [r for r in (A.load(*ex(a.silent), complete_only=True) if ex(a.silent) else []) if 40 <= r["run_seed"] <= 49 and r["task"] == "mixed_silent"]
+        kofh = lambda r: int(_re.search(r"__p(\d+)__s", r["run"]).group(1))
+        rows_h = ([dict(r, task="mixed", condition="h_nb") for r in hyp_rows]
+                  + [dict(r, task="mixed", condition="s_nb12") for r in silent_all if r["condition"] == "notebook" and kofh(r) == 12]
+                  + [dict(r, task="mixed", condition="s_none") for r in silent_all if r["condition"] == "none"])
+        HN = {"h_nb": "own notebook, writer may guess", "s_nb12": "own notebook, facts only (section 6n)", "s_none": "no memory (section 6n)"}
+        mh = [m for m in ("claude-haiku-5-5", "gpt-6-luna") if any(r["model"] == m for r in hyp_rows)]
+        L += ["## 6o. Exploratory: may the notebook writer guess? (`notebook_hyp` on the silent job)", "",
+              "Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.17, tag `code-hyp`). Section 6n found that the model's own notebook after 12 practice episodes did not carry the silent trap. Every notebook arm so far has a writer that is told \"you never invent facts\", which also keeps it from proposing a cause. Here only the writer changes: it records results as facts and may add clearly marked guesses with a test for each. Same practice seeds, same held-out layouts and same cap as the facts-only arm of section 6n, Haiku 5.5 and Luna, run seeds 40 to 49. "
+              f"Run files started {len(hcov)}, complete {sum(int(c['complete']) for c in hcov)} (planned 20). Unadjusted 95% intervals by the project's interval rule, paired by run seed, no multiplicity correction.", ""]
+        pred_at_6o = len(L)
+        hrows = []
+        for m in mh:
+            for c in ("s_none", "s_nb12", "h_nb"):
+                x = A.select(rows_h, model=m, condition=c, phase="eval", quirk=True)
+                if x:
+                    suc = [r for r in x if r["success"]]
+                    cr = sum(1 for r in x if r["cracked"] > 0)
+                    hrows.append((m, HN[c], len(x), f"{len(suc)} ({len(suc) / len(x) * 100:.0f}%)", f"{cr} ({cr / len(x) * 100:.0f}%)"))
+        L += [table(["model", "what the model has", "episodes", "solved", "verdict names a cracked cube"], hrows), ""]
+        cmp_h, vh = [], {}
+        for m in mh:
+            for x_, y_ in (("h_nb", "s_nb12"), ("h_nb", "s_none")):
+                d = A.paired_difference(rows_h, m, x_, y_)
+                if d.get("n_pairs"):
+                    cmp_h.append((m, f"{HN[x_]} against {HN[y_]}", d["n_pairs"], f(d["a"], True), f(d["b"], True), ci(d, pct=True)))
+                    vh[(m, x_, y_)] = d
+        L += ["Paired differences (run seed, per model, same layouts):", "", table(["model", "comparison", "pairs", "first", "second", "difference"], cmp_h), ""]
+        # H3: the damage-and-grip sentence in the final guessing notebooks (a text search; the sentences are read by hand afterwards, see results/notebook_audit_mixed.md)
+        nbspec = _ilu.spec_from_file_location("nbaudit", ROOT / "scripts/notebook_audit_mixed.py")
+        nbaudit = _ilu.module_from_spec(nbspec)
+        nbspec.loader.exec_module(nbaudit)
+        link = {}
+        for m in mh:
+            files = sorted(Path(d).glob(f"{m}__mixed_silent__notebook_hyp__quirk__p12__*.jsonl") for d in ex(a.hyp))
+            files = [f_ for grp in files for f_ in grp]
+            n_link = 0
+            for f_ in files:
+                nb_, _s, _p = nbaudit.final_notebook(f_)
+                n_link += any(_re.search(r"crack|damag|fragile|break|squeeze limit", x, _re.I) and _re.search(r"\bfirm\b|\bgrip|squeez|\bforce\b", x, _re.I) for x in nbaudit.sentences(nb_))
+            link[m] = (n_link, len(files))
+        L += ["Final guessing notebooks with a sentence that mentions both damage and the grip (text search, not a coding): " + "; ".join(f"{m}: {a_} of {b_}" for m, (a_, b_) in link.items()) + ".", ""]
+        finalh = (ROOT / "logs/hyp_done.txt").exists() or (len(hcov) == 20 and all(c["complete"] for c in hcov))
+        readyh = all(vh.get((m, x_, y_), {}).get("n_pairs", 0) >= 10 for m in ("claude-haiku-5-5", "gpt-6-luna") for x_, y_ in (("h_nb", "s_nb12"), ("h_nb", "s_none")))
+
+        def sch(keys, fn):
+            n = min([vh.get(k, {}).get("n_pairs", 0) for k in keys] or [0])
+            if n >= 10 and (readyh or finalh):
+                return fn()
+            if not finalh:
+                return "pending"
+            return "inconclusive (below the registered floor)" if n < 8 else fn() + " (scored with fewer than the planned pairs, above the floor)"
+        H, Lu = "claude-haiku-5-5", "gpt-6-luna"
+        MODELS = (("Haiku", H), ("Luna", Lu))
+        dd = lambda m, x_, y_: vh.get((m, x_, y_), {}).get("diff", float("nan"))
+        rate = lambda m: (lambda x: (sum(r["success"] for r in x) / len(x)) if x else float("nan"))(A.select(rows_h, model=m, condition="h_nb", phase="eval", quirk=True))
+        show = lambda fn: " / ".join(f"{nm} {fn(m)}" for nm, m in MODELS)
+        pr = []
+        pr.append(("H1: guessing notebook minus facts-only notebook is at least +20 points for at least one model", show(lambda m: f"{dd(m, 'h_nb', 's_nb12') * 100:+.1f}"),
+                   sch([(m, "h_nb", "s_nb12") for m in (H, Lu)], lambda: "met" if any(at_least(dd(m, "h_nb", "s_nb12"), 0.20) for m in (H, Lu)) else "MISSED")))
+        pr.append(("H2: guessing notebook minus no memory is at least +15 points for at least one model", show(lambda m: f"{dd(m, 'h_nb', 's_none') * 100:+.1f}"),
+                   sch([(m, "h_nb", "s_none") for m in (H, Lu)], lambda: "met" if any(at_least(dd(m, "h_nb", "s_none"), 0.15) for m in (H, Lu)) else "MISSED")))
+        pr.append(("H3: at least 5 of 10 final guessing notebooks have a damage-and-grip sentence, for at least one model", "; ".join(f"{nm} {link.get(m, (0, 0))[0]} of {link.get(m, (0, 0))[1]}" for nm, m in MODELS),
+                   sch([(m, "h_nb", "s_none") for m in (H, Lu)], lambda: "met" if any(link.get(m, (0, 0))[0] >= 5 for m in (H, Lu)) else "MISSED")))
+        pr.append(("H4: guessing notebook solves at most 90% of the layouts for both models", show(lambda m: f"{rate(m) * 100:.0f}%"),
+                   sch([(m, "h_nb", "s_none") for m in (H, Lu)], lambda: who_missed([(nm, at_most(rate(m), 0.90)) for nm, m in MODELS]))))
+        bad_files = bad_cov(hcov, {HYP_HASH}, 40, 49)
+        pr = void_if(bad_files, pr)
+        st = [x[2] for x in pr]
+        if finalh and not bad_files and all(x.startswith(("met", "MISSED")) for x in st):
+            reading = "Registered reading of the outcome: " + reading_hyp(st)
+        else:
+            reading = "Registered reading: scored when the cell has finished."
+        L[pred_at_6o:pred_at_6o] = ["**Predictions of PROTOCOL.md v1.17, scored by the generator first** (pending until every pair exists; below 8 of 10 pairs inconclusive once the cell has finished). Written after v1.16, so not blind to the facts-only result.", "",
+                                    table(["prediction", "result", "status"], pr), "", reading, "",
+                                    f"Validation of the included files: {len(hcov)} run files, every one with code hash `{HYP_HASH}` and a run seed from 40 to 49: {'yes' if not bad_files else 'NO (' + str(len(bad_files)) + ' files)'}.", ""]
 
     # --- 6l: solved within k calls, every arm (descriptive; round 5g)
     wk_src = {"none": [r for r in rep_rows if r["condition"] == "none"], "notebook": [r for r in rep_rows if r["condition"] == "notebook"],
