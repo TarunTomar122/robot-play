@@ -183,6 +183,37 @@ def at_most(x, t):
     return x <= t + EPS
 
 
+def two_sided_chart(rows_e, rows_s, out):
+    """Held-out success per arm on the two-sided job: announced damage (section 6m) next to silent damage (section 6n), Haiku and Luna side by side (conditions e_* and s_*)."""
+    arms = [("none", "no memory"), ("lm_names", "names\nlist"), ("lm_firm", "firm for\nevery cube"), ("lm_proc", "answer key\n(procedure)"), ("nb12", "own notebook\n(12 episodes)")]
+    models = [("claude-haiku-5-5", "Haiku 5.5", "#2a78d6"), ("gpt-6-luna", "GPT-6 Luna", "#eb6834")]
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.0), sharey=True, facecolor=SURFACE)
+    for ax, rows, pre, title in ((axes[0], rows_e, "e_", "The refusal is announced (squeeze-limit message)"), (axes[1], rows_s, "s_", "The damage is silent (only the final verdict shows it)")):
+        ax.set_facecolor(SURFACE)
+        for k, (m, nm, col) in enumerate(models):
+            vals = []
+            for c, _ in arms:
+                x = A.select(rows, model=m, condition=pre + c, phase="eval", quirk=True)
+                vals.append(100 * sum(r["success"] for r in x) / len(x) if x else 0.0)
+            xs = [i + (k - 0.5) * 0.38 for i in range(len(arms))]
+            ax.bar(xs, vals, width=0.34, color=col, label=nm, zorder=3)
+        ax.set_xticks(range(len(arms)))
+        ax.set_xticklabels([a_[1] for a_ in arms], fontsize=9, color=INK2)
+        ax.set_title(title, loc="left", fontsize=11, color=INK)
+        ax.set_ylim(0, 105)
+        ax.set_yticks([0, 25, 50, 75, 100])
+        ax.grid(axis="y", color=GRID, lw=0.8, zorder=0)
+        for sp in ("top", "right", "left"):
+            ax.spines[sp].set_visible(False)
+        ax.tick_params(length=0)
+    axes[0].set_ylabel("held-out layouts solved (%)")
+    h_, l_ = axes[0].get_legend_handles_labels()
+    fig.legend(h_, l_, frameon=False, fontsize=10, loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.06))
+    fig.suptitle("Two odd cubes: one needs a firm grip, the other breaks under one (10 runs of 4 layouts per bar)", x=0.01, ha="left", fontsize=13, fontweight="bold", color=INK)
+    fig.tight_layout()
+    fig.savefig(out, dpi=140, bbox_inches="tight", facecolor=SURFACE)
+
+
 def learning_chart(rows, models, out):
     fig, axes = plt.subplots(len(models), 3, figsize=(13, 3.6 * len(models)), sharey=True, facecolor=SURFACE, squeeze=False)
     for i, m in enumerate(models):
@@ -1434,6 +1465,9 @@ def main():
                     cr = sum(1 for r in x if r["cracked"] > 0)
                     srows.append((m, SN[c], len(x), f"{len(suc)} ({len(suc) / len(x) * 100:.0f}%)", f"{np.mean([r['calls'] for r in suc]):.1f}" if suc else "-", f"{cr} ({cr / len(x) * 100:.0f}%)",
                                   f"{sum(1 for r in x if r['silent_pick'] > 0)} ({sum(1 for r in x if r['silent_pick'] > 0) / len(x) * 100:.0f}%)"))
+        Path(a.img).mkdir(parents=True, exist_ok=True)
+        two_sided_chart(rows_e, rows_s, Path(a.img) / "two_sided.png")
+        L += ["![the two-sided job: announced against silent damage](docs/img/two_sided.png)", ""]
         L += ["Columns: held-out episodes; solved; calls used by the solved episodes; episodes in which the final verdict names a cracked cube; episodes with at least one silent failed pick (the heavy cube slipping out).", "",
               table(["model", "what the model has", "episodes", "solved", "calls of the solved", "verdict names a cracked cube", "with a silent failed pick"], srows), ""]
         cmp_s, vs = [], {}
