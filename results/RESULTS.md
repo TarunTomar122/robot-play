@@ -101,7 +101,7 @@ Runs with practice or a borrowed notebook that did not finish their whole plan a
 
 Planned cells that did not start (exploratory cells included; the borrowed cells are planned only where the Fable notebook they read finished): none (every planned run file exists).
 
-Spend meter (pessimistic pricing): {"anthropic": {"spent": 79.425392, "reserved": 0.0, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 28.797511, "reserved": 0.0, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 0. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
+Spend meter (pessimistic pricing): {"anthropic": {"spent": 81.015649, "reserved": 0.0, "cap": 90.0, "overrun_usd": 0.0, "overrun_calls": 0}, "openai": {"spent": 30.565093, "reserved": 0.0, "cap": 45.0, "overrun_usd": 0.0, "overrun_calls": 0}}. Ledger reconciles with the running totals: True. Open reservations: 0. Dollars of abandoned attempts kept in the run files (already inside the meter totals): $0.00.
 
 ## 2. Q1: does experience raise held-out success?
 
@@ -1035,9 +1035,164 @@ Paired differences (run seed, per model and job):
 | gpt-6-luna | flasks | own notebook, 12 practice episodes against no memory | 10 | 100% | 38% | +62.5 pp (95% CI +47.1 to +77.9) |
 | gpt-6-luna | flasks | own notebook, 12 practice episodes against own notebook, 1 practice episode | 10 | 100% | 92% | +7.5 pp (95% CI -4.6 to +20.0) |
 
+## 6m. Exploratory: a job where no single setting works (the `mixed` job)
+
+Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.15, branch `two-sided`, tag `code-mixed`). The job is `stack` with two odd cubes: in every layout one of `cube_green` and `cube_blue` is heavy and slippery (it needs `grip_level firm`) and the other is fragile (a firm grip makes the hand let go with a squeeze-limit message); which is which is drawn from the layout seed and never shown. The scripted gate (`results/gate_mixed.md`, 100 layouts, no model): every fixed pick setting solves 0 or 1 of 100 catch layouts and all 100 control layouts; a player that reads each result and switches grips solves 96 of 100. Haiku 5.5 and Luna, run seeds 40 to 49, four held-out episodes per run, 20 calls. Run files started 140, complete 140 (planned 140). Unadjusted 95% intervals by the project's interval rule, paired by run seed, no multiplicity correction, never pooled with registered rows.
+
+**Predictions of PROTOCOL.md v1.15, scored by the generator first** (pending until every pair exists; below 8 of 10 pairs inconclusive once the cell has finished). Written after the scripted gate and after v1.12 to v1.14, so not blind to the earlier findings. If M2 is missed for a model there is no room for it: M3 to M5 are then reported but not read for that model.
+
+| prediction | result | status |
+|---|---|---|
+| M1: `lm_firm` solves at most 25% of the catch layouts for Haiku and Luna | Haiku 72% / Luna 85% | MISSED (Haiku and Luna) |
+| M2: `none` solves less than 60% of the catch layouts for Haiku and Luna (room check) | Haiku 50% / Luna 100% | MISSED (Luna) |
+| M3: `lm_proc` minus `none` is at least +20 points for Haiku and Luna | Haiku +50.0 / Luna +0.0 | MISSED (Luna) |
+| M4: own notebook (12) minus `none` is at least +15 points for at least one model, and the notebook is not above `lm_proc` for either | Haiku vs none +32.5, vs lm_proc -17.5 / Luna vs none -10.0, vs lm_proc -10.0 | met |
+| M5: in the control scene `lm_proc` solves at least 80% for both models and is within 10 points of `none` | Haiku 100% (difference +0.0) / Luna 100% (difference +0.0) | met |
+| M6: `lm_names` is not above `lm_proc` for either model | Haiku -10.0 / Luna -7.5 | met |
+
+Registered reading of the outcome: M1 missed for Haiku and Luna: a wrong constant rule did not stop the model: it recovers by reading the error message; M2 missed for Luna: no room, the model solves the job with no memory (its M3 and M6 results are reported but not read).
+
+Validation of the included files: 140 run files, every one with code hash `6119571baae3816f` and a run seed from 40 to 49: yes.
+
+Columns: held-out episodes; solved (the simulator's verdict); calls used by the solved episodes; episodes with at least one squeeze-limit refusal (the hand pressed too hard on the fragile cube); episodes with at least one failed pick with no error text (a cube slipped out of the grip with no error message).
+
+| model | scene | what the model has | episodes | solved | calls of the solved | with a squeeze refusal | with a failed pick and no error |
+|---|---|---|---|---|---|---|---|
+| claude-haiku-5-5 | catch (one heavy, one fragile) | no memory | 40 | 20 (50%) | 15.2 | 7 (18%) | 40 (100%) |
+| claude-haiku-5-5 | catch (one heavy, one fragile) | the frame and the four names | 40 | 36 (90%) | 11.2 | 15 (38%) | 40 (100%) |
+| claude-haiku-5-5 | catch (one heavy, one fragile) | constant rule: firm for every cube | 40 | 29 (72%) | 11.2 | 40 (100%) | 24 (60%) |
+| claude-haiku-5-5 | catch (one heavy, one fragile) | answer key: try, read, switch | 40 | 40 (100%) | 7.3 | 0 (0%) | 40 (100%) |
+| claude-haiku-5-5 | catch (one heavy, one fragile) | own notebook, 12 practice episodes | 40 | 33 (82%) | 11.6 | 19 (48%) | 26 (65%) |
+| claude-haiku-5-5 | control (two ordinary cubes) | no memory | 40 | 40 (100%) | 6.0 | 0 (0%) | 0 (0%) |
+| claude-haiku-5-5 | control (two ordinary cubes) | answer key: try, read, switch | 40 | 40 (100%) | 6.3 | 0 (0%) | 0 (0%) |
+| gpt-6-luna | catch (one heavy, one fragile) | no memory | 40 | 40 (100%) | 8.1 | 16 (40%) | 40 (100%) |
+| gpt-6-luna | catch (one heavy, one fragile) | the frame and the four names | 40 | 37 (92%) | 9.1 | 25 (62%) | 36 (90%) |
+| gpt-6-luna | catch (one heavy, one fragile) | constant rule: firm for every cube | 40 | 34 (85%) | 11.8 | 40 (100%) | 6 (15%) |
+| gpt-6-luna | catch (one heavy, one fragile) | answer key: try, read, switch | 40 | 40 (100%) | 7.2 | 0 (0%) | 40 (100%) |
+| gpt-6-luna | catch (one heavy, one fragile) | own notebook, 12 practice episodes | 40 | 36 (90%) | 8.9 | 19 (48%) | 26 (65%) |
+| gpt-6-luna | control (two ordinary cubes) | no memory | 40 | 40 (100%) | 6.2 | 0 (0%) | 0 (0%) |
+| gpt-6-luna | control (two ordinary cubes) | answer key: try, read, switch | 40 | 40 (100%) | 6.2 | 0 (0%) | 0 (0%) |
+
+Paired differences (run seed, per model):
+
+| model | scene | comparison | pairs | first | second | difference |
+|---|---|---|---|---|---|---|
+| claude-haiku-5-5 | catch | constant rule: firm for every cube against no memory | 10 | 72% | 50% | +22.5 pp (95% CI +2.1 to +42.9) |
+| claude-haiku-5-5 | catch | the frame and the four names against no memory | 10 | 90% | 50% | +40.0 pp (95% CI +22.0 to +58.0) |
+| claude-haiku-5-5 | catch | answer key: try, read, switch against no memory | 10 | 100% | 50% | +50.0 pp (95% CI +34.2 to +65.8) |
+| claude-haiku-5-5 | catch | own notebook, 12 practice episodes against no memory | 10 | 82% | 50% | +32.5 pp (95% CI +11.8 to +53.2) |
+| claude-haiku-5-5 | catch | own notebook, 12 practice episodes against answer key: try, read, switch | 10 | 82% | 100% | -17.5 pp (95% CI -32.2 to -2.8) |
+| claude-haiku-5-5 | catch | the frame and the four names against answer key: try, read, switch | 10 | 90% | 100% | -10.0 pp (95% CI -20.8 to +0.8) |
+| claude-haiku-5-5 | control | answer key: try, read, switch against no memory | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| gpt-6-luna | catch | constant rule: firm for every cube against no memory | 10 | 85% | 100% | -15.0 pp (95% CI -27.2 to -2.8) |
+| gpt-6-luna | catch | the frame and the four names against no memory | 10 | 92% | 100% | -7.5 pp (95% CI -17.5 to +2.5) |
+| gpt-6-luna | catch | answer key: try, read, switch against no memory | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| gpt-6-luna | catch | own notebook, 12 practice episodes against no memory | 10 | 90% | 100% | -10.0 pp (95% CI -27.3 to +7.3) |
+| gpt-6-luna | catch | own notebook, 12 practice episodes against answer key: try, read, switch | 10 | 90% | 100% | -10.0 pp (95% CI -27.3 to +7.3) |
+| gpt-6-luna | catch | the frame and the four names against answer key: try, read, switch | 10 | 92% | 100% | -7.5 pp (95% CI -17.5 to +2.5) |
+| gpt-6-luna | control | answer key: try, read, switch against no memory | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+
+## 6n. Exploratory: the two-sided job with no error message (`mixed_silent`)
+
+Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.16, branch `silent-crush`, tag `code-silent`). The same layouts and the same two odd cubes as section 6m, but a firm grip on the fragile cube is accepted without a word: the pick and the place answer like a sound pick, `observe` reports nothing unusual, and only the final verdict fails and names the cracked cube. The scripted gate (`results/gate_mixed_silent.md`, 50 layouts, no model): every fixed setting 0 of 50, an oracle 50, a try-then-switch player 49, a player that keeps a fix once it worked 21 of 50. Haiku 5.5 and Luna, run seeds 40 to 49 (the layouts of section 6m, so the comparison with it is paired), four held-out episodes per run, 20 calls. Run files started 100, complete 100 (planned 100). Unadjusted 95% intervals by the project's interval rule, paired by run seed, no multiplicity correction, never pooled with registered rows or with section 6m.
+
+**Predictions of PROTOCOL.md v1.16, scored by the generator first** (pending until every pair exists; below 8 of 10 pairs inconclusive once the cell has finished). Written after the scripted gate and after an informal first look at half of the section 6m episodes, so not blind to the explicit-message finding. If S3 is missed for a model there is no room for it: S4 to S6 are then reported but not read for that model.
+
+| prediction | result | status |
+|---|---|---|
+| S1: `lm_firm` solves at most 10% of the layouts for Haiku and Luna | Haiku 0% / Luna 0% | met |
+| S2: `lm_firm` here minus `lm_firm` in section 6m (same layouts) is at most -30 points for Haiku and Luna | Haiku -72.5 / Luna -85.0 | met |
+| S3: `none` solves less than 80% of the layouts for Haiku and Luna (room check) | Haiku 35% / Luna 57% | met |
+| S4: `lm_proc` minus `none` is at least +15 points for Haiku and Luna | Haiku +65.0 / Luna +42.5 | met |
+| S5: own notebook (12) minus `none` is at least +15 points for at least one model, and the notebook is not above `lm_proc` for either | Haiku vs none -7.5, vs lm_proc -72.5 / Luna vs none -22.5, vs lm_proc -65.0 | MISSED (no model gains 15 points) |
+| S6: `lm_names` is not above `lm_proc` for either model | Haiku -55.0 / Luna -55.0 | met |
+
+Registered reading of the outcome: S5 missed (no model gains 15 points): practice does not turn the final verdict alone into a rule at this dose, or the notebook beat the answer key (then the upper-bound reading is void).
+
+Validation of the included files: 100 run files, every one with code hash `f2f91f6508ec38c7` and a run seed from 40 to 49: yes.
+
+![the two-sided job: with an error message against without one](docs/img/two_sided.png)
+
+Columns: held-out episodes; solved; calls used by the solved episodes; episodes in which the final verdict names a cracked cube; episodes with at least one failed pick with no error text (the heavy cube slipping out).
+
+| model | what the model has | episodes | solved | calls of the solved | verdict names a cracked cube | with a failed pick and no error |
+|---|---|---|---|---|---|---|
+| claude-haiku-5-5 | no memory | 40 | 14 (35%) | 16.2 | 6 (15%) | 40 (100%) |
+| claude-haiku-5-5 | the frame and the four names | 40 | 18 (45%) | 13.0 | 15 (38%) | 40 (100%) |
+| claude-haiku-5-5 | constant rule: firm for every cube | 40 | 0 (0%) | - | 40 (100%) | 0 (0%) |
+| claude-haiku-5-5 | answer key: try, switch, no message | 40 | 40 (100%) | 7.2 | 0 (0%) | 40 (100%) |
+| claude-haiku-5-5 | own notebook, 12 practice episodes | 40 | 11 (28%) | 8.5 | 27 (68%) | 6 (15%) |
+| gpt-6-luna | no memory | 40 | 23 (57%) | 8.6 | 16 (40%) | 40 (100%) |
+| gpt-6-luna | the frame and the four names | 40 | 18 (45%) | 8.3 | 22 (55%) | 28 (70%) |
+| gpt-6-luna | constant rule: firm for every cube | 40 | 0 (0%) | - | 40 (100%) | 0 (0%) |
+| gpt-6-luna | answer key: try, switch, no message | 40 | 40 (100%) | 7.2 | 0 (0%) | 40 (100%) |
+| gpt-6-luna | own notebook, 12 practice episodes | 40 | 14 (35%) | 7.3 | 26 (65%) | 17 (42%) |
+
+Paired differences (run seed, per model; `explicit` is the same arm in section 6m on the same layouts):
+
+| model | comparison | pairs | first | second | difference |
+|---|---|---|---|---|---|
+| claude-haiku-5-5 | constant rule: firm for every cube (no error message) against no memory (no error message) | 10 | 0% | 35% | -35.0 pp (95% CI -50.2 to -19.8) |
+| claude-haiku-5-5 | the frame and the four names (no error message) against no memory (no error message) | 10 | 45% | 35% | +10.0 pp (95% CI -10.9 to +30.9) |
+| claude-haiku-5-5 | answer key: try, switch, no message (no error message) against no memory (no error message) | 10 | 100% | 35% | +65.0 pp (95% CI +49.8 to +80.2) |
+| claude-haiku-5-5 | own notebook, 12 practice episodes (no error message) against no memory (no error message) | 10 | 28% | 35% | -7.5 pp (95% CI -38.0 to +23.0) |
+| claude-haiku-5-5 | own notebook, 12 practice episodes (no error message) against answer key: try, switch, no message (no error message) | 10 | 28% | 100% | -72.5 pp (95% CI -97.0 to -48.0) |
+| claude-haiku-5-5 | the frame and the four names (no error message) against answer key: try, switch, no message (no error message) | 10 | 45% | 100% | -55.0 pp (95% CI -73.5 to -36.5) |
+| claude-haiku-5-5 | constant rule: firm for every cube (no error message) against constant rule: firm for every cube (error message) | 10 | 0% | 72% | -72.5 pp (95% CI -86.9 to -58.1) |
+| claude-haiku-5-5 | no memory (no error message) against no memory (error message) | 10 | 35% | 50% | -15.0 pp (95% CI -37.6 to +7.6) |
+| claude-haiku-5-5 | answer key: try, switch, no message (no error message) against answer key: try, switch, no message (error message) | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| claude-haiku-5-5 | own notebook, 12 practice episodes (no error message) against own notebook, 12 practice episodes (error message) | 10 | 28% | 82% | -55.0 pp (95% CI -86.3 to -23.7) |
+| gpt-6-luna | constant rule: firm for every cube (no error message) against no memory (no error message) | 10 | 0% | 57% | -57.5 pp (95% CI -73.2 to -41.8) |
+| gpt-6-luna | the frame and the four names (no error message) against no memory (no error message) | 10 | 45% | 57% | -12.5 pp (95% CI -33.7 to +8.7) |
+| gpt-6-luna | answer key: try, switch, no message (no error message) against no memory (no error message) | 10 | 100% | 57% | +42.5 pp (95% CI +26.8 to +58.2) |
+| gpt-6-luna | own notebook, 12 practice episodes (no error message) against no memory (no error message) | 10 | 35% | 57% | -22.5 pp (95% CI -57.7 to +12.7) |
+| gpt-6-luna | own notebook, 12 practice episodes (no error message) against answer key: try, switch, no message (no error message) | 10 | 35% | 100% | -65.0 pp (95% CI -93.2 to -36.8) |
+| gpt-6-luna | the frame and the four names (no error message) against answer key: try, switch, no message (no error message) | 10 | 45% | 100% | -55.0 pp (95% CI -70.7 to -39.3) |
+| gpt-6-luna | constant rule: firm for every cube (no error message) against constant rule: firm for every cube (error message) | 10 | 0% | 85% | -85.0 pp (95% CI -97.2 to -72.8) |
+| gpt-6-luna | no memory (no error message) against no memory (error message) | 10 | 57% | 100% | -42.5 pp (95% CI -58.2 to -26.8) |
+| gpt-6-luna | answer key: try, switch, no message (no error message) against answer key: try, switch, no message (error message) | 10 | 100% | 100% | +0.0 pp (95% CI -6.5 to +6.5) |
+| gpt-6-luna | own notebook, 12 practice episodes (no error message) against own notebook, 12 practice episodes (error message) | 10 | 35% | 90% | -55.0 pp (95% CI -81.4 to -28.6) |
+
+## 6o. Exploratory: may the notebook writer guess? (`notebook_hyp` on the job with no error message)
+
+Registered before any episode ran, and pushed to GitHub before the first one started (PROTOCOL.md v1.17, tag `code-hyp`). Section 6n found that the model's own notebook after 12 practice episodes did not learn the rule when the tool returned no error message. Every notebook arm so far has a writer that is told "you never invent facts", which also keeps it from proposing a cause. Here only the writer changes: it records results as facts and may add clearly marked guesses with a test for each. Same practice seeds, same held-out layouts and same cap as the facts-only arm of section 6n, Haiku 5.5 and Luna, run seeds 40 to 49. Run files started 20, complete 20 (planned 20). Unadjusted 95% intervals by the project's interval rule, paired by run seed, no multiplicity correction.
+
+**Predictions of PROTOCOL.md v1.17, scored by the generator first** (pending until every pair exists; below 8 of 10 pairs inconclusive once the cell has finished). Written after v1.16, so not blind to the facts-only result.
+
+| prediction | result | status |
+|---|---|---|
+| H1: guessing notebook minus facts-only notebook is at least +20 points for at least one model | Haiku -2.5 / Luna +0.0 | MISSED |
+| H2: guessing notebook minus no memory is at least +15 points for at least one model | Haiku -10.0 / Luna -22.5 | MISSED |
+| H3: at least 5 of 10 final guessing notebooks have a damage-and-grip sentence, for at least one model | Haiku 4 of 10; Luna 6 of 10 | met |
+| H4: guessing notebook solves at most 90% of the layouts for both models | Haiku 25% / Luna 35% | met |
+
+Registered reading of the outcome: H1 missed and H3 met: the models write the guess and it does not help (untested or wrong guesses).
+
+Validation of the included files: 20 run files, every one with code hash `30176d67142362d9` and a run seed from 40 to 49: yes.
+
+| model | what the model has | episodes | solved | verdict names a cracked cube |
+|---|---|---|---|---|
+| claude-haiku-5-5 | no memory (section 6n) | 40 | 14 (35%) | 6 (15%) |
+| claude-haiku-5-5 | own notebook, facts only (section 6n) | 40 | 11 (28%) | 27 (68%) |
+| claude-haiku-5-5 | own notebook, writer may guess | 40 | 10 (25%) | 22 (55%) |
+| gpt-6-luna | no memory (section 6n) | 40 | 23 (57%) | 16 (40%) |
+| gpt-6-luna | own notebook, facts only (section 6n) | 40 | 14 (35%) | 26 (65%) |
+| gpt-6-luna | own notebook, writer may guess | 40 | 14 (35%) | 26 (65%) |
+
+Paired differences (run seed, per model, same layouts):
+
+| model | comparison | pairs | first | second | difference |
+|---|---|---|---|---|---|
+| claude-haiku-5-5 | own notebook, writer may guess against own notebook, facts only (section 6n) | 10 | 25% | 28% | -2.5 pp (95% CI -45.9 to +40.9) |
+| claude-haiku-5-5 | own notebook, writer may guess against no memory (section 6n) | 10 | 25% | 35% | -10.0 pp (95% CI -42.9 to +22.9) |
+| gpt-6-luna | own notebook, writer may guess against own notebook, facts only (section 6n) | 10 | 35% | 35% | +0.0 pp (95% CI -42.2 to +42.2) |
+| gpt-6-luna | own notebook, writer may guess against no memory (section 6n) | 10 | 35% | 57% | -22.5 pp (95% CI -52.2 to +7.2) |
+
+Final guessing notebooks with a sentence that mentions both damage and the grip (text search, not a coding): claude-haiku-5-5: 4 of 10; gpt-6-luna: 6 of 10.
+
 ## 6l. Exploratory: solved within k calls, every arm of the replication (run seeds 20 to 29)
 
-Descriptive and **not registered**: it was added after round 5g of the review showed that the 20-call success rate hides differences in efficiency. An episode counts as solved within k calls when it succeeded and its logged call count (including `observe`) is at most k; the model was told 20 calls, not k, so this scores the same episodes against a tighter budget than the model saw. An episode that never calls `done` uses the whole 20-call budget, so for k below 20 "solved within k" also implies that `done` was called. Section 6k (when present) repeats the question with the budget stated to the model. Held-out episodes only, 40 per cell (10 runs of 4 layouts, the same layouts in every arm of a model and job).
+Descriptive and **not registered**: it was added after round 5g of the review found that the 20-call success rate hides differences in efficiency. An episode counts as solved within k calls when it succeeded and its logged call count (including `observe`) is at most k; the model was told 20 calls, not k, so this scores the same episodes against a tighter budget than the model saw. An episode that never calls `done` uses the whole 20-call budget, so for k below 20 "solved within k" also implies that `done` was called. Section 6k (when present) repeats the question with the budget stated to the model. Held-out episodes only, 40 per cell (10 runs of 4 layouts, the same layouts in every arm of a model and job).
 
 | model | job | what the model has | episodes | within 8 calls | within 10 | within 12 | within 20 (the success rate) |
 |---|---|---|---|---|---|---|---|
