@@ -329,6 +329,10 @@ def build_specs(cell: str, models: list[str], run_seeds: list[int], out_dir: str
                 for c in ("lm_names", "lm_firm", "lm_proc"):
                     specs.append(RunSpec(m, "mixed_silent", c, s, True, practice=0, borrowed_notebook=SILENT_TEXTS[c], **common))
                 specs.append(RunSpec(m, "mixed_silent", "notebook", s, True, practice=12, **common))
+    elif cell == "hyp":                         # exploratory (v1.17): the silent job again, the notebook writer may now write marked guesses; Haiku and Luna, run seeds 40 to 49
+        for m in models:
+            for s in run_seeds:
+                specs.append(RunSpec(m, "mixed_silent", "notebook_hyp", s, True, practice=12, **common))
     elif cell == "dose":                        # exploratory (v1.12): the model's own notebook after 1, 3, 6 (and, on run seeds 30 to 39, 12) practice episodes, held-out layouts of the usual four per run seed
         for m in models:
             for t in tasks:

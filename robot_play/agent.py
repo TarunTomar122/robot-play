@@ -83,7 +83,7 @@ class Memory:
     replay: str = ""
 
     def prompt_block(self) -> str:
-        if self.condition == "notebook" and self.notebook:
+        if self.condition in ("notebook", "notebook_hyp") and self.notebook:
             return ("\n\nYOUR NOTEBOOK, written by you after earlier attempts at this same task (object positions change between attempts, "
                     "and the notes may be incomplete or wrong):\n" + self.notebook)
         if self.condition in ("borrowed", "borrowed_1", "borrowed_3") and self.notebook:        # a frozen notebook written by a stronger model on the same task (exploratory cell, PROTOCOL.md section 10, v1.4)
@@ -118,6 +118,23 @@ def notebook_request(instruction: str, notebook: str, verdict: str, calls: int, 
             "Object positions change at every attempt and the transcript is shortened, so do not record positions or coordinates. Rewrite the notebook now. "
             "Replace it, do not append. Keep it under 300 words. Say which settings or approaches worked or failed and what in the results showed that, "
             "and note anything that wasted calls. Output only the notebook text.")
+
+
+# v1.17: the same notebook, but the writer may guess. The fact-only writer above is told "you never invent facts", which also keeps it from proposing a cause for a failure the results do not
+# explain (v1.16). Here it records facts as facts and may add clearly marked guesses and a test for each.
+HYP_SYSTEM = ("You keep a short notebook for an agent that controls a simulated robot arm through tools. After each attempt at the task you rewrite "
+              "the whole notebook so the next attempt goes better. Record what the tool results and the simulator's verdict showed as facts. Where they do not explain a failure, "
+              "you may also write your best guess about its cause, clearly marked GUESS, and what the agent should try next to test it. A guess is a hypothesis to test, not a fact.")
+
+
+def notebook_request_hyp(instruction: str, notebook: str, verdict: str, calls: int, max_calls: int, transcript: str) -> str:
+    return (f"TASK: {instruction}\n\nCURRENT NOTEBOOK:\n{notebook or '(empty)'}\n\n"
+            f"The attempt that just ended used {calls} of {max_calls} tool calls. The simulator's verdict: {verdict}\n\n"
+            f"WHAT THE AGENT DID (tool, arguments, what came back):\n{transcript}\n\n"
+            "Object positions change at every attempt and the transcript is shortened, so do not record positions or coordinates. Rewrite the notebook now. "
+            "Replace it, do not append. Keep it under 300 words. Say which settings or approaches worked or failed and what in the results showed that, compare this attempt "
+            "with the earlier ones in the notebook, and note anything that wasted calls. If a failure is not explained by the tool results, write your best guess about the cause "
+            "marked GUESS and a way to test it in the next attempt. Output only the notebook text.")
 
 
 PRIOR_SYSTEM = ("You write a short notebook for an agent that will control a simulated robot arm through tools. The agent has not attempted the task yet. "
@@ -214,10 +231,11 @@ def update_memory(provider, memory: Memory, rec: EpisodeRecord, task: str, instr
     """Called after each *practice* episode only. Evaluation episodes never change the memory.
     Returns False if the notebook rewrite failed or was cut off. The caller then stops and redoes the episode, so a run never carries on with a stale notebook
     that is silently one episode behind."""
-    if memory.condition == "notebook":
+    if memory.condition in ("notebook", "notebook_hyp"):
         transcript = render_transcript(rec.log, 6000)
         paid0, retry0 = provider.tally.usd, provider.tally.retry_usd
-        text, u = provider.complete(NOTEBOOK_SYSTEM, notebook_request(instruction, memory.notebook, verdict_text(rec.result), rec.result["calls"], max_calls, transcript))
+        system, request = (HYP_SYSTEM, notebook_request_hyp) if memory.condition == "notebook_hyp" else (NOTEBOOK_SYSTEM, notebook_request)
+        text, u = provider.complete(system, request(instruction, memory.notebook, verdict_text(rec.result), rec.result["calls"], max_calls, transcript))
         rec.mem_usage = add_usage(rec.mem_usage, u)
         rec.cost_usd += provider.tally.usd - paid0         # the notebook rewrite is part of the episode's cost, retries included
         rec.retry_usd += provider.tally.retry_usd - retry0
