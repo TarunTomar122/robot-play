@@ -1,6 +1,6 @@
 # Which code produced which numbers
 
-Every run file records the hash of the code it ran under (the `robot_play/*.py` files except `analysis.py` and `render.py`, `uv.lock` and the Panda model files). The hash was computed again for each git ref below by exporting that ref and calling `robot_play.runner.code_hash()`; each of the first six matches the hash in the run files of its folders (the generated tables in [RESULTS.md](RESULTS.md) section 1 list the hashes per folder).
+Every run file records the hash of the code it ran under (the `robot_play/*.py` files except `analysis.py` and `render.py`, `uv.lock` and the Panda model files). The hash was computed again for each git ref below by exporting that ref and calling `robot_play.runner.code_hash()`; each of the first six and the hint row match the hash in the run files of its folders (the generated tables in [RESULTS.md](RESULTS.md) section 1 list the hashes per folder).
 
 | run folder | what it is | git ref (tag) | commit | code hash |
 |---|---|---|---|---|
@@ -11,5 +11,7 @@ Every run file records the hash of the code it ran under (the `robot_play/*.py` 
 | `runs/main_fixhold` | Haiku on `stack`, false-`holding` sentence fixed only | `code-fixhold` | 9d402a7 | `c694b1a45aaf30c5` |
 | `runs/main_fixcollide` | Haiku on `stack`, cause fixed too | `code-fixcollide` | 8b7afe3 | `aef351c5c3033d54` |
 | `runs/rep_fixed`, gates on the corrected code | the Q1 replication on fresh layouts | `code-fixed` | 2267bf8 | `8fdcf6b2491b68a3` |
+| `runs/hint`, `runs/hint_generic`, `runs/prior` | one-sentence hint, generic hint and zero-practice Fable notebook, run seeds 20 to 29 | `code-hint-prior` | d06b0fc | `088c639d7139a3af` |
+| merged `main` (the code to run for anything new) | all five branches merged | `main` after the merge (its `robot_play/` equals `code-hint-prior` except `analysis.py`, which the hash ignores) | see `git log` | `088c639d7139a3af` |
 
-The registered results (main, control, frontier) come from `matrix-launch` and were produced on the simulator with the defect described in `results/deviations.md` deviation 4. The branch tips were merged into `main` after the matrix finished (the merge changes no registered run file). Differences between hashes are intended: each exploratory cell was added while the matrix was running, from a separate checkout, so the matrix code stayed untouched (PROTOCOL.md v1.4 to v1.6).
+The registered results (main, control, frontier) come from `matrix-launch` and were produced on the simulator with the defect described in `results/deviations.md` deviation 4. The branch tips were merged into `main` after the matrix finished (the merge changes no registered run file). To reproduce the registered numbers, check out `matrix-launch`; to reproduce the corrected-simulator numbers, check out `code-fixed` (replication, gates) or `code-hint-prior` (hint cells); `main` is the corrected simulator plus every exploratory switch. Differences between hashes are intended: each exploratory cell was added while the matrix was running, from a separate checkout, so the matrix code stayed untouched (PROTOCOL.md v1.4 to v1.6).
